@@ -408,6 +408,14 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                       <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewingItem(item)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>View Details</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
