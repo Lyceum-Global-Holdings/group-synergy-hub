@@ -42,10 +42,13 @@ export interface UseBulkItemMasterReturn {
   seedFromNames: (names: string[]) => void;
   autoClassifyAll: () => void;
   resetCode: (rowId: string) => void;
-  submit: () => Promise<{ ok: number; failed: number }>;
+  submit: () => Promise<{ created: number; updated: number; skipped: number; failed: number }>;
   isSubmitting: boolean;
   validCount: number;
   invalidCount: number;
+  skippedCount: number;
+  duplicatePolicy: DuplicatePolicy;
+  setDuplicatePolicy: (p: DuplicatePolicy) => void;
   categories: ReturnType<typeof useItemCategories>['categories'];
   units: ReturnType<typeof useItemUnits>['units'];
 }
