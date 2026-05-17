@@ -31,8 +31,7 @@ export interface InventoryPageRow {
   created_at: string;
   updated_at: string;
   bins: Array<{ id: string; bin_code: string; name: string; quantity: number }>;
-  owner_company_ids: string[] | null;
-  owner_company_names: string[] | null;
+  stock_owners: string[] | null;
 }
 
 interface Params {

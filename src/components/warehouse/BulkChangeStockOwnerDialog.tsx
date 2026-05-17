@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from '@/contexts/CompanyContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
@@ -16,7 +15,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   selectedIds: Set<string>;
   onComplete: () => void;
-  defaultFromCompanyId?: string | null;
+  defaultFromOwner?: string | null;
 }
 
 export function BulkChangeStockOwnerDialog({
@@ -24,21 +23,15 @@ export function BulkChangeStockOwnerDialog({
   onOpenChange,
   selectedIds,
   onComplete,
-  defaultFromCompanyId = null,
+  defaultFromOwner = null,
 }: Props) {
   const qc = useQueryClient();
-  const { companies } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
 
-  const [fromCompany, setFromCompany] = useState<string>(defaultFromCompanyId ?? '');
-  const [toCompany, setToCompany] = useState<string>('');
+  const [fromOwner, setFromOwner] = useState<string>(defaultFromOwner ?? '');
+  const [toOwner, setToOwner] = useState<string>('');
   const [busy, setBusy] = useState(false);
-
-  const toOptions = useMemo(
-    () => companies.filter((c) => c.id !== fromCompany),
-    [companies, fromCompany]
-  );
 
   // Compute selected location + all descendants (sub-locations / departments).
   const { scopeIds, scopeLabel, descendantCount } = useMemo(() => {
@@ -63,19 +56,25 @@ export function BulkChangeStockOwnerDialog({
     return { scopeIds: Array.from(ids), scopeLabel: label, descendantCount: ids.size - 1 };
   }, [globalLocationId, locations]);
 
-  const canSubmit = !!globalLocationId && !!fromCompany && !!toCompany && fromCompany !== toCompany && selectedIds.size > 0;
+  const trimmedTo = toOwner.trim();
+  const trimmedFrom = fromOwner.trim();
+  const canSubmit =
+    !!globalLocationId &&
+    trimmedTo.length > 0 &&
+    trimmedFrom.toLowerCase() !== trimmedTo.toLowerCase() &&
+    selectedIds.size > 0;
 
   const handleSubmit = async () => {
     if (!globalLocationId) {
       toast.error('Select a location in the header first');
       return;
     }
-    if (!fromCompany || !toCompany) {
-      toast.error('Select both source and target Stock Owner');
+    if (!trimmedTo) {
+      toast.error('Enter the new Stock Owner');
       return;
     }
-    if (fromCompany === toCompany) {
-      toast.error('Source and target must differ');
+    if (trimmedFrom.toLowerCase() === trimmedTo.toLowerCase()) {
+      toast.error('Source and target Stock Owner must differ');
       return;
     }
     if (selectedIds.size === 0) {
@@ -86,8 +85,8 @@ export function BulkChangeStockOwnerDialog({
     setBusy(true);
     const { data, error } = await supabase.rpc('bulk_change_stock_owner' as any, {
       _item_ids: Array.from(selectedIds),
-      _from_company: fromCompany,
-      _to_company: toCompany,
+      _from_owner: trimmedFrom || null,
+      _to_owner: trimmedTo,
       _location_ids: scopeIds,
     } as any);
     setBusy(false);
@@ -126,9 +125,9 @@ export function BulkChangeStockOwnerDialog({
         <DialogHeader>
           <DialogTitle>Change Stock Owner — {selectedIds.size} item(s)</DialogTitle>
           <DialogDescription>
-            Reassigns ownership of physical stock (SAP EWM "Stock Owner") between companies within
-            the currently selected location. Bin and location stay the same; quantities are merged
-            if the target owner already holds stock for the same item in the same bin.
+            Reassigns the Stock Owner label on physical stock within the currently selected
+            location. Bin and location stay the same; quantities are merged if the target
+            owner already holds stock for the same item in the same bin.
           </DialogDescription>
         </DialogHeader>
 
@@ -153,32 +152,31 @@ export function BulkChangeStockOwnerDialog({
 
           <div className="space-y-1.5">
             <Label>From (current owner)</Label>
-            <Select value={fromCompany} onValueChange={setFromCompany}>
-              <SelectTrigger><SelectValue placeholder="Select source owner" /></SelectTrigger>
-              <SelectContent>
-                {companies.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              value={fromOwner}
+              onChange={(e) => setFromOwner(e.target.value)}
+              placeholder="Leave blank to match unassigned stock"
+              maxLength={120}
+            />
+            <p className="text-xs text-muted-foreground">
+              Case-sensitive label match. Leave blank to move stock that currently has no owner.
+            </p>
           </div>
 
           <div className="space-y-1.5">
             <Label>To (new owner)</Label>
-            <Select value={toCompany} onValueChange={setToCompany}>
-              <SelectTrigger><SelectValue placeholder="Select target owner" /></SelectTrigger>
-              <SelectContent>
-                {toOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              value={toOwner}
+              onChange={(e) => setToOwner(e.target.value)}
+              placeholder="Type the new Stock Owner"
+              maxLength={120}
+            />
           </div>
 
           <div className="flex gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
-              Only allocations belonging to the source owner inside this location scope are moved.
+              Only allocations matching the source owner inside this location scope are moved.
               This action is restricted to administrators and cannot be undone in bulk.
             </span>
           </div>
