@@ -94,6 +94,8 @@ export function useWarehouseItemsLazyInventory({
           ? { id: row.supplier_id, name: row.supplier_name }
           : null,
         bins: Array.isArray(row.bins) && row.bins.length > 0 ? row.bins : null,
+        owner_company_ids: Array.isArray(row.owner_company_ids) ? row.owner_company_ids : null,
+        owner_company_names: Array.isArray(row.owner_company_names) ? row.owner_company_names : null,
       }));
 
       let nextCursor: Cursor | null = null;
