@@ -97,7 +97,7 @@ export function useWarehouseInventoryPage({
         _limit: pageSize,
       });
       if (error) throw error;
-      return (data ?? []) as InventoryPageRow[];
+      return (data ?? []) as unknown as InventoryPageRow[];
     },
     staleTime: 30_000,
     placeholderData: keepPreviousData,
