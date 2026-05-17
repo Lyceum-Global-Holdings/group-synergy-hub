@@ -26,11 +26,46 @@ import {
   AlertCircle,
   Sparkles,
   RotateCcw,
+  Copy,
+  Download,
 } from 'lucide-react';
 import { useBulkItemMaster } from './useBulkItemMaster';
 import { PasteNamesDialog } from './PasteNamesDialog';
 import type { BulkItemMasterRow } from './types';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+function resolveCode(row: BulkItemMasterRow): string {
+  return (row.item_code?.trim() || row.auto_item_code || '').trim();
+}
+
+function csvEscape(v: string): string {
+  if (/[",\r\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
+}
+
+function buildExportRows(
+  rows: BulkItemMasterRow[],
+  categories: any[],
+  units: any[],
+) {
+  const catMap = new Map(categories.map((c) => [c.id, c.name as string]));
+  const uomMap = new Map(units.map((u) => [u.id, (u.abbreviation as string) || (u.name as string)]));
+  return rows
+    .map((r) => ({
+      code: resolveCode(r),
+      name: r.name?.trim() ?? '',
+      category: r.category_id ? catMap.get(r.category_id) ?? '' : '',
+      uom: r.unit_id ? uomMap.get(r.unit_id) ?? '' : '',
+    }))
+    .filter((r) => r.code);
+}
+
+function timestamp() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
 
 interface Props {
   open: boolean;
@@ -112,6 +147,56 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
               Clear invalid ({invalidCount})
             </Button>
             <Button size="sm" variant="ghost" onClick={resetAll}>Reset</Button>
+            {(() => {
+              const exportRows = buildExportRows(rows, categories, units);
+              const n = exportRows.length;
+              const header = ['Item Code', 'Name', 'Category', 'UoM'];
+              const handleCopy = async () => {
+                const tsv = [header.join('\t'), ...exportRows.map((r) => [r.code, r.name, r.category, r.uom].join('\t'))].join('\n');
+                try {
+                  await navigator.clipboard.writeText(tsv);
+                  toast.success(`Copied ${n} code${n === 1 ? '' : 's'} to clipboard`);
+                } catch {
+                  toast.error('Copy failed');
+                }
+              };
+              const handleDownload = () => {
+                const csv = '\uFEFF' + [header.map(csvEscape).join(','), ...exportRows.map((r) => [r.code, r.name, r.category, r.uom].map(csvEscape).join(','))].join('\r\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `item-codes-${timestamp()}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              };
+              return (
+                <>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="sm" variant="outline" onClick={handleCopy} disabled={n === 0}>
+                          <Copy className="h-4 w-4 mr-1" /> Copy codes
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Copy {n} code{n === 1 ? '' : 's'} as TSV (paste into Excel)</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="sm" variant="outline" onClick={handleDownload} disabled={n === 0}>
+                          <Download className="h-4 w-4 mr-1" /> Download CSV
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download {n} code{n === 1 ? '' : 's'} as CSV</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </>
+              );
+            })()}
             <div className="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="h-4 w-4 text-success" /> {validCount} valid
