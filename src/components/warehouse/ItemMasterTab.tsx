@@ -176,6 +176,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const {
     data: lazyData,
     isLoading,
+    isError,
+    error: lazyError,
+    refetch: refetchInventory,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -574,6 +577,15 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               <TableRow>
               <TableCell colSpan={visibleCount + 1} className="text-center py-8">
                   Loading items...
+                </TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-destructive">
+                  Inventory could not load{lazyError instanceof Error && lazyError.message ? `: ${lazyError.message}` : '.'}{' '}
+                  <Button variant="link" size="sm" className="px-1" onClick={() => refetchInventory()}>
+                    Retry
+                  </Button>
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
