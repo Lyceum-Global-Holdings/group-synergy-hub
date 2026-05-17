@@ -1,37 +1,32 @@
-# Fix: Stock movement history not appearing after adjustments
+# Fix: Search in Inventory doesn't find existing items (e.g. ALA056)
 
 ## Root cause
-`StockAdjustmentDialog.handleSubmit` inserts a `stock_transactions` row without `bin_id` or `location_id`:
+`public.list_warehouse_inventory` applies pagination (`LIMIT 50` ordered by `wi.created_at DESC`) in the `base` CTE **before** the search/category/supplier filters run in `joined`. ALA056 was created in Jan 2026 and is not in the most recent 50 `warehouse_items`, so search returns nothing even though the item exists with stock.
 
-```ts
-createTransaction({
-  item_id, transaction_type, reference_type,
-  quantity_change, quantity_before, quantity_after,
-  unit_cost, total_value, notes,
-  issued_to_location_id,
-});
-```
+Confirmed:
+- `warehouse_item_catalog` has `ALA056` (Cladding sheet Board 4x8).
+- The matching `warehouse_items` row has `created_at = 2026-01-11`.
+- Page-1 keyset cursor only sees the newest 50 rows; search is applied post-pagination.
 
-DB confirms the two most recent adjustments today have `bin_id IS NULL` and `location_id IS NULL`.
+## Fix (DB migration only)
 
-The history dialog reads via `get_bin_scoped_stock_movements`, which is bin/location-scoped. With a `locationId` in scope (Inventory tab always passes one), rows with NULL bin_id AND NULL location_id are filtered out — so the new adjustment never appears in the user's history view.
+Recreate `public.list_warehouse_inventory` so the catalog-driven filters (search, category, supplier) are applied **before** pagination:
 
-## Fix (frontend only, `src/components/warehouse/StockAdjustmentDialog.tsx`)
+1. Join `warehouse_item_catalog cat` inside the `base` CTE (LEFT JOIN to tolerate legacy rows; rows without catalog won't satisfy `_search` and that is correct).
+2. Move these predicates from `joined` into `base`:
+   - `_search ILIKE` over `cat.name`, `cat.item_code`, `cat.brand`, `cat.barcode`, `cat.sku`.
+   - `_category_id` against `cat.category_id`.
+   - `_supplier_id` against `cat.supplier_id`.
+3. `base` continues to `ORDER BY wi.created_at DESC, wi.id DESC LIMIT _limit` and honours the cursor — so pagination now operates on the filtered set.
+4. `joined` keeps projecting catalog columns (no further filtering on them).
+5. Everything downstream (`with_stock`, `filtered`, `page_bins`, `page_owners`, final select) is unchanged.
 
-Populate `bin_id` (and derived `location_id`) on the transaction insert:
-
-1. Resolve the selected bin: `const selectedBin = bins.find(b => b.id === binId);`
-2. Pass to `createTransaction`:
-   - `bin_id: binId`
-   - `location_id: selectedBin?.location_id ?? undefined`
-3. No other call sites changed; the field is already in `CreateStockTransactionData` and on the `stock_transactions` table.
-
-This makes the row visible to the bin-scoped reader for both bin-only and location-only scope filters.
+Signature, return columns, security, and search_path are preserved.
 
 ## Out of scope
-- No DB migration. The RPC and table already support the fields.
-- No backfill of the two NULL-bin rows already inserted (they were created by the same bug; user can re-issue if needed, or we can write a one-off backfill if asked).
-- No changes to GRN / transfer / picking writers (they already set bin_id/location_id).
+- No frontend changes.
+- No changes to other RPCs.
+- No changes to indexes (existing trigram indexes on `warehouse_item_catalog.name` / `item_code` from memory still apply).
 
 ## Files
-- `src/components/warehouse/StockAdjustmentDialog.tsx`
+- New migration: `supabase/migrations/<timestamp>_fix_list_warehouse_inventory_search.sql` (`CREATE OR REPLACE FUNCTION` only).
