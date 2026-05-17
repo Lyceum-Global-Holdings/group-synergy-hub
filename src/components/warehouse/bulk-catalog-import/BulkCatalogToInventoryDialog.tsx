@@ -218,7 +218,6 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
                     row={r}
                     companies={companies}
                     locations={locationsByCompany(r.company_id)}
-                    bins={binsByLocation(r.location_id)}
                     defaultLocationId={defaultLocationId}
                     onChange={(patch) => setRow(r.rowId, patch)}
                     onRemove={() => removeRow(r.rowId)}
