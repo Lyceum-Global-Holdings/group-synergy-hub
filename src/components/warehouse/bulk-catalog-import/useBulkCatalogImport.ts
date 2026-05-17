@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { BulkCatalogRow, ImportResultRow, newRow } from './types';
+import { BulkCatalogRow, ImportResultRow, PasteEntry, newRow } from './types';
 
 export interface BulkCatalogDefaults {
   company_id: string | null;
