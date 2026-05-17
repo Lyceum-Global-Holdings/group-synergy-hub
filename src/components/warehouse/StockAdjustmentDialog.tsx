@@ -112,15 +112,14 @@ export function StockAdjustmentDialog({
   useEffect(() => {
     if (adjustmentType === 'increase') {
       setIssueToSubLocation(false);
-      setSelectedLocationId('');
       setSelectedSubLocationId('');
     }
   }, [adjustmentType]);
 
-  // Reset sub-location when parent location changes
+  // Reset sub-location when bin (parent context) changes
   useEffect(() => {
     setSelectedSubLocationId('');
-  }, [selectedLocationId]);
+  }, [binId]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -130,7 +129,6 @@ export function StockAdjustmentDialog({
       setUnitCost('');
       setNotes('');
       setIssueToSubLocation(false);
-      setSelectedLocationId('');
       setSelectedSubLocationId('');
       setAdjustmentType('increase');
     }
