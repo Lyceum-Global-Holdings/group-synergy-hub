@@ -35,6 +35,9 @@ const StockMovementDialog = lazy(() =>
 const DeleteItemConfirmationDialog = lazy(() =>
   import('@/components/warehouse/DeleteItemConfirmationDialog').then(m => ({ default: m.DeleteItemConfirmationDialog }))
 );
+const ItemDetailsDialog = lazy(() =>
+  import('@/components/warehouse/ItemDetailsDialog').then(m => ({ default: m.ItemDetailsDialog }))
+);
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CatalogItem } from '@/types/itemBin';
 
@@ -44,9 +47,6 @@ const COLUMN_DEFS = [
   { key: 'name', label: 'Name', fixed: true },
   { key: 'category', label: 'Category', fixed: false },
   { key: 'unit', label: 'Unit', fixed: false },
-  { key: 'brand', label: 'Brand', fixed: false },
-  { key: 'supplier', label: 'Supplier', fixed: false },
-  { key: 'barcode_sku', label: 'Barcode / SKU', fixed: false },
   { key: 'unit_cost', label: 'Unit Cost', fixed: false },
   { key: 'selling_price', label: 'Selling Price', fixed: false },
   { key: 'reorder_level', label: 'Reorder Lvl', fixed: false },
@@ -73,6 +73,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<CatalogItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<CatalogItem | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
@@ -345,9 +346,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <TableHead>Name</TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
-              {col('brand') && <TableHead>Brand</TableHead>}
-              {col('supplier') && <TableHead>Supplier</TableHead>}
-              {col('barcode_sku') && <TableHead>Barcode / SKU</TableHead>}
               {col('unit_cost') && <TableHead className="text-right">Unit Cost</TableHead>}
               {col('selling_price') && <TableHead className="text-right">Selling Price</TableHead>}
               {col('reorder_level') && <TableHead className="text-right">Reorder Lvl</TableHead>}
@@ -395,18 +393,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                   </TableCell>
                   {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
                   {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
-                  {col('brand') && <TableCell>{item.brand || '-'}</TableCell>}
-                  {col('supplier') && <TableCell>{item.supplier?.name || '-'}</TableCell>}
-                  {col('barcode_sku') && (
-                    <TableCell className="text-xs">
-                      {item.barcode || item.sku ? (
-                        <div className="space-y-0.5">
-                          {item.barcode && <div>{item.barcode}</div>}
-                          {item.sku && <div className="text-muted-foreground">{item.sku}</div>}
-                        </div>
-                      ) : '-'}
-                    </TableCell>
-                  )}
                   {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
                   {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
                   {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
@@ -420,6 +406,14 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewingItem(item)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>View Details</TooltipContent>
+                            </Tooltip>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
@@ -537,6 +531,16 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
             <p className="text-center text-sm text-muted-foreground">{previewImage.name}</p>
           </DialogContent>
         </Dialog>
+      )}
+
+      {viewingItem && (
+        <Suspense fallback={null}>
+          <ItemDetailsDialog
+            item={viewingItem as any}
+            open={!!viewingItem}
+            onOpenChange={(open) => { if (!open) setViewingItem(null); }}
+          />
+        </Suspense>
       )}
     </div>
   );
