@@ -287,7 +287,6 @@ export function StockAdjustmentDialog({
                   onCheckedChange={(checked) => {
                     setIssueToSubLocation(checked === true);
                     if (!checked) {
-                      setSelectedLocationId('');
                       setSelectedSubLocationId('');
                     }
                   }}
@@ -303,56 +302,41 @@ export function StockAdjustmentDialog({
 
               {issueToSubLocation && (
                 <div className="space-y-3 pl-6">
-                  {/* Step 1: Select Location (parent) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="parentLocation">Location *</Label>
-                    <Select
-                      value={selectedLocationId}
-                      onValueChange={setSelectedLocationId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {parentLocations.map(loc => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name} {loc.location_code ? `(${loc.location_code})` : ''}
-                          </SelectItem>
-                        ))}
-                        {parentLocations.length === 0 && (
-                          <SelectItem value="none" disabled>
-                            No locations available
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {!binId && (
+                    <p className="text-xs text-muted-foreground">
+                      Select a bin first to see available sub-locations.
+                    </p>
+                  )}
 
-                  {/* Step 2: Select Sub-Location (child) */}
-                  {selectedLocationId && (
-                    <div className="space-y-2">
-                      <Label htmlFor="subLocation">Sub-Location *</Label>
-                      <Select
-                        value={selectedSubLocationId}
-                        onValueChange={setSelectedSubLocationId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select sub-location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {subLocations.map(sub => (
-                            <SelectItem key={sub.id} value={sub.id}>
-                              {sub.name} {sub.location_code ? `(${sub.location_code})` : ''}
-                            </SelectItem>
-                          ))}
-                          {subLocations.length === 0 && (
-                            <SelectItem value="none" disabled>
-                              No sub-locations under this location
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {binId && derivedParentLocation && (
+                    <>
+                      <div className="text-xs text-muted-foreground">
+                        Issuing from: <span className="font-medium text-foreground">{derivedParentLocation.name}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="subLocation">Sub-Location *</Label>
+                        <Select
+                          value={selectedSubLocationId}
+                          onValueChange={setSelectedSubLocationId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select sub-location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {subLocations.map(sub => (
+                              <SelectItem key={sub.id} value={sub.id}>
+                                {sub.name} {sub.location_code ? `(${sub.location_code})` : ''}
+                              </SelectItem>
+                            ))}
+                            {subLocations.length === 0 && (
+                              <SelectItem value="none" disabled>
+                                No sub-locations under {derivedParentLocation.name}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
                   )}
 
                   <p className="text-xs text-muted-foreground">
