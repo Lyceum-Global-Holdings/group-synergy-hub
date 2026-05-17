@@ -104,23 +104,25 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     }
   };
 
-  // Paste TSV into the grid: row-per-line, columns: code, qty, unit_cost
+  // Paste TSV directly into the grid: row-per-line, columns: code, qty, unit_cost, notes
   const handleGridPaste = (e: React.ClipboardEvent) => {
     const text = e.clipboardData?.getData('text');
-    if (!text || !text.includes('\t')) return; // single value paste falls through to default
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    if (lines.length < 1) return;
+    if (!text || !text.includes('\t')) return; // single value paste falls through
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
     e.preventDefault();
-    const codes = lines.map((l) => l.split('\t')[0]);
-    seedFromCodes(codes).then((r) => {
-      // After seed, set qty/unit_cost from the remaining columns
-      const extras = lines.map((l) => l.split('\t').slice(1));
-      // Map sequentially to newly added rows (by matching item_code in order)
-      // Simplified: rely on order; user reviews afterwards.
-      // (rows updated via state by seedFromCodes; subsequent edits via cells)
-      void r;
-      void extras;
+    const entries = lines.map((l) => {
+      const [code, qty, cost, ...rest] = l.split('\t').map((c) => c.trim());
+      const qN = Number(qty);
+      const cN = Number(cost);
+      return {
+        code,
+        opening_qty: Number.isFinite(qN) ? qN : null,
+        unit_cost: Number.isFinite(cN) ? cN : null,
+        notes: rest.length ? rest.join(' ') : null,
+      };
     });
+    void seedFromPaste(entries);
   };
 
   return (
