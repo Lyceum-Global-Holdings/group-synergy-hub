@@ -135,17 +135,18 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
         const next: BulkItemMasterRow = { ...row, errors: [], warnings: [] };
 
         const cat = next.category_id ? categoryById.get(next.category_id) : null;
-        const catCode = cat?.code?.trim().toUpperCase() || '';
+        const codes = resolveCategoryCodes(next.category_id);
+        const catKey = codes ? `${codes.parent}-${codes.leaf}` : '';
 
         let autoPreview = '';
-        if (catCode) {
-          // Auto-generate per ISO/IEC 8000 + GS1 sequencing: monotonically
-          // increasing per-category sequence, skipping any code already taken
-          // by the catalog or by an earlier row in this batch.
-          let seq = (counters.get(catCode) ?? (maxByCategoryCode.get(catCode) ?? 0)) + 1;
-          // Safety cap to avoid runaway loops on misconfigured data.
+        if (codes) {
+          // Auto-generate per ISO/IEC 8000 + GS1 sequencing in the
+          // standard XXX-XXX-XXX-NNNN shape: INV-{parent}-{leaf}-{NNNN}.
+          // Skip any sequence already taken by the catalog or by an
+          // earlier row in this batch.
+          let seq = (counters.get(catKey) ?? (maxByCategoryCode.get(catKey) ?? 0)) + 1;
           for (let guard = 0; guard < 10000; guard++) {
-            const candidate = `INV-${catCode}-${String(seq).padStart(3, '0')}`;
+            const candidate = `INV-${codes.parent}-${codes.leaf}-${String(seq).padStart(4, '0')}`;
             const lower = candidate.toLowerCase();
             if (!existingCodeToId.has(lower) && !codesSeen.has(lower)) {
               autoPreview = candidate;
@@ -153,7 +154,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
             }
             seq += 1;
           }
-          counters.set(catCode, seq);
+          counters.set(catKey, seq);
         }
         next.auto_item_code = autoPreview;
 
