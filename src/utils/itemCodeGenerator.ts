@@ -19,10 +19,15 @@ import { supabase } from '@/integrations/supabase/client';
 export type ItemCodeScope = 'catalog' | 'inventory';
 
 export interface AllocateItemCodesOptions {
+  /** Category mnemonic. May be compound, e.g. "PARENT-LEAF", in which case
+   *  the full string is embedded between the INV- prefix and the sequence. */
   categoryCode: string;
   count: number;
   scope: ItemCodeScope;
   companyId?: string | null;
+  /** Zero-pad width for the sequence (default 3 for legacy back-compat).
+   *  Use 4 for the canonical XXX-XXX-XXX-NNNN format. */
+  padWidth?: number;
 }
 
 export async function allocateItemCodes(
@@ -42,7 +47,7 @@ export async function allocateItemCodes(
         }
       : optionsOrCategoryCode;
 
-  const { categoryCode, count, scope, companyId = null } = opts;
+  const { categoryCode, count, scope, companyId = null, padWidth = 3 } = opts;
 
   if (!categoryCode) {
     throw new Error('Category code is required to auto-generate item codes');
@@ -88,7 +93,7 @@ export async function allocateItemCodes(
 
   const codes: string[] = [];
   for (let i = 1; i <= count; i++) {
-    const nextSeq = (maxSeq + i).toString().padStart(3, '0');
+    const nextSeq = (maxSeq + i).toString().padStart(padWidth, '0');
     codes.push(`${prefix}${nextSeq}`);
   }
 
