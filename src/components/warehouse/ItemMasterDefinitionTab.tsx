@@ -35,6 +35,9 @@ const StockMovementDialog = lazy(() =>
 const DeleteItemConfirmationDialog = lazy(() =>
   import('@/components/warehouse/DeleteItemConfirmationDialog').then(m => ({ default: m.DeleteItemConfirmationDialog }))
 );
+const ItemDetailsDialog = lazy(() =>
+  import('@/components/warehouse/ItemDetailsDialog').then(m => ({ default: m.ItemDetailsDialog }))
+);
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CatalogItem } from '@/types/itemBin';
 
