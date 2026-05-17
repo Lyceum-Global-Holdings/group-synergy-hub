@@ -511,7 +511,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [rows, categoryById, bulkCreateItemsAsync, updateItemAsync, invalidateStock, toast]);
+  }, [rows, resolveCategoryCodes, bulkCreateItemsAsync, updateItemAsync, invalidateStock, toast]);
 
   const validCount = rows.filter((r) => r.status === 'valid').length;
   const invalidCount = rows.filter((r) => r.status === 'invalid').length;
