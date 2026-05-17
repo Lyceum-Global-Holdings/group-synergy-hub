@@ -226,7 +226,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
 
       return out;
     },
-    [categoryById, existingCodeToId, maxByCategoryCode, duplicatePolicy],
+    [categoryById, existingCodeToId, maxByCategoryCode, duplicatePolicy, resolveCategoryCodes],
   );
 
   const rowsRef = useRef(rows);
