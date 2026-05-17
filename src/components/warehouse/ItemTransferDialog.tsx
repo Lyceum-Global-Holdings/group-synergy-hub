@@ -268,12 +268,7 @@ export function ItemTransferDialog({
         .eq('transfer_id', pendingTransferData.transfer.id);
 
       // Invalidate caches so Inventory / Bin Allocations / ledger views refresh
-      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-transfer-requests'] });
+      invalidateWarehouseStock();
 
       // Reset and close
       setShowVerificationDialog(false);

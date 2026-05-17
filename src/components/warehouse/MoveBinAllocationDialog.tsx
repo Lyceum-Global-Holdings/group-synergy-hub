@@ -194,12 +194,7 @@ export function MoveBinAllocationDialog({
         .eq('transfer_id', transfer.id);
 
       toast.success(`Moved ${qty} units to destination bin`);
-      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-transfer-requests'] });
+      invalidateWarehouseStock();
       onOpenChange(false);
     } catch (err: any) {
       console.error('Move stock failed:', err);
