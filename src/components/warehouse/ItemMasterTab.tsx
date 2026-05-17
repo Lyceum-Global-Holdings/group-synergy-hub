@@ -452,19 +452,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </SelectContent>
             </Select>
 
-            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Supplier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Suppliers</SelectItem>
-                {uniqueSuppliers.map(supplier => (
-                  <SelectItem key={supplier} value={supplier}>
-                    {supplier}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             <Input
               placeholder="Stock Owner"
