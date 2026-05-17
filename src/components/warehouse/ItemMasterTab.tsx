@@ -282,22 +282,12 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return Array.from(binMap.entries()).map(([code, name]) => ({ code, name }));
   }, [allItems]);
 
-  // Extract unique suppliers from loaded items for the supplier filter dropdown
-  const uniqueSuppliers = useMemo(() => {
-    const suppliers = new Set<string>();
-    allItems.forEach(item => {
-      if (item.supplier?.name) suppliers.add(item.supplier.name);
-    });
-    return Array.from(suppliers).sort();
-  }, [allItems]);
-
-  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all" || ownerLabelFilter !== "";
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || stockMode !== "all" || ownerLabelFilter !== "";
 
   const clearFilters = () => {
     setCategoryFilter("all");
     setBinFilter("all");
     setStatusFilter("all");
-    setSupplierFilter("all");
     setStockMode("all");
     setOwnerLabelFilter("");
   };
