@@ -29,6 +29,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
           warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(
             bin_code,
             name,
+            is_shared,
             location_id,
             warehouse_location:warehouse_locations!warehouse_bins_location_id_fkey(
               id,
