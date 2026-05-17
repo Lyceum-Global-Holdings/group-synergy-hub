@@ -300,6 +300,10 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
         return <Badge variant="destructive">Error</Badge>;
       case 'imported':
         return <Badge variant="outline" className="border-success text-success">Imported</Badge>;
+      case 'updated':
+        return <Badge variant="outline" className="border-success text-success">Updated</Badge>;
+      case 'skipped':
+        return <Badge variant="secondary">Skipped</Badge>;
       default:
         return <Badge variant="secondary">Pending</Badge>;
     }
