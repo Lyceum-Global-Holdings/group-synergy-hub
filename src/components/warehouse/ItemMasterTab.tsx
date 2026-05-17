@@ -180,6 +180,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     supplierId: supplierFilter,
     locationId: globalLocationId,
     stockMode,
+    ownerCompanyId: ownerCompanyFilter === 'all' ? null : ownerCompanyFilter,
   });
 
   // Keep mutations via the old hook with fetching disabled
