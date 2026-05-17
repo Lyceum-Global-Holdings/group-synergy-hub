@@ -20990,6 +20990,19 @@ export type Database = {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
       }
+      bulk_change_stock_owner: {
+        Args: {
+          _from_company: string
+          _item_ids: string[]
+          _location_ids?: string[]
+          _to_company: string
+        }
+        Returns: {
+          merged_rows: number
+          moved_rows: number
+          total_quantity: number
+        }[]
+      }
       bulk_clone_bin_scope: {
         Args: {
           _bin_ids: string[]
