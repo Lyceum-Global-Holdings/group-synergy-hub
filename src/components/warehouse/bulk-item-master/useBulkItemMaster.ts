@@ -61,7 +61,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     useWarehouseItemCatalog();
   const invalidateStock = useInvalidateWarehouseStock();
 
-  const [duplicatePolicy, setDuplicatePolicy] = useState<DuplicatePolicy>('fail');
+  const [duplicatePolicy, setDuplicatePolicy] = useState<DuplicatePolicy>('skip');
 
   const [rows, setRows] = useState<BulkItemMasterRow[]>(() =>
     Array.from({ length: 5 }, emptyRow),
