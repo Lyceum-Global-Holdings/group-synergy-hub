@@ -190,7 +190,7 @@ export function CreateStockTransferDialog({
         <DialogHeader>
           <DialogTitle>Create Stock Transfer</DialogTitle>
           <DialogDescription>
-            Create a new stock transfer request between bins
+            Creates a transfer request (pending approval). Stock physically moves only after the request is approved and completed. For an immediate bin-to-bin move, use the “Move stock” action on Bin Allocations.
           </DialogDescription>
         </DialogHeader>
 
