@@ -1,43 +1,79 @@
 ## Diagnosis
 
-On `/warehouse/bin-allocations` (`BinAllocationsTab.tsx`) the only row actions today are **QR** and **Delete**. There is **no "Move stock" / transfer action** at all. Header buttons are: Bulk QR, Return Stock, Allocate Item to Bin.
+I traced the transfer end-to-end in the database. The stock **was** moved correctly. The UI is showing stale data.
 
-What you're seeing as "submits but stock doesn't move" almost certainly comes from one of these two adjacent flows being used as a workaround:
+### What the DB shows for `LED ceiling recessed - 8W` (item id `6ceac60f…`)
 
-1. **Stock Transfer page (`CreateStockTransferDialog`)** — only inserts a row into `stock_transfer_requests` with `status='pending'`. It never calls `transfer_stock_fifo`, so no allocation actually changes. The transfer sits in approval limbo and on-hand quantities stay identical at source and destination. This matches the symptom exactly.
-2. **Item Master → Transfer (`ItemTransferDialog`)** — does call `transfer_stock_fifo` but only after the user confirms the second "Verification" dialog; closing it early leaves the request in `approved` state with no physical move.
+```text
+Transfer:  STR-20260517-001   status=completed   completed at 11:05:44 UTC
+           LNPE (dfce7a5b…)  →  LNQ (013c1ade…)   qty 153
 
-Bin Allocations itself has no move action, so a user who expects SAP-EWM-style "click the row → move to another bin/warehouse" finds nothing happens.
+warehouse_bin_allocations (per-bin balances):
+  LNQ   153.00   ← NEW row, location_id = Lyceum Nugegoda Quarters ✓
+  LNPE  245.00   ← decreased from 398 by 153 ✓
 
-## International-standard fix (SAP EWM "Internal Stock Transfer / Posting Change")
+stock_transactions (ledger):
+  11:05:43  transfer_out  bin=LNPE  qty -153   398 → 245 ✓
+  11:05:43  transfer_in   bin=LNQ   qty +153     0 → 153 ✓
 
-In SAP EWM / Oracle WMS / Manhattan, the canonical pattern for moving stock between warehouses is a **bin-to-bin posting change** executed directly from the stock overview, atomically updating both source and destination allocations and writing two ledger rows (issue + receipt). The project already has the correct primitive (`transfer_stock_fifo` RPC, per `mem://architecture/warehouse-batch-fifo-logic` and `mem://architecture/stock-transactions-location-scope`); it just isn't surfaced here.
+warehouse_items.current_stock = 398 (unchanged, transfer is intra-company)
+```
 
-## Changes
+Allocation row, ledger, and stock totals are all consistent. The 153 units are physically in LNQ as a brand-new bin allocation. **There is no DB bug.**
 
-### 1. Add `MoveBinAllocationDialog.tsx` (new, frontend only)
-- Inputs: read-only source (item + bin + location + on-hand), destination bin picker grouped by warehouse, quantity (≤ available), optional reason/notes.
-- Destination bin list: `useWarehouseBins({ skipLocationFilter: true })` filtered to user's editable locations via `useCurrentUserLocationPermissions` (respects `mem://access-control/hierarchical-location-permissions`).
-- On submit, in one click:
-  1. Insert a `stock_transfer_requests` row with `status='completed'`, `transfer_type='location'`, source/destination bins, `company_id` from the allocation.
-  2. Insert the matching `stock_transfer_items` row.
-  3. Call `supabase.rpc('transfer_stock_fifo', { p_item_id, p_from_bin_id, p_to_bin_id, p_quantity, p_company_id, p_user_id, p_transfer_number, p_transfer_id })`.
-  4. Toast success/failure, invalidate `warehouse_bin_allocations`, `warehouse_items`, `stock_transactions`.
-- Guards: same-bin rejection, quantity > 0 and ≤ `available_quantity`, surfaces RPC errors verbatim (no silent failures).
+### Why the Inventory UI doesn't show LNQ
 
-### 2. Wire it into `BinAllocationsTab.tsx`
-- Add `moveAllocation` state.
-- Add an `ArrowRightLeft` icon button in the row actions column (between QR and Delete), gated by `useIsAdminOrHigher` for write capability, with tooltip "Move stock to another bin/warehouse".
-- Render `<MoveBinAllocationDialog allocation={moveAllocation} ... />` next to the existing dialogs.
+The Inventory tab reads from `list_warehouse_inventory` and is refreshed by `useRealtimeStockUpdates`, which subscribes to `warehouse_bin_allocations` and `warehouse_bins` Postgres CDC events.
 
-### 3. Tighten `CreateStockTransferDialog` (small UX fix, no logic change to RPC)
-- After creating a transfer request, show an inline notice: *"Transfer request created (pending). Stock will move once approved and completed."* This removes the "submits but stock doesn't move" surprise on that page, and points users to the Approval Console or the new Bin Allocations Move action for instant moves.
+The Supabase realtime publication on this project currently includes only `warehouse_items`:
+
+```sql
+-- pg_publication_tables WHERE pubname='supabase_realtime'
+public.warehouse_items   ← only this one
+-- warehouse_bin_allocations  MISSING
+-- warehouse_bins             MISSING
+```
+
+Consequences:
+
+1. A bin-to-bin transfer doesn't change `warehouse_items.current_stock` (total is unchanged), so no `warehouse_items` realtime event fires.
+2. The bin-level changes happen on `warehouse_bin_allocations` / `warehouse_bins`, which are not published → the realtime subscriptions in `useRealtimeStockUpdates` never fire.
+3. React Query has `staleTime: 30s` and `refetchOnWindowFocus: false`, so the cached per-bin breakdown sits there until the user manually triggers a refetch (search change, filter change, page reload).
+
+Secondary issue: the explicit `invalidateQueries` calls in the transfer write paths target `['warehouse-bin-allocations']`, `['warehouse-items']`, `['stock-transactions']`, `['stock-transfer-requests']` — but **not** `['warehouse-items-inventory']`, which is the Inventory tab's actual key. So even users who avoid the realtime path don't get instant feedback.
+
+## Fix (international-standard: DB is the single source of truth; UI listens to CDC)
+
+### 1. DB migration — publish the bin tables to realtime
+
+```sql
+ALTER TABLE public.warehouse_bin_allocations REPLICA IDENTITY FULL;
+ALTER TABLE public.warehouse_bins            REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_bin_allocations;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_bins;
+```
+
+`REPLICA IDENTITY FULL` is required so the realtime payload carries `company_id`, matching the scoped invalidation in `useRealtimeStockUpdates.onBinAllocation`.
+
+### 2. Frontend — also invalidate the Inventory list key explicitly
+
+Three transfer write paths today bypass the inventory key:
+
+- `src/components/warehouse/MoveBinAllocationDialog.tsx` (new, added today) — add `['warehouse-items-inventory']` and `['all-items-location-stock']` to the post-success invalidation list.
+- `src/components/warehouse/ItemTransferDialog.tsx` — after the `transfer_stock_fifo` RPC succeeds, invalidate `['warehouse-items-inventory']`, `['warehouse-bin-allocations']`, `['warehouse-items']`, `['all-items-location-stock']`, `['stock-transactions']`. Currently it invalidates nothing.
+- Stock Transfer page completion handler (if/when a transfer flips to `completed`): mirror the same invalidations.
+
+This gives belt-and-braces freshness: realtime CDC for passive listeners, explicit invalidation for the user who just clicked.
 
 ## Out of scope
-- No DB migrations. The `transfer_stock_fifo` RPC, RLS, and triggers are already correct (per memory `stock-ledger-immutable-balances` and `stock-transactions-location-scope`).
-- No changes to ItemTransferDialog, Asset Transfer, or the multi-step approval workflow.
+
+- No change to `transfer_stock_fifo` RPC, triggers, or RLS — they are working correctly.
+- No change to staleTime or `refetchOnWindowFocus` — keeping the project-wide caching contract intact (per memory `react-query-global-cache-freshness-permanent`).
+- Historical inconsistency on the Mar 6 transfer (older ledger rows had source bin_id stamped on the transfer_in row) is an artifact of an earlier RPC version — already fixed in the current RPC; no backfill needed for current balances.
 
 ## Files
-- New: `src/components/warehouse/MoveBinAllocationDialog.tsx`
-- Edited: `src/components/warehouse/BinAllocationsTab.tsx`
-- Edited: `src/components/warehouse/CreateStockTransferDialog.tsx` (notice only)
+
+- New migration: `supabase/migrations/<ts>_publish_bin_tables_realtime.sql`
+- Edited: `src/components/warehouse/MoveBinAllocationDialog.tsx`
+- Edited: `src/components/warehouse/ItemTransferDialog.tsx`
+- Optionally edited: `src/components/warehouse/StockTransferDetailsDialog.tsx` (if it owns the "Complete" action)
