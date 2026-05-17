@@ -37,7 +37,7 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
-  const { bins } = useWarehouseBins({ skipLocationFilter: true });
+  
 
   const defaultCompanyId = selectedCompany?.id ?? null;
   // Only use global location if it belongs to the active company (or is unscoped)
