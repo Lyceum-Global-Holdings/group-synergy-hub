@@ -1076,6 +1076,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             onOpenChange={setIsBulkUpdateOpen}
             selectedIds={selectedItemIds}
             onComplete={clearSelection}
+            defaultOwnerCompanyId={ownerCompanyFilter === 'all' ? null : ownerCompanyFilter}
           />
         </Suspense>
       )}
