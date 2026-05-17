@@ -17,11 +17,12 @@ interface BulkInventoryUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedIds: Set<string>;
   onComplete: () => void;
+  defaultOwnerCompanyId?: string | null;
 }
 
-export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onComplete }: BulkInventoryUpdateDialogProps) {
+export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onComplete, defaultOwnerCompanyId = null }: BulkInventoryUpdateDialogProps) {
   const queryClient = useQueryClient();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, companies } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
 
@@ -29,6 +30,7 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
   const [unitId, setUnitId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [brand, setBrand] = useState<string>('');
+  const [ownerCompanyId, setOwnerCompanyId] = useState<string>(defaultOwnerCompanyId ?? '');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async () => {
