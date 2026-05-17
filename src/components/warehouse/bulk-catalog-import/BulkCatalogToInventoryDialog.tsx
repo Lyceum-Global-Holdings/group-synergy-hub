@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, ClipboardPaste, Loader2, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, ClipboardPaste, Loader2, X, CheckCircle2, AlertCircle, CopyCheck } from 'lucide-react';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
