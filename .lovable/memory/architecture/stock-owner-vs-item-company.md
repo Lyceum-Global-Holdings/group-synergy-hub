@@ -1,12 +1,27 @@
 ---
-name: Stock Owner vs Item Master Company
-description: Stock Owner = warehouse_bin_allocations.company_id (SAP EWM party of ownership); Item Master Company = warehouse_items.company_id. Always surface as separate, never-merged columns.
+name: Stock Owner as Free-Text Label
+description: Stock Owner = warehouse_bin_allocations.stock_owner (text). Free-typed label, decoupled from companies. Never combined with company_id (which remains for tenant isolation).
 type: architecture
 ---
 
-Two distinct concepts that must never be merged in inventory UI:
+Stock Owner is a **free-text label** stored in `warehouse_bin_allocations.stock_owner` (nullable text). It is typed by users, not chosen from a list of companies. `NULL` is rendered as the badge "Unassigned".
 
-- **Item Master Company** — `warehouse_items.company_id`. Who maintains the catalog row for that company. Shown as the "Company" column.
-- **Stock Owner** — `warehouse_bin_allocations.company_id`. Legal entity that owns physical units at a bin/location (SAP EWM "Stock Owner" / Oracle WMS "Inventory Owner" / ISO 19440 party of ownership). With shared bins (`warehouse_bins.is_shared`) one bin can hold stock for multiple owners simultaneously.
+Distinct from:
+- **Item Master Company** — `warehouse_items.company_id` (catalog row owner per tenant).
+- **Tenant isolation** — `warehouse_bin_allocations.company_id` (still required, drives RLS/visibility).
 
-The `list_warehouse_inventory` RPC accepts `_owner_company_id` and returns `owner_company_ids` + `owner_company_names` arrays (distinct owners visible per item in the current location scope). The Inventory tab has a "Stock Owner" filter and a dedicated badge column; the Bulk Update dialog accepts a Stock Owner filter that limits processed rows to those holding stock for the chosen owner. Ownership itself is never changed by bulk update — it is filter/read only.
+The Stock Owner label never combines with any ID. Filters, badges, and the bulk-change dialog all operate on the plain text value.
+
+### Reader
+`list_warehouse_inventory` accepts `_owner_label text` and returns `stock_owners text[]` (distinct labels visible per item in the current location scope; `NULL` surfaced as `"Unassigned"`). Matching is case-insensitive (`ILIKE`).
+
+### Writer
+`bulk_change_stock_owner(_item_ids uuid[], _from_owner text, _to_owner text, _location_ids uuid[])`
+- `_to_owner` is required (trimmed); `_from_owner` may be NULL to target unassigned stock.
+- `_location_ids` is mandatory — system-wide ownership changes are forbidden.
+- Admin/super_admin only. Merges into existing rows when `(item, bin, location, company, to_owner)` already exists.
+
+### UI
+- Inventory tab "Stock Owner" filter: debounced free-text `<Input>` (no dropdown).
+- Bulk Update dialog "Stock Owner filter": free-text `<Input>`.
+- Change Stock Owner dialog: two free-text `<Input>` fields (From / To), scoped to the selected location and its sub-locations.
