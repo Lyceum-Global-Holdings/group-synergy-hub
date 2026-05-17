@@ -48,7 +48,6 @@ export function StockAdjustmentDialog({
   const [unitCost, setUnitCost] = useState('');
   const [notes, setNotes] = useState('');
   const [issueToSubLocation, setIssueToSubLocation] = useState(false);
-  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [selectedSubLocationId, setSelectedSubLocationId] = useState('');
 
   const { createTransaction, isCreating } = useStockTransactions();
@@ -58,17 +57,25 @@ export function StockAdjustmentDialog({
   const { locations } = useWarehouseLocations();
   const [itemAllocations, setItemAllocations] = useState<any[]>([]);
 
-  // Derive parent locations and sub-locations from warehouse_locations
-  const parentLocations = useMemo(
-    () => (locations || []).filter(l => l.type === 'location' && l.status === 'active'),
-    [locations]
-  );
+  // Derive parent location from the selected bin (walk up if bin sits on a sub-location)
+  const derivedParentLocation = useMemo(() => {
+    if (!binId) return null;
+    const bin = bins.find(b => b.id === binId);
+    if (!bin?.location_id) return null;
+    const loc = (locations || []).find(l => l.id === bin.location_id);
+    if (!loc) return null;
+    if (loc.type === 'location') return loc;
+    if (loc.type === 'sublocation' && loc.parent_id) {
+      return (locations || []).find(l => l.id === loc.parent_id) || null;
+    }
+    return loc;
+  }, [binId, bins, locations]);
 
   const subLocations = useMemo(
     () => (locations || []).filter(
-      l => l.type === 'sublocation' && l.status === 'active' && l.parent_id === selectedLocationId
+      l => l.type === 'sublocation' && l.status === 'active' && l.parent_id === derivedParentLocation?.id
     ),
-    [locations, selectedLocationId]
+    [locations, derivedParentLocation]
   );
 
   // Group active bins by their parent location for the bin selector
@@ -105,15 +112,14 @@ export function StockAdjustmentDialog({
   useEffect(() => {
     if (adjustmentType === 'increase') {
       setIssueToSubLocation(false);
-      setSelectedLocationId('');
       setSelectedSubLocationId('');
     }
   }, [adjustmentType]);
 
-  // Reset sub-location when parent location changes
+  // Reset sub-location when bin (parent context) changes
   useEffect(() => {
     setSelectedSubLocationId('');
-  }, [selectedLocationId]);
+  }, [binId]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -123,7 +129,6 @@ export function StockAdjustmentDialog({
       setUnitCost('');
       setNotes('');
       setIssueToSubLocation(false);
-      setSelectedLocationId('');
       setSelectedSubLocationId('');
       setAdjustmentType('increase');
     }
@@ -170,7 +175,7 @@ export function StockAdjustmentDialog({
 
     // Determine transaction type and notes based on issue destination
     const selectedSubLocation = (locations || []).find(l => l.id === selectedSubLocationId);
-    const selectedParentLocation = (locations || []).find(l => l.id === selectedLocationId);
+    const selectedParentLocation = derivedParentLocation;
     const isSubLocationIssue = issueToSubLocation && selectedSubLocation && adjustmentType === 'decrease';
     
     let transactionType: StockTransactionType = 'adjustment';
@@ -282,7 +287,6 @@ export function StockAdjustmentDialog({
                   onCheckedChange={(checked) => {
                     setIssueToSubLocation(checked === true);
                     if (!checked) {
-                      setSelectedLocationId('');
                       setSelectedSubLocationId('');
                     }
                   }}
@@ -298,56 +302,41 @@ export function StockAdjustmentDialog({
 
               {issueToSubLocation && (
                 <div className="space-y-3 pl-6">
-                  {/* Step 1: Select Location (parent) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="parentLocation">Location *</Label>
-                    <Select
-                      value={selectedLocationId}
-                      onValueChange={setSelectedLocationId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {parentLocations.map(loc => (
-                          <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name} {loc.location_code ? `(${loc.location_code})` : ''}
-                          </SelectItem>
-                        ))}
-                        {parentLocations.length === 0 && (
-                          <SelectItem value="none" disabled>
-                            No locations available
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {!binId && (
+                    <p className="text-xs text-muted-foreground">
+                      Select a bin first to see available sub-locations.
+                    </p>
+                  )}
 
-                  {/* Step 2: Select Sub-Location (child) */}
-                  {selectedLocationId && (
-                    <div className="space-y-2">
-                      <Label htmlFor="subLocation">Sub-Location *</Label>
-                      <Select
-                        value={selectedSubLocationId}
-                        onValueChange={setSelectedSubLocationId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select sub-location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {subLocations.map(sub => (
-                            <SelectItem key={sub.id} value={sub.id}>
-                              {sub.name} {sub.location_code ? `(${sub.location_code})` : ''}
-                            </SelectItem>
-                          ))}
-                          {subLocations.length === 0 && (
-                            <SelectItem value="none" disabled>
-                              No sub-locations under this location
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {binId && derivedParentLocation && (
+                    <>
+                      <div className="text-xs text-muted-foreground">
+                        Issuing from: <span className="font-medium text-foreground">{derivedParentLocation.name}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="subLocation">Sub-Location *</Label>
+                        <Select
+                          value={selectedSubLocationId}
+                          onValueChange={setSelectedSubLocationId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select sub-location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {subLocations.map(sub => (
+                              <SelectItem key={sub.id} value={sub.id}>
+                                {sub.name} {sub.location_code ? `(${sub.location_code})` : ''}
+                              </SelectItem>
+                            ))}
+                            {subLocations.length === 0 && (
+                              <SelectItem value="none" disabled>
+                                No sub-locations under {derivedParentLocation.name}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
                   )}
 
                   <p className="text-xs text-muted-foreground">
