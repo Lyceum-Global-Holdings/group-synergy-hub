@@ -459,3 +459,72 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
     </tr>
   );
 }
+
+interface CategoryComboboxProps {
+  categories: any[];
+  value: string | null;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}
+
+function CategoryCombobox({ categories, value, onChange, disabled }: CategoryComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const selected = categories.find((c) => c.id === value);
+  const label = selected ? `${selected.name}${selected.code ? ` (${selected.code})` : ''}` : '';
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            'h-8 w-full justify-between text-xs font-normal px-2',
+            !selected && 'text-muted-foreground',
+          )}
+        >
+          <span className="truncate">{label || 'Select…'}</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-1" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[280px]" align="start">
+        <Command
+          filter={(val, search) => {
+            // val is the lowercased label we set on CommandItem
+            return val.includes(search.toLowerCase()) ? 1 : 0;
+          }}
+        >
+          <CommandInput placeholder="Search category…" className="h-9" />
+          <CommandList>
+            <CommandEmpty>No category found.</CommandEmpty>
+            <CommandGroup>
+              {categories.map((c) => {
+                const text = `${c.name}${c.code ? ` (${c.code})` : ''}`;
+                return (
+                  <CommandItem
+                    key={c.id}
+                    value={text.toLowerCase()}
+                    onSelect={() => {
+                      onChange(c.id);
+                      setOpen(false);
+                    }}
+                    className="text-xs"
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-3.5 w-3.5',
+                        value === c.id ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    {text}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
