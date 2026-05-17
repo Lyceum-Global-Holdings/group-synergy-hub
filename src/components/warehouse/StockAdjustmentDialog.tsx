@@ -48,7 +48,6 @@ export function StockAdjustmentDialog({
   const [unitCost, setUnitCost] = useState('');
   const [notes, setNotes] = useState('');
   const [issueToSubLocation, setIssueToSubLocation] = useState(false);
-  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [selectedSubLocationId, setSelectedSubLocationId] = useState('');
 
   const { createTransaction, isCreating } = useStockTransactions();
