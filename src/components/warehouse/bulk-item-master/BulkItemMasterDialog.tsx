@@ -87,6 +87,9 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
     isSubmitting,
     validCount,
     invalidCount,
+    skippedCount,
+    duplicatePolicy,
+    setDuplicatePolicy,
     categories,
     units,
   } = useBulkItemMaster();
