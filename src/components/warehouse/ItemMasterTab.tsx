@@ -92,10 +92,7 @@ const INV_COLUMN_DEFS = [
   { key: 'name', label: 'Name', fixed: true },
   { key: 'category', label: 'Category', fixed: false },
   { key: 'unit', label: 'Unit', fixed: false },
-  { key: 'brand', label: 'Brand', fixed: false },
-  { key: 'supplier', label: 'Supplier', fixed: false },
   { key: 'bin', label: 'Bin', fixed: false },
-  { key: 'company', label: 'Company', fixed: false },
   { key: 'stock_owner', label: 'Stock Owner', fixed: false },
   { key: 'current_stock', label: 'Current Stock', fixed: false },
   { key: 'unit_cost', label: 'Unit Cost', fixed: false },
@@ -151,7 +148,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [binFilter, setBinFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  
   const [ownerLabelFilter, setOwnerLabelFilter] = useState<string>("");
   const [debouncedOwnerLabel, setDebouncedOwnerLabel] = useState<string>("");
   const [stockMode, setStockMode] = useState<'all' | 'in_stock' | 'zero' | 'low'>("all");
@@ -183,11 +180,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     hasNextPage,
     isFetchingNextPage,
   } = useWarehouseItemsLazyInventory({
-    pageSize: 100,
+    pageSize: 50,
     search: debouncedSearch,
     categoryId: categoryFilter,
     status: statusFilter,
-    supplierId: supplierFilter,
     locationId: globalLocationId,
     stockMode,
     ownerLabel: debouncedOwnerLabel || null,
@@ -286,22 +282,12 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return Array.from(binMap.entries()).map(([code, name]) => ({ code, name }));
   }, [allItems]);
 
-  // Extract unique suppliers from loaded items for the supplier filter dropdown
-  const uniqueSuppliers = useMemo(() => {
-    const suppliers = new Set<string>();
-    allItems.forEach(item => {
-      if (item.supplier?.name) suppliers.add(item.supplier.name);
-    });
-    return Array.from(suppliers).sort();
-  }, [allItems]);
-
-  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all" || ownerLabelFilter !== "";
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || stockMode !== "all" || ownerLabelFilter !== "";
 
   const clearFilters = () => {
     setCategoryFilter("all");
     setBinFilter("all");
     setStatusFilter("all");
-    setSupplierFilter("all");
     setStockMode("all");
     setOwnerLabelFilter("");
   };
@@ -455,19 +441,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </SelectContent>
             </Select>
 
-            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Supplier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Suppliers</SelectItem>
-                {uniqueSuppliers.map(supplier => (
-                  <SelectItem key={supplier} value={supplier}>
-                    {supplier}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             <Input
               placeholder="Stock Owner"
@@ -588,10 +561,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               <TableHead>Name</TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
-              {col('brand') && <TableHead>Brand</TableHead>}
-              {col('supplier') && <TableHead>Supplier</TableHead>}
               {col('bin') && <TableHead>Bin</TableHead>}
-              {col('company') && <TableHead>Company</TableHead>}
               {col('stock_owner') && <TableHead>Stock Owner</TableHead>}
               {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
               {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
@@ -677,8 +647,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       }
                     </TableCell>
                   )}
-                  {col('brand') && <TableCell>{item.brand || '-'}</TableCell>}
-                  {col('supplier') && <TableCell>{item.supplier?.name || '-'}</TableCell>}
                   {col('bin') && (
                     <TableCell>
                       {item.bins && item.bins.length > 0 ? (
@@ -708,14 +676,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
-                    </TableCell>
-                  )}
-                  {col('company') && (
-                    <TableCell>
-                      {item.company_id
-                        ? companyById.get(item.company_id)?.name || '-'
-                        : 'All Companies'
-                      }
                     </TableCell>
                   )}
                   {col('stock_owner') && (

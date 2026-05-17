@@ -112,5 +112,7 @@ export function useWarehouseItemsLazyInventory({
       return lastPage.nextCursor;
     },
     enabled: !!(isViewingAllCompanies || selectedCompany?.id),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
   });
 }

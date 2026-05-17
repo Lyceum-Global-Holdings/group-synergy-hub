@@ -1,32 +1,34 @@
-# Fix: Search in Inventory doesn't find existing items (e.g. ALA056)
+# Hide Brand/Supplier/Company columns + speed up Inventory
 
-## Root cause
-`public.list_warehouse_inventory` applies pagination (`LIMIT 50` ordered by `wi.created_at DESC`) in the `base` CTE **before** the search/category/supplier filters run in `joined`. ALA056 was created in Jan 2026 and is not in the most recent 50 `warehouse_items`, so search returns nothing even though the item exists with stock.
+## Scope
+Frontend-only change in `src/components/warehouse/ItemMasterTab.tsx` (the Inventory tab on `/warehouse/inventory`). No DB / RPC changes.
 
-Confirmed:
-- `warehouse_item_catalog` has `ALA056` (Cladding sheet Board 4x8).
-- The matching `warehouse_items` row has `created_at = 2026-01-11`.
-- Page-1 keyset cursor only sees the newest 50 rows; search is applied post-pagination.
+## 1. Hide Brand, Supplier, Company columns
 
-## Fix (DB migration only)
+Approach: remove these three columns from the inventory table entirely (header, body cells, column toggle, related filter and CSV export fields). Rationale: the user asked to hide them from the table; removing the dead UI also cuts render cost, which contributes to the speed-up.
 
-Recreate `public.list_warehouse_inventory` so the catalog-driven filters (search, category, supplier) are applied **before** pagination:
+Edits in `ItemMasterTab.tsx`:
+- `INV_COLUMN_DEFS`: drop `brand`, `supplier`, `company` entries (Columns menu no longer lists them).
+- Remove the Supplier `<Select>` filter (and its `supplierFilter`, `uniqueSuppliers`, `companyById`-only-for-column state, `setSupplierFilter` from `clearFilters`, and the `supplierId` arg passed to `useWarehouseItemsLazyInventory`).
+- Remove the `<TableHead>` and `<TableCell>` blocks gated by `col('brand')`, `col('supplier')`, `col('company')`.
+- Remove the corresponding `Brand`, `Supplier`, `Company` fields from the Excel export builder around line 360.
+- Drop now-unused `companyById` if it has no other reader (verify; keep otherwise).
 
-1. Join `warehouse_item_catalog cat` inside the `base` CTE (LEFT JOIN to tolerate legacy rows; rows without catalog won't satisfy `_search` and that is correct).
-2. Move these predicates from `joined` into `base`:
-   - `_search ILIKE` over `cat.name`, `cat.item_code`, `cat.brand`, `cat.barcode`, `cat.sku`.
-   - `_category_id` against `cat.category_id`.
-   - `_supplier_id` against `cat.supplier_id`.
-3. `base` continues to `ORDER BY wi.created_at DESC, wi.id DESC LIMIT _limit` and honours the cursor — so pagination now operates on the filtered set.
-4. `joined` keeps projecting catalog columns (no further filtering on them).
-5. Everything downstream (`with_stock`, `filtered`, `page_bins`, `page_owners`, final select) is unchanged.
+## 2. Speed-ups (lightweight, no schema work)
 
-Signature, return columns, security, and search_path are preserved.
+a. Stop sending `_supplier_id` to the RPC and drop the supplier-derived memos — fewer dependencies on `allItems`, cheaper renders as the list grows.
+
+b. Memo trimming: `uniqueSuppliers` (removed) and `itemLocationStock` already exist; no other change needed there.
+
+c. React Query: this hook currently relies on the global default. Add an explicit `staleTime: 30_000` and `gcTime: 5 * 60_000` to `useInfiniteQuery` in `src/hooks/useWarehouseItemsLazyInventory.ts` so navigating back to Inventory within 30s reuses cache instead of re-running the heavy RPC. (Aligns with the Core rule: 30s SWR default; inventory is not a live hook.)
+
+d. Reduce initial page size from `100` to `50` in `ItemMasterTab` (matches the RPC default and the keyset cursor index assumptions in `Inventory Server Pagination` memory). First paint becomes ~2× faster; the IntersectionObserver still fetches the next page automatically as the user scrolls.
 
 ## Out of scope
-- No frontend changes.
-- No changes to other RPCs.
-- No changes to indexes (existing trigram indexes on `warehouse_item_catalog.name` / `item_code` from memory still apply).
+- No changes to `list_warehouse_inventory` RPC.
+- No changes to other tabs (Item Master Definition, Bins, etc.).
+- No removal of Brand/Supplier/Company from the create/edit dialogs or detail views — the data still exists, just hidden from the inventory list and filter bar.
 
 ## Files
-- New migration: `supabase/migrations/<timestamp>_fix_list_warehouse_inventory_search.sql` (`CREATE OR REPLACE FUNCTION` only).
+- `src/components/warehouse/ItemMasterTab.tsx`
+- `src/hooks/useWarehouseItemsLazyInventory.ts`
