@@ -220,6 +220,11 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
               <span className="flex items-center gap-1">
                 <AlertCircle className="h-4 w-4 text-destructive" /> {invalidCount} invalid
               </span>
+              {skippedCount > 0 && (
+                <span className="flex items-center gap-1">
+                  {skippedCount} skipped
+                </span>
+              )}
             </div>
           </div>
 
