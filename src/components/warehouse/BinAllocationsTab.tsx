@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2, MapPin } from 'lucide-react';
+import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2, MapPin, ArrowRightLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
@@ -23,6 +23,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
 import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDialog';
+import { MoveBinAllocationDialog } from './MoveBinAllocationDialog';
 import { BinAllocationQRDialog } from './BinAllocationQRDialog';
 import { generateBulkBinQRCodePdf, downloadBulkBinQRCodePdf } from '@/utils/bulkBinQRCodePdf';
 import { toast } from 'sonner';
@@ -35,6 +36,7 @@ export function BinAllocationsTab() {
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [allocationToDelete, setAllocationToDelete] = useState<string | null>(null);
   const [qrAllocation, setQrAllocation] = useState<BinAllocationWithDetails | null>(null);
+  const [moveAllocation, setMoveAllocation] = useState<BinAllocationWithDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
@@ -216,15 +218,26 @@ export function BinAllocationsTab() {
       id: 'actions',
       header: 'Actions',
       cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setAllocationToDelete(row.original.id)}
-          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          title="Delete allocation"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMoveAllocation(row.original)}
+            title="Move stock to another bin/warehouse"
+            disabled={(row.original.available_quantity || 0) <= 0}
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setAllocationToDelete(row.original.id)}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            title="Delete allocation"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       ),
     }] as ColumnDef<BinAllocationWithDetails>[] : []),
   ];
@@ -348,6 +361,12 @@ export function BinAllocationsTab() {
         allocation={qrAllocation}
         open={!!qrAllocation}
         onOpenChange={(o) => !o && setQrAllocation(null)}
+      />
+
+      <MoveBinAllocationDialog
+        allocation={moveAllocation}
+        open={!!moveAllocation}
+        onOpenChange={(o) => !o && setMoveAllocation(null)}
       />
 
       <AlertDialog open={!!allocationToDelete} onOpenChange={() => setAllocationToDelete(null)}>
