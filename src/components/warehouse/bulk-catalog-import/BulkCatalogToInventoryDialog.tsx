@@ -125,6 +125,29 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     void seedFromPaste(entries);
   };
 
+  const applyFirstRowBinToAll = () => {
+    const first = rows[0];
+    if (!first || !first.bin_id) {
+      toast({
+        title: 'No bin on first row',
+        description: 'Select a company, location and bin on row 1 first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    let applied = 0;
+    rows.forEach((r, i) => {
+      if (i === 0) return;
+      setRow(r.rowId, {
+        company_id: first.company_id,
+        location_id: first.location_id,
+        bin_id: first.bin_id,
+      });
+      applied += 1;
+    });
+    toast({ title: 'Bin applied', description: `Applied row 1 bin to ${applied} row${applied === 1 ? '' : 's'}.` });
+  };
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
