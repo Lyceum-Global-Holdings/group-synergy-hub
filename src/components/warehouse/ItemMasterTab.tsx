@@ -1064,6 +1064,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           <CheckSquare className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">{selectedItemIds.size} item(s) selected</span>
           <Button size="sm" variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>Bulk Update</Button>
+          <Button size="sm" variant="outline" onClick={() => setIsBulkChangeOwnerOpen(true)}>Change Stock Owner</Button>
           {canDelete && (
             <Button size="sm" variant="destructive" onClick={() => setIsBulkDeleteOpen(true)}>Bulk Delete</Button>
           )}
