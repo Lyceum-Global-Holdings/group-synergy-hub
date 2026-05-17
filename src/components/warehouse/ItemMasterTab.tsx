@@ -148,7 +148,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [binFilter, setBinFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  
   const [ownerLabelFilter, setOwnerLabelFilter] = useState<string>("");
   const [debouncedOwnerLabel, setDebouncedOwnerLabel] = useState<string>("");
   const [stockMode, setStockMode] = useState<'all' | 'in_stock' | 'zero' | 'low'>("all");
