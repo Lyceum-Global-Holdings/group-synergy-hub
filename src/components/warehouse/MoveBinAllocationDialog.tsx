@@ -23,6 +23,7 @@ import {
 import { ArrowRightLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useInvalidateWarehouseStock } from '@/hooks/useInvalidateWarehouseStock';
 import { supabase } from '@/integrations/supabase/client';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
@@ -45,6 +46,7 @@ export function MoveBinAllocationDialog({
   onOpenChange,
 }: MoveBinAllocationDialogProps) {
   const queryClient = useQueryClient();
+  const invalidateWarehouseStock = useInvalidateWarehouseStock();
   const { bins = [] } = useWarehouseBins({ skipLocationFilter: true });
   const { locations = [] } = useWarehouseLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();

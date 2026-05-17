@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInvalidateWarehouseStock } from "@/hooks/useInvalidateWarehouseStock";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -100,6 +101,7 @@ export function ItemTransferDialog({
   } | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const queryClient = useQueryClient();
+  const invalidateWarehouseStock = useInvalidateWarehouseStock();
 
   const unitName = item?.unit_id 
     ? units.find(u => u.id === item.unit_id)?.abbreviation || "units"
