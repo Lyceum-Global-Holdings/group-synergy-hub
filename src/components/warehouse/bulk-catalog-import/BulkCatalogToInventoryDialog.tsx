@@ -175,6 +175,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
             <Button size="sm" variant="outline" onClick={() => setPasteOpen(true)}>
               <ClipboardPaste className="h-4 w-4 mr-1" /> Paste codes &amp; qty
             </Button>
+            <Button size="sm" variant="outline" onClick={applyFirstRowBinToAll} disabled={rows.length < 2 || !rows[0]?.bin_id}>
+              <CopyCheck className="h-4 w-4 mr-1" /> Apply row 1 bin to all
+            </Button>
             <Button size="sm" variant="ghost" onClick={clearInvalid} disabled={invalidCount === 0}>
               Clear invalid ({invalidCount})
             </Button>
