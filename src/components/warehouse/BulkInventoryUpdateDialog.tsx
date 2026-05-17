@@ -133,6 +133,20 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
         </DialogHeader>
         <p className="text-sm text-muted-foreground">Only non-empty fields will be applied.</p>
 
+        <div className="space-y-1.5">
+          <Label>Stock Owner filter</Label>
+          <Select value={ownerCompanyId || 'all'} onValueChange={(v) => setOwnerCompanyId(v === 'all' ? '' : v)}>
+            <SelectTrigger><SelectValue placeholder="All stock owners" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All stock owners</SelectItem>
+              {companies.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Only items holding stock for this owner will be updated.</p>
+        </div>
+
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label>Category</Label>
