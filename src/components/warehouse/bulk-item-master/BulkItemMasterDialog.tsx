@@ -266,7 +266,9 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
             </Button>
             <Button onClick={handleSubmit} disabled={isSubmitting || validCount === 0}>
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Create {validCount} item{validCount === 1 ? '' : 's'}
+              {duplicatePolicy === 'fail'
+                ? `Create ${validCount} item${validCount === 1 ? '' : 's'}`
+                : `Process ${validCount} item${validCount === 1 ? '' : 's'}`}
             </Button>
           </div>
         </SheetContent>
