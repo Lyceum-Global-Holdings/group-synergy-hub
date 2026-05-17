@@ -19,6 +19,7 @@ interface UseWarehouseItemsLazyInventoryOptions {
   supplierId?: string;
   locationId?: string | null;
   stockMode?: StockMode;
+  ownerCompanyId?: string | null;
 }
 
 const MAX_ITEMS = 20000;
