@@ -1,0 +1,3 @@
+REVOKE EXECUTE ON FUNCTION public.list_warehouse_inventory(uuid, text, uuid, text, uuid[], timestamptz, uuid, int, text, uuid, text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.list_warehouse_inventory(uuid, text, uuid, text, uuid[], timestamptz, uuid, int, text, uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.list_warehouse_inventory(uuid, text, uuid, text, uuid[], timestamptz, uuid, int, text, uuid, text) TO authenticated;
