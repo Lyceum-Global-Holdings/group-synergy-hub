@@ -121,6 +121,7 @@ export function BinMasterTab() {
               <TableHead>Capacity</TableHead>
               <TableHead>Current Qty</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Shared</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
