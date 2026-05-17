@@ -150,10 +150,18 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
           if (next.code_manual && !/^[A-Z0-9][A-Z0-9._\-/]{1,49}$/i.test(next.item_code)) {
             next.errors.push('Item code has invalid characters');
           }
-          if (existingCodes.has(next.item_code.toLowerCase())) {
-            next.errors.push('Item code already exists in the catalog');
-          }
           const lower = next.item_code.toLowerCase();
+          const existingId = existingCodeToId.get(lower) ?? null;
+          next.existing_catalog_id = existingId;
+          if (existingId) {
+            if (duplicatePolicy === 'fail') {
+              next.errors.push('Item code already exists in the catalog');
+            } else if (duplicatePolicy === 'skip') {
+              next.warnings.push('Skipped — code already exists in catalog');
+            } else {
+              next.warnings.push('Will update existing catalog item');
+            }
+          }
           if (codesSeen.has(lower)) {
             next.errors.push('Duplicate item code in this batch');
           } else {
@@ -161,8 +169,14 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
           }
         }
 
-        if (next.status !== 'imported' && next.status !== 'error') {
-          next.status = next.errors.length > 0 ? 'invalid' : 'valid';
+        if (next.status !== 'imported' && next.status !== 'updated' && next.status !== 'error') {
+          if (next.errors.length > 0) {
+            next.status = 'invalid';
+          } else if (next.existing_catalog_id && duplicatePolicy === 'skip') {
+            next.status = 'skipped';
+          } else {
+            next.status = 'valid';
+          }
         }
 
         out.push(next);
@@ -170,7 +184,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
 
       return out;
     },
-    [categoryById, existingCodes, maxByCategoryCode],
+    [categoryById, existingCodeToId, maxByCategoryCode, duplicatePolicy],
   );
 
   const rowsRef = useRef(rows);
