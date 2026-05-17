@@ -726,6 +726,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       )}
                     </TableCell>
                   )}
+                  {col('current_stock') && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <div className="space-y-1 text-right min-w-[140px]">
