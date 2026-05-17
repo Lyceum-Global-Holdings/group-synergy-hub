@@ -285,7 +285,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return Array.from(suppliers).sort();
   }, [allItems]);
 
-  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all";
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all" || ownerCompanyFilter !== "all";
 
   const clearFilters = () => {
     setCategoryFilter("all");
@@ -293,6 +293,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     setStatusFilter("all");
     setSupplierFilter("all");
     setStockMode("all");
+    setOwnerCompanyFilter("all");
   };
 
   // Selection helpers
