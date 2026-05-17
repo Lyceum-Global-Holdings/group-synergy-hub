@@ -671,8 +671,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       }
                     </TableCell>
                   )}
-                  {col('brand') && <TableCell>{item.brand || '-'}</TableCell>}
-                  {col('supplier') && <TableCell>{item.supplier?.name || '-'}</TableCell>}
                   {col('bin') && (
                     <TableCell>
                       {item.bins && item.bins.length > 0 ? (
