@@ -152,7 +152,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [binFilter, setBinFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
-  const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("all");
+  const [ownerLabelFilter, setOwnerLabelFilter] = useState<string>("");
+  const [debouncedOwnerLabel, setDebouncedOwnerLabel] = useState<string>("");
   const [stockMode, setStockMode] = useState<'all' | 'in_stock' | 'zero' | 'low'>("all");
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
@@ -169,6 +170,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedOwnerLabel(ownerLabelFilter.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [ownerLabelFilter]);
+
   // Lazy loading hook for inventory items
   const {
     data: lazyData,
@@ -184,7 +190,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     supplierId: supplierFilter,
     locationId: globalLocationId,
     stockMode,
-    ownerCompanyId: ownerCompanyFilter === 'all' ? null : ownerCompanyFilter,
+    ownerLabel: debouncedOwnerLabel || null,
   });
 
   // Keep mutations via the old hook with fetching disabled
@@ -289,7 +295,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return Array.from(suppliers).sort();
   }, [allItems]);
 
-  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all" || ownerCompanyFilter !== "all";
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all" || ownerLabelFilter !== "";
 
   const clearFilters = () => {
     setCategoryFilter("all");
@@ -297,7 +303,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     setStatusFilter("all");
     setSupplierFilter("all");
     setStockMode("all");
-    setOwnerCompanyFilter("all");
+    setOwnerLabelFilter("");
   };
 
   // Selection helpers
@@ -463,17 +469,12 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </SelectContent>
             </Select>
 
-            <Select value={ownerCompanyFilter} onValueChange={setOwnerCompanyFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Stock Owner" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stock Owners</SelectItem>
-                {companies.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              placeholder="Stock Owner"
+              value={ownerLabelFilter}
+              onChange={(e) => setOwnerLabelFilter(e.target.value)}
+              className="w-[160px]"
+            />
 
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -719,10 +720,16 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   )}
                   {col('stock_owner') && (
                     <TableCell>
-                      {item.owner_company_names && item.owner_company_names.length > 0 ? (
+                      {item.stock_owners && item.stock_owners.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {item.owner_company_names.map((n, i) => (
-                            <Badge key={`${n}-${i}`} variant="secondary" className="text-xs">{n}</Badge>
+                          {item.stock_owners.map((n, i) => (
+                            <Badge
+                              key={`${n}-${i}`}
+                              variant={n === 'Unassigned' ? 'outline' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {n}
+                            </Badge>
                           ))}
                         </div>
                       ) : (
@@ -1081,7 +1088,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             onOpenChange={setIsBulkUpdateOpen}
             selectedIds={selectedItemIds}
             onComplete={clearSelection}
-            defaultOwnerCompanyId={ownerCompanyFilter === 'all' ? null : ownerCompanyFilter}
+            defaultOwnerLabel={debouncedOwnerLabel || null}
           />
         </Suspense>
       )}
@@ -1103,7 +1110,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             onOpenChange={setIsBulkChangeOwnerOpen}
             selectedIds={selectedItemIds}
             onComplete={clearSelection}
-            defaultFromCompanyId={ownerCompanyFilter === 'all' ? null : ownerCompanyFilter}
+            defaultFromOwner={debouncedOwnerLabel || null}
           />
         </Suspense>
       )}

@@ -19321,6 +19321,7 @@ export type Database = {
           notes: string | null
           reserved_quantity: number
           secondary_quantity: number | null
+          stock_owner: string | null
           updated_at: string
           warehouse_item_id: string
         }
@@ -19336,6 +19337,7 @@ export type Database = {
           notes?: string | null
           reserved_quantity?: number
           secondary_quantity?: number | null
+          stock_owner?: string | null
           updated_at?: string
           warehouse_item_id: string
         }
@@ -19351,6 +19353,7 @@ export type Database = {
           notes?: string | null
           reserved_quantity?: number
           secondary_quantity?: number | null
+          stock_owner?: string | null
           updated_at?: string
           warehouse_item_id?: string
         }
@@ -20967,6 +20970,7 @@ export type Database = {
           notes: string | null
           reserved_quantity: number
           secondary_quantity: number | null
+          stock_owner: string | null
           updated_at: string
           warehouse_item_id: string
         }
@@ -20992,10 +20996,10 @@ export type Database = {
       }
       bulk_change_stock_owner: {
         Args: {
-          _from_company: string
+          _from_owner: string
           _item_ids: string[]
           _location_ids?: string[]
-          _to_company: string
+          _to_owner: string
         }
         Returns: {
           merged_rows: number
@@ -21966,7 +21970,7 @@ export type Database = {
           _cursor_id?: string
           _limit?: number
           _location_ids?: string[]
-          _owner_company_id?: string
+          _owner_label?: string
           _search?: string
           _status?: string
           _stock_mode?: string
@@ -21989,12 +21993,11 @@ export type Database = {
           max_stock_level: number
           min_stock_level: number
           name: string
-          owner_company_ids: string[]
-          owner_company_names: string[]
           reorder_level: number
           reserved_quantity: number
           selling_price: number
           status: string
+          stock_owners: string[]
           supplier_id: string
           supplier_name: string
           unit_abbreviation: string

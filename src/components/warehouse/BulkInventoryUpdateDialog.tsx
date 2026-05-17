@@ -17,12 +17,12 @@ interface BulkInventoryUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedIds: Set<string>;
   onComplete: () => void;
-  defaultOwnerCompanyId?: string | null;
+  defaultOwnerLabel?: string | null;
 }
 
-export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onComplete, defaultOwnerCompanyId = null }: BulkInventoryUpdateDialogProps) {
+export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onComplete, defaultOwnerLabel = null }: BulkInventoryUpdateDialogProps) {
   const queryClient = useQueryClient();
-  const { selectedCompany, companies } = useCompany();
+  const { selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
 
@@ -30,7 +30,7 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
   const [unitId, setUnitId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [brand, setBrand] = useState<string>('');
-  const [ownerCompanyId, setOwnerCompanyId] = useState<string>(defaultOwnerCompanyId ?? '');
+  const [ownerLabel, setOwnerLabel] = useState<string>(defaultOwnerLabel ?? '');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async () => {
@@ -54,15 +54,21 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     let errorCount = 0;
     let skippedCount = 0;
 
-    // Narrow target item IDs to those holding stock for the selected Stock Owner
+    // Narrow target item IDs to those holding stock for the typed Stock Owner label
     let targetIds = Array.from(selectedIds);
-    if (ownerCompanyId) {
-      const { data: allocRows, error: allocErr } = await supabase
+    const trimmedOwner = ownerLabel.trim();
+    if (trimmedOwner) {
+      let query = supabase
         .from('warehouse_bin_allocations')
         .select('warehouse_item_id')
-        .eq('company_id', ownerCompanyId)
         .gt('allocated_quantity', 0)
         .in('warehouse_item_id', targetIds);
+      if (trimmedOwner.toLowerCase() === 'unassigned') {
+        query = query.is('stock_owner', null);
+      } else {
+        query = query.ilike('stock_owner', trimmedOwner);
+      }
+      const { data: allocRows, error: allocErr } = await query;
       if (allocErr) {
         toast.error('Failed to resolve stock owner filter');
         setIsProcessing(false);
@@ -122,7 +128,7 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     setUnitId('');
     setStatus('');
     setBrand('');
-    setOwnerCompanyId(defaultOwnerCompanyId ?? '');
+    setOwnerLabel(defaultOwnerLabel ?? '');
   };
 
   return (
@@ -135,16 +141,16 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
 
         <div className="space-y-1.5">
           <Label>Stock Owner filter</Label>
-          <Select value={ownerCompanyId || 'all'} onValueChange={(v) => setOwnerCompanyId(v === 'all' ? '' : v)}>
-            <SelectTrigger><SelectValue placeholder="All stock owners" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All stock owners</SelectItem>
-              {companies.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">Only items holding stock for this owner will be updated.</p>
+          <Input
+            value={ownerLabel}
+            onChange={(e) => setOwnerLabel(e.target.value)}
+            placeholder="All stock owners"
+            maxLength={120}
+          />
+          <p className="text-xs text-muted-foreground">
+            Type a Stock Owner label to limit updates to items holding stock for that owner.
+            Use "Unassigned" to target stock with no owner.
+          </p>
         </div>
 
         <div className="space-y-4 py-2">
