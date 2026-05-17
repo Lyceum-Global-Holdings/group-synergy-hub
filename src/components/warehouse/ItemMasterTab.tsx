@@ -713,7 +713,19 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       }
                     </TableCell>
                   )}
-                  {col('current_stock') && (
+                  {col('stock_owner') && (
+                    <TableCell>
+                      {item.owner_company_names && item.owner_company_names.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {item.owner_company_names.map((n, i) => (
+                            <Badge key={`${n}-${i}`} variant="secondary" className="text-xs">{n}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <div className="space-y-1 text-right min-w-[140px]">
