@@ -109,10 +109,21 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
 
         let autoPreview = '';
         if (catCode) {
-          const startedAt = counters.get(catCode) ?? (maxByCategoryCode.get(catCode) ?? 0);
-          const nextSeq = startedAt + 1;
-          counters.set(catCode, nextSeq);
-          autoPreview = `INV-${catCode}-${String(nextSeq).padStart(3, '0')}`;
+          // Auto-generate per ISO/IEC 8000 + GS1 sequencing: monotonically
+          // increasing per-category sequence, skipping any code already taken
+          // by the catalog or by an earlier row in this batch.
+          let seq = (counters.get(catCode) ?? (maxByCategoryCode.get(catCode) ?? 0)) + 1;
+          // Safety cap to avoid runaway loops on misconfigured data.
+          for (let guard = 0; guard < 10000; guard++) {
+            const candidate = `INV-${catCode}-${String(seq).padStart(3, '0')}`;
+            const lower = candidate.toLowerCase();
+            if (!existingCodeToId.has(lower) && !codesSeen.has(lower)) {
+              autoPreview = candidate;
+              break;
+            }
+            seq += 1;
+          }
+          counters.set(catCode, seq);
         }
         next.auto_item_code = autoPreview;
 
