@@ -6,7 +6,7 @@ import { useItemUnits } from '@/hooks/useItemUnits';
 import { useInvalidateWarehouseStock } from '@/hooks/useInvalidateWarehouseStock';
 import { allocateItemCodes } from '@/utils/itemCodeGenerator';
 import { classifyItem } from '@/lib/itemMaster/autoClassify';
-import type { BulkItemMasterRow } from './types';
+import type { BulkItemMasterRow, DuplicatePolicy } from './types';
 import type { CreateCatalogItemData } from '@/types/itemBin';
 
 let _rid = 0;
