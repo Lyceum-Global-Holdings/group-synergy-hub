@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -99,6 +99,7 @@ export function ItemTransferDialog({
     values: z.infer<typeof formSchema>;
   } | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
+  const queryClient = useQueryClient();
 
   const unitName = item?.unit_id 
     ? units.find(u => u.id === item.unit_id)?.abbreviation || "units"
@@ -265,6 +266,14 @@ export function ItemTransferDialog({
           quantity_transferred: pendingTransferData.values.quantity,
         })
         .eq('transfer_id', pendingTransferData.transfer.id);
+
+      // Invalidate caches so Inventory / Bin Allocations / ledger views refresh
+      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transfer-requests'] });
 
       // Reset and close
       setShowVerificationDialog(false);
