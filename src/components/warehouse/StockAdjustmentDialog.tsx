@@ -57,17 +57,25 @@ export function StockAdjustmentDialog({
   const { locations } = useWarehouseLocations();
   const [itemAllocations, setItemAllocations] = useState<any[]>([]);
 
-  // Derive parent locations and sub-locations from warehouse_locations
-  const parentLocations = useMemo(
-    () => (locations || []).filter(l => l.type === 'location' && l.status === 'active'),
-    [locations]
-  );
+  // Derive parent location from the selected bin (walk up if bin sits on a sub-location)
+  const derivedParentLocation = useMemo(() => {
+    if (!binId) return null;
+    const bin = bins.find(b => b.id === binId);
+    if (!bin?.location_id) return null;
+    const loc = (locations || []).find(l => l.id === bin.location_id);
+    if (!loc) return null;
+    if (loc.type === 'location') return loc;
+    if (loc.type === 'sublocation' && loc.parent_id) {
+      return (locations || []).find(l => l.id === loc.parent_id) || null;
+    }
+    return loc;
+  }, [binId, bins, locations]);
 
   const subLocations = useMemo(
     () => (locations || []).filter(
-      l => l.type === 'sublocation' && l.status === 'active' && l.parent_id === selectedLocationId
+      l => l.type === 'sublocation' && l.status === 'active' && l.parent_id === derivedParentLocation?.id
     ),
-    [locations, selectedLocationId]
+    [locations, derivedParentLocation]
   );
 
   // Group active bins by their parent location for the bin selector
