@@ -175,6 +175,22 @@ export function BinMasterTab() {
                     </Badge>
                   </TableCell>
                   <TableCell>
+                    {isAdminOrHigher ? (
+                      <Switch
+                        checked={!!bin.is_shared}
+                        disabled={isSettingSharing}
+                        onCheckedChange={(v) =>
+                          setBinSharing({ binId: bin.id, isShared: !!v })
+                        }
+                        aria-label="Toggle multi-owner sharing"
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {bin.is_shared ? 'Yes' : 'No'}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="ghost"
