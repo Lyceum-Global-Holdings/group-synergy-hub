@@ -333,10 +333,10 @@ function Row({ index, row, companies, locations, defaultLocationId, onChange, on
         <Select
           value={row.bin_id ?? undefined}
           onValueChange={(v) => onChange({ bin_id: v })}
-          disabled={!row.location_id || bins.length === 0}
+          disabled={!row.location_id || binsLoading || bins.length === 0}
         >
           <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder={bins.length === 0 ? 'No bins' : 'Optional'} />
+            <SelectValue placeholder={binsLoading ? 'Loading…' : bins.length === 0 ? 'No bins' : 'Optional'} />
           </SelectTrigger>
           <SelectContent>
             {bins.map((b) => (
