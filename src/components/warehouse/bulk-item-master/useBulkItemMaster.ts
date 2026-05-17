@@ -25,6 +25,7 @@ function emptyRow(): BulkItemMasterRow {
     code_manual: false,
     classify_confidence: 'none',
     suggested_family: null,
+    existing_catalog_id: null,
     status: 'pending',
     errors: [],
     warnings: [],
