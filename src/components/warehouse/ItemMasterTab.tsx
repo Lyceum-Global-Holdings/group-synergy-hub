@@ -72,6 +72,9 @@ const BulkInventoryUpdateDialog = lazy(() =>
 const BulkInventoryDeleteDialog = lazy(() =>
   import('@/components/warehouse/BulkInventoryDeleteDialog').then(m => ({ default: m.BulkInventoryDeleteDialog }))
 );
+const BulkChangeStockOwnerDialog = lazy(() =>
+  import('@/components/warehouse/BulkChangeStockOwnerDialog').then(m => ({ default: m.BulkChangeStockOwnerDialog }))
+);
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
