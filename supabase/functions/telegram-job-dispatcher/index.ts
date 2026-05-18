@@ -198,10 +198,6 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
   let grandIn = 0, grandOut = 0, grandNetValue = 0;
   for (const g of groups.values()) {
     const item = itemMap.get(g.itemId) ?? { code: g.itemId.slice(0, 8), name: 'Unknown item', uom: '' };
-    const first = g.rows[0];
-    const last = g.rows[g.rows.length - 1];
-    const openingQty = Number(first?.qty_before ?? 0);
-    const closingQty = Number(last?.qty_after ?? openingQty);
 
     let totalIn = 0, totalOut = 0;
     const ledgerRows: LedgerRow[] = g.rows.map((t: any) => {
@@ -217,7 +213,6 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
         description: t.reference_type ?? '',
         inQty: isIn ? q : 0,
         outQty: isIn ? 0 : Math.abs(q),
-        balance: Number(t.qty_after ?? 0),
         uom: item.uom,
         unitCost,
         value,
@@ -231,11 +226,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
       itemCode: item.code,
       itemName: item.name,
       uom: item.uom,
-      openingQty,
-      openingValue: openingQty * (Number(first?.unit_cost) || 0),
       rows: ledgerRows,
-      closingQty,
-      closingValue: closingQty * (Number(last?.unit_cost) || 0),
       totalIn,
       totalOut,
     };
