@@ -1,134 +1,50 @@
-# Unify tools into the warehouse inventory (SAP-style material type)
+## Goal
 
-## Why
+Make Tool Management write directly to `warehouse_item_catalog` / `warehouse_items` / `warehouse_bin_allocations` (the standard inventory plumbing), then retire the legacy `warehouse_tools` + `tool_bin_allocations` tables and the bidirectional sync triggers installed in Phase 1.
 
-The previous fix merged tools into Bin Allocations / Inventory at the read
-layer, but tools still live in their own `warehouse_tools` /
-`tool_bin_allocations` tables. That means every stock workflow — adjust,
-transfer, GRN, putaway, audit, FIFO, ledger, valuation — is duplicated or
-unavailable for tools. International WMS practice (SAP MM, Oracle, NetSuite)
-keeps **one material master**, and differentiates behavior via a
-**material type** (`ERSA`/`NLAG`/`HIBE` for tools/consumables). The same
-items table powers stock; the "tool" character is an attribute, not a
-parallel table.
+Issue / Return workflows already carry `warehouse_item_id` from Phase 1 — they will be repointed to it and the legacy `tool_id` column is kept nullable for history only.
 
-## Target architecture
+## Phase 2a — Frontend rewrite (no destructive DB changes yet)
 
-```text
-warehouse_item_catalog        (master)         ← tools live here, item_type='tool'
-        │
-        ├─ warehouse_items           (per-company on-hand row)
-        │       │
-        │       └─ warehouse_bin_allocations   (per-bin qty)
-        │
-        └─ stock_transactions (ledger)  • valuation • reorder • audit  ─┐
-                                                                       │
-Tool-specific lifecycle stays separate (loanable behavior):            │
-   tool_issues / tool_returns  ── now reference warehouse_items.id ────┘
-```
+Rewrite every Tool Management hook + dialog to read/write the standard tables. The Phase 1 sync triggers stay in place during this phase so anything we miss keeps working.
 
-Result: stock, bins, transfers, GRN, audits, valuation — all one path.
-Issue/Return is the only tool-specific workflow and keeps its own tables,
-but those tables now point at `warehouse_items`.
+**`useWarehouseTools.ts`** — replace `get_warehouse_tools_list` RPC + `warehouse_tools` writes with:
+- Read: `list_warehouse_inventory` RPC filtered by `item_type = 'tool'` (or a thin new RPC `list_warehouse_tools_v2` if filter not supported), mapped to the existing `WarehouseTool` shape so dialogs don't have to change.
+- Create single: insert into `warehouse_item_catalog` (`item_type='tool'`, `item_code` auto-prefixed `TOOL-…`) then insert per-company `warehouse_items` (`is_loanable=true`, `condition`, `current_stock = total_quantity`).
+- Create bulk: same dual-insert in a loop, batched.
+- Update: split into catalog fields (name, category, unit, brand, model, serial, specs) → `update_warehouse_catalog_item` RPC; per-company fields (location, condition, status, reorder) → `warehouse_items` UPDATE.
+- Delete: delete the `warehouse_items` row (RLS-verified `.select('id')`); catalog row is left alone if other companies still use it, else cascade-cleaned by a small `delete_tool_catalog_if_unused` RPC.
 
-## Migration plan (one migration, reversible-safe)
+**`useToolBinAllocations.ts`** — delete in favor of the existing `useWarehouseBinAllocations` hook. Update the two callers (`ToolBinAllocationsPanel`, `AllocateToolToBinDialog`, `MoveToolBetweenBinsDialog`) to use `createAllocation` / `moveAllocation` from the standard hook.
 
-### Schema
+**`useToolAdjustments.ts`** — rewrite to call the standard `useStockAdjustments` flow (writes `stock_transactions` + updates `warehouse_items.current_stock`). Keep the `tool_adjustments` audit row insert so historical reports keep working, but source `quantity_before` / `quantity_after` from `warehouse_items.current_stock`, not `warehouse_tools.total_quantity`.
 
-1. Add `warehouse_item_catalog.item_type text default 'item' check (item_type in ('item','tool'))` and an index on it.
-2. Add `warehouse_items.is_loanable boolean default false` (true for tools)
-   and `warehouse_items.condition text` (good/fair/poor/damaged), so tool
-   metadata survives the move.
-3. Add `tool_issues.warehouse_item_id uuid` and
-   `tool_returns.warehouse_item_id uuid` (nullable for now, FK to
-   `warehouse_items` ON DELETE RESTRICT).
+**`useToolIssues.ts` / `useToolReturns.ts`** — write `warehouse_item_id` (already added in Phase 1) and post a `stock_transactions` row (`transaction_type='issue'` / `'return'`) so `available_quantity` reflects loans through the standard reservation pathway instead of `warehouse_tools.issued_quantity`. The `tool_issues` / `tool_returns` tables stay (they carry borrower, due-date, condition-out/in — domain-specific to tools).
 
-### Data backfill (idempotent SQL)
+**Dialogs** (`CreateToolDialog`, `EditToolDialog`, `BulkToolImportDialog`, `ImportFromItemMasterDialog`, `AllocateToolToBinDialog`, `MoveToolBetweenBinsDialog`, `ToolAdjustmentDialog`, `IssueToolDialog`, `ReturnToolDialog`, `BulkIssueToolDialog`, `BulkReturnToolDialog`) — keep UI; swap the hook calls only. `ImportFromItemMasterDialog` simplifies: just flip `item_type` to `'tool'` and set `is_loanable=true` on existing catalog rows.
 
-4. For every `warehouse_tools` row:
-   - Insert/find a `warehouse_item_catalog` row keyed by `tool_code` →
-     `item_code`, `item_type='tool'`, mapping category, unit, brand,
-     description, image, unit_cost.
-   - Insert a per-company `warehouse_items` row (one per tool row) with
-     `is_loanable=true`, `condition`, `location_id`, `current_stock =
-     total_quantity`, `available_quantity = available_quantity`. Use the
-     existing `upsert_warehouse_inventory` RPC.
-   - Copy each `tool_bin_allocations` row → `warehouse_bin_allocations`
-     using the new `warehouse_item_id`. Skip if already present.
-   - Set `tool_issues.warehouse_item_id` and `tool_returns.warehouse_item_id`
-     via the `tool_id → warehouse_item_id` map.
-5. Verify counts; emit a NOTICE per orphaned row (none expected — there are
-   206 tools, 1 allocation, 4 issues, 4 returns).
+**Tabs** (`ToolsInventoryTab`, `ToolBinAllocationsPanel`, `ToolIssuesTab`, `ToolReturnsTab`, `OverdueToolsTab`) — keep, just consume the rewired hooks.
 
-### Compatibility
+## Phase 2b — DB cleanup migration
 
-6. Replace `warehouse_tools` with a **view** (`security_invoker=on`) over
-   `warehouse_items` filtered by `is_loanable=true`, exposing the legacy
-   column names (`tool_code`, `total_quantity`, `available_quantity`,
-   `issued_quantity`, `condition`, …) so the existing Tool Management UI
-   keeps working without a frontend rewrite. Same trick for
-   `tool_bin_allocations` → view over `warehouse_bin_allocations` filtered
-   to loanable items.
-7. After the FE swap (Phase 2) the legacy view can be dropped.
+Run after Phase 2a is verified in preview:
 
-### RLS
-
-8. Catalog visibility (`is_loanable` rows) reuses the existing
-   `warehouse_item_catalog` policy — already global with company-scoped
-   inventory. No new policy needed.
-
-## Frontend changes
-
-### Tool Management page
-
-- `useWarehouseTools` now reads from `warehouse_items` with
-  `catalog.item_type='tool'` (or via the compat view in Phase 1). Type
-  surface stays the same so existing dialogs (Add Tool, Issue, Return,
-  Allocate to Bin, Move, QR) compile unchanged.
-- `AllocateToolToBinDialog` switches to the standard
-  `useWarehouseBinAllocations.createAllocation` mutation.
-- `MoveToolBetweenBinsDialog` calls the standard move flow.
-- `IssueToolDialog` / `ReturnToolDialog` continue using
-  `tool_issues` / `tool_returns`, but now write `warehouse_item_id` and
-  call `stock_transactions` (out=issue, in=return) so the **standard
-  ledger** records the movement and `available_quantity` reflects loans.
-- "Add Tool" routes through the standard catalog + inventory create flow
-  with `item_type='tool'`, `is_loanable=true`.
-
-### Warehouse → Inventory page
-
-- Remove the temporary `Tools` tab and `ToolsInventoryOnHand` component.
-- Tools now appear naturally in the main inventory list with a "Tool"
-  badge (driven by `catalog.item_type`). Add a Type filter (All / Items /
-  Tools) to the existing filter bar.
-
-### Bin Allocations page
-
-- Remove `useAllToolBinAllocations` merge and the `_entity_type` shim —
-  tools now flow through `warehouse_bin_allocations` and appear
-  automatically. Keep the Type column, sourced from `catalog.item_type`.
-
-### Cleanup
-
-- Delete: `useAllToolBinAllocations.ts`, `ToolsInventoryOnHand.tsx`.
-- Trim `WAREHOUSE_STOCK_QUERY_KEYS` back to item keys; the old
-  `tool-bin-allocations*` keys stay only for the Issue/Return hooks.
-- Update memory: replace `unified-on-hand-tools-merge` with a new
-  `tools-as-warehouse-items` rule documenting that tools = items with
-  `item_type='tool'` + `is_loanable=true`, and that every stock workflow
-  uses the standard item path.
-
-## Rollout (two-phase, no downtime)
-
-**Phase 1 (this migration + small FE):** schema + backfill + compat views.
-Tool Management UI keeps working unchanged. Inventory, Bin Allocations,
-GRN, transfers, audits immediately see tools as first-class stock.
-
-**Phase 2 (follow-up):** rewrite Tool Management hooks/dialogs to call the
-standard item APIs directly, drop the compat views, drop
-`warehouse_tools` and `tool_bin_allocations` tables.
+1. Drop the four sync triggers and their functions (`sync_tool_to_warehouse_item`, `sync_tool_bin_alloc_to_warehouse`, `sync_warehouse_item_to_tool`, `sync_warehouse_bin_alloc_to_tool`).
+2. `ALTER TABLE tool_issues / tool_returns` — drop the `tool_id` NOT NULL constraint (keep column for history); add `NOT NULL` on `warehouse_item_id`.
+3. Drop `warehouse_tools` and `tool_bin_allocations`. (`tool_adjustments` keeps `tool_id` as a free text/uuid history column without FK.)
+4. Drop the `get_warehouse_tools_list` RPC.
+5. Update memory `architecture/tools-as-warehouse-items.md` to reflect Phase 2 complete.
 
 ## Out of scope
 
-- Serial-number tracking per tool unit (existing tools are bulk-quantity).
-- Calibration / depreciation schedules (asset module already covers this).
+- Issue/Return business rules, overdue logic, calibration, depreciation — untouched.
+- Serial-number-per-unit tracking (deferred to a separate feature).
+- Reports / analytics that still join `warehouse_tools` will be migrated in a follow-up sweep using `grep` (none expected outside the hooks above based on current code search, but verify).
+
+## Rollout
+
+1. Implement Phase 2a in one batch, verify Tool Management screens in preview (list, create, edit, allocate, move, issue, return, adjust).
+2. Then run the Phase 2b migration.
+3. Final memory + plan doc updates.
+
+Confirm and I'll start with Phase 2a.
