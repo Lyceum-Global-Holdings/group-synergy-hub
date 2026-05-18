@@ -111,6 +111,7 @@ export function useToolBinAllocations(toolId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
       toast({ title: "Allocated", description: "Bin allocation saved." });
     },
@@ -181,6 +182,7 @@ export function useToolBinAllocations(toolId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
       toast({ title: "Moved", description: "Stock moved between bins." });
     },
@@ -208,6 +210,7 @@ export function useToolBinAllocations(toolId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
       toast({ title: "Removed", description: "Bin allocation removed." });
     },
