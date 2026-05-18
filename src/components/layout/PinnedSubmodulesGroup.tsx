@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useReorderPins, type PinnedSubmodule } from "@/hooks/useSidebarPins";
 import { moduleConfig } from "@/constants/moduleConfig";
 import { useCompany } from "@/contexts/CompanyContext";
+import { navPreloadProps } from "@/lib/navPreload";
 
 interface PinnedGroupProps {
   /** Pins for the active scope (specific company or union for "all"). */
