@@ -9,20 +9,20 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { data: isSuperAdmin, isLoading: superAdminLoading } = useSuperAdmin();
   const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
 
-  // Fast path: super_admin / admin status is cached (60s+) and usually
-  // resolves before the page even mounts. Skip the heavier module-access
-  // query for these users entirely.
-  if (isSuperAdmin || isAdmin) {
-    return <>{children}</>;
-  }
-
-  // Only non-admins pay for the module access lookup, and only after the
-  // role check has resolved (so we don't block twice).
+  // Defer the heavier module-access query: only fetch once role checks have
+  // settled AND the user is NOT already admin/super_admin. Admin/super_admin
+  // status is cached aggressively so this usually resolves instantly without
+  // ever firing the module query.
   const roleResolved = !superAdminLoading && !adminLoading;
-  const { data: effectiveModules, isLoading: modulesLoading } =
-    useUserEffectiveModules(roleResolved ? user?.id : undefined);
+  const hasAdminRole = !!isSuperAdmin || !!isAdmin;
+  const needsModuleCheck = roleResolved && !hasAdminRole;
 
-  if (!roleResolved || modulesLoading) {
+  const { data: effectiveModules, isLoading: modulesLoading } =
+    useUserEffectiveModules(needsModuleCheck ? user?.id : undefined);
+
+  if (hasAdminRole) return <>{children}</>;
+
+  if (!roleResolved || (needsModuleCheck && modulesLoading)) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
