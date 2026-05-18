@@ -149,7 +149,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
   // Movements in period
   let txQuery = sb
     .from('stock_transactions')
-    .select('id, transaction_type, quantity_change, total_value, unit_cost, location_id, item_id, reference_no, reference_type, created_at')
+    .select('id, transaction_type, quantity_change, total_value, unit_cost, location_id, item_id, reference_id, reference_type, created_at')
     .eq('company_id', job.company_id)
     .gte('created_at', from)
     .lt('created_at', to)
@@ -208,7 +208,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
       const value = Number(t.total_value) || Math.abs(q) * unitCost;
       return {
         date: t.created_at,
-        docNo: t.reference_no ?? '—',
+        docNo: t.reference_id ? String(t.reference_id).slice(0, 8) : '—',
         refType: TX_TYPE_LABEL[t.transaction_type] ?? t.transaction_type,
         description: t.reference_type ?? '',
         inQty: isIn ? q : 0,
