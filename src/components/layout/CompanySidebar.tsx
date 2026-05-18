@@ -478,6 +478,7 @@ function NestedSubItem({
               >
                 <NavLink
                   to={child.url}
+                  {...navPreloadProps(child.url)}
                   className={`flex-1 block text-xs py-1.5 px-2 rounded-sm transition-colors relative z-[1] ${
                     isActive(child.url)
                       ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'
