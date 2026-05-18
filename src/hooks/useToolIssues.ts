@@ -9,6 +9,7 @@ export function useToolIssues() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const invalidateWarehouseStock = useInvalidateWarehouseStock();
 
   const issuesQuery = useQuery({
     queryKey: ["tool-issues", selectedCompany?.id],
