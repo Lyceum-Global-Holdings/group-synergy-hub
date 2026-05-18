@@ -138,6 +138,7 @@ export function useToolReturns() {
       queryClient.invalidateQueries({ queryKey: ["tool-issues-active"] });
       queryClient.invalidateQueries({ queryKey: ["tool-issues-overdue"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      invalidateWarehouseStock();
       toast({ title: "Success", description: "Tool return processed successfully" });
     },
     onError: (error: any) => {
