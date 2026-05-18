@@ -34,7 +34,9 @@ interface Job {
 
 interface RenderedReport {
   title: string;
-  html: string;
+  html: string;          // caption (PDF) or full body (text mode)
+  pdf?: Uint8Array;      // when filters.format === 'pdf'
+  filename?: string;
 }
 
 // ---------- Telegram send ----------
