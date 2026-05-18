@@ -22179,10 +22179,15 @@ export type Database = {
           _company_id?: string
           _cursor_created_at?: string
           _cursor_id?: string
+          _cursor_item_code?: string
+          _cursor_name?: string
+          _cursor_stock?: number
           _limit?: number
           _location_ids?: string[]
           _owner_label?: string
           _search?: string
+          _sort_by?: string
+          _sort_dir?: string
           _status?: string
           _stock_mode?: string
           _supplier_id?: string
