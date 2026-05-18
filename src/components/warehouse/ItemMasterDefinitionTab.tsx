@@ -399,13 +399,28 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </div>
       </div>
 
-      <div className="rounded-md border overflow-auto">
+      <div
+        ref={scrollParentRef}
+        className="rounded-md border overflow-auto max-h-[calc(100vh-320px)]"
+        role="grid"
+        aria-rowcount={items.length}
+      >
         <Table className="[&_td]:py-1.5 [&_th]:py-2">
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow>
               {col('photo') && <TableHead className="w-10"></TableHead>}
-              {col('item_code') && <TableHead>Item Code</TableHead>}
-              <TableHead>Name</TableHead>
+              {col('item_code') && (
+                <TableHead aria-sort={sortBy === 'item_code' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button type="button" onClick={() => handleSort('item_code')} className="inline-flex items-center font-medium hover:text-foreground">
+                    Item Code<SortIcon k="item_code" />
+                  </button>
+                </TableHead>
+              )}
+              <TableHead aria-sort={sortBy === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <button type="button" onClick={() => handleSort('name')} className="inline-flex items-center font-medium hover:text-foreground">
+                  Name<SortIcon k="name" />
+                </button>
+              </TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
               {col('unit_cost') && <TableHead className="text-right">Unit Cost</TableHead>}
@@ -424,109 +439,37 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <TableRow>
                 <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">No items found</TableCell>
               </TableRow>
-            ) : items.map(item => {
-              const category = categories.find(c => c.id === item.category_id);
-              const unit = units.find(u => u.id === item.unit_id);
-              return (
-                <TableRow key={item.id}>
-                  {col('photo') && (
-                    <TableCell>
-                      {item.image_url ? (
-                        <button onClick={() => setPreviewImage({ url: item.image_url!, name: item.name })} className="cursor-pointer">
-                          <img src={item.image_url} alt={item.name} className="h-7 w-7 rounded object-cover" />
-                        </button>
-                      ) : (
-                        <div className="h-7 w-7 rounded bg-muted flex items-center justify-center">
-                          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
+            ) : shouldVirtualize ? (
+              <>
+                {(() => {
+                  const vItems = rowVirtualizer.getVirtualItems();
+                  const totalSize = rowVirtualizer.getTotalSize();
+                  const paddingTop = vItems.length > 0 ? vItems[0].start : 0;
+                  const paddingBottom = vItems.length > 0 ? totalSize - vItems[vItems.length - 1].end : 0;
+                  return (
+                    <>
+                      {paddingTop > 0 && (
+                        <TableRow style={{ height: paddingTop }}>
+                          <TableCell colSpan={visibleCount} className="p-0" />
+                        </TableRow>
                       )}
-                    </TableCell>
-                  )}
-                  {col('item_code') && <TableCell className="font-mono text-xs">{item.item_code}</TableCell>}
-                  <TableCell>
-                    <div className="space-y-0.5">
-                      <div className="font-medium">{item.name}</div>
-                      {item.description && (
-                        <div className="text-xs text-muted-foreground line-clamp-1">
-                          {item.description}
-                        </div>
+                      {vItems.map(v => renderRow(items[v.index], v.index))}
+                      {paddingBottom > 0 && (
+                        <TableRow style={{ height: paddingBottom }}>
+                          <TableCell colSpan={visibleCount} className="p-0" />
+                        </TableRow>
                       )}
-                    </div>
-                  </TableCell>
-                  {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
-                  {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
-                  {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
-                  {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
-                  {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
-                  {col('status') && (
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusColor(item.status || 'active')}>
-                        {item.status || 'active'}
-                      </Badge>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewingItem(item)}>
-                                  <Eye className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>View Details</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Edit Item</TooltipContent>
-                            </Tooltip>
-                            {canDelete && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingItem(item)} disabled={isDeleting || isMarkingInactive}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete Item</TooltipContent>
-                              </Tooltip>
-                            )}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToInventory?.(item.id)}>
-                                  <Package className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>View in Inventory</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToBins?.(item.id)}>
-                                  <MapPin className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>View Bin Allocations</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setStockMovementItem(item)}>
-                                  <History className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Stock Movement History</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                    </>
+                  );
+                })()}
+              </>
+            ) : (
+              items.map((item, idx) => renderRow(item, idx))
+            )}
           </TableBody>
         </Table>
       </div>
+
 
       <div className="flex flex-col items-center gap-2">
         <div className="text-sm text-muted-foreground">
