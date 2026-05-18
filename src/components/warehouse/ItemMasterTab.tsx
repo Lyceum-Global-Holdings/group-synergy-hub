@@ -207,6 +207,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     locationId: globalLocationId,
     stockMode,
     ownerLabel: debouncedOwnerLabel || null,
+    sortBy,
+    sortDir,
   });
 
   // Keep mutations via the old hook with fetching disabled
