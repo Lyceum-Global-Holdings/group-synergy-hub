@@ -120,6 +120,29 @@ export function useToolIssues() {
         if (updateError) throw updateError;
       }
 
+      // Phase 2b: post to unified inventory ledger via standard tables
+      const warehouseItemId =
+        (tool as any)?.warehouse_item_id ??
+        (await supabase
+          .from("warehouse_tools")
+          .select("warehouse_item_id")
+          .eq("id", issueData.tool_id)
+          .single()).data?.warehouse_item_id;
+
+      if (warehouseItemId) {
+        const { error: ledgerError } = await supabase.rpc(
+          "tool_issue_post_ledger",
+          {
+            p_warehouse_item_id: warehouseItemId,
+            p_quantity: issueData.quantity_issued,
+            p_reference_id: issue.id,
+            p_company_id: selectedCompany?.id || issueData.company_id,
+            p_notes: `Tool issue ${issueNumber}`,
+          },
+        );
+        if (ledgerError) console.error("tool ledger (issue) failed", ledgerError);
+      }
+
       return issue;
     },
     onSuccess: () => {
