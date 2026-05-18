@@ -149,7 +149,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
   // Movements in period
   let txQuery = sb
     .from('stock_transactions')
-    .select('id, transaction_type, quantity_change, total_value, unit_cost, qty_before, qty_after, location_id, item_id, reference_no, reference_type, created_at')
+    .select('id, transaction_type, quantity_change, total_value, unit_cost, location_id, item_id, reference_no, reference_type, created_at')
     .eq('company_id', job.company_id)
     .gte('created_at', from)
     .lt('created_at', to)
@@ -198,10 +198,6 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
   let grandIn = 0, grandOut = 0, grandNetValue = 0;
   for (const g of groups.values()) {
     const item = itemMap.get(g.itemId) ?? { code: g.itemId.slice(0, 8), name: 'Unknown item', uom: '' };
-    const first = g.rows[0];
-    const last = g.rows[g.rows.length - 1];
-    const openingQty = Number(first?.qty_before ?? 0);
-    const closingQty = Number(last?.qty_after ?? openingQty);
 
     let totalIn = 0, totalOut = 0;
     const ledgerRows: LedgerRow[] = g.rows.map((t: any) => {
@@ -217,7 +213,6 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
         description: t.reference_type ?? '',
         inQty: isIn ? q : 0,
         outQty: isIn ? 0 : Math.abs(q),
-        balance: Number(t.qty_after ?? 0),
         uom: item.uom,
         unitCost,
         value,
@@ -231,11 +226,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
       itemCode: item.code,
       itemName: item.name,
       uom: item.uom,
-      openingQty,
-      openingValue: openingQty * (Number(first?.unit_cost) || 0),
       rows: ledgerRows,
-      closingQty,
-      closingValue: closingQty * (Number(last?.unit_cost) || 0),
       totalIn,
       totalOut,
     };
@@ -263,7 +254,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
       for (const loc of sectionsMap.values()) {
         html += `\n<b>${esc(loc.locationName)}</b>\n`;
         for (const it of loc.items) {
-          html += `  • ${esc(it.itemCode)} ${esc(it.itemName)}: open ${fmtNum(it.openingQty)} → close ${fmtNum(it.closingQty)} (in +${fmtNum(it.totalIn)} / out -${fmtNum(it.totalOut)})\n`;
+          html += `  • ${esc(it.itemCode)} ${esc(it.itemName)}: in +${fmtNum(it.totalIn)} / out -${fmtNum(it.totalOut)}\n`;
         }
       }
     }
