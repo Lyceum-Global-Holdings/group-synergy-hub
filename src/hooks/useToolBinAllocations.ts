@@ -26,7 +26,7 @@ interface MoveInput {
 
 /** Resolve the warehouse_items.id linked to a warehouse_tools.id (Phase 2a cache). */
 async function resolveWarehouseItemId(toolId: string): Promise<string> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("warehouse_tools")
     .select("warehouse_item_id")
     .eq("id", toolId)
