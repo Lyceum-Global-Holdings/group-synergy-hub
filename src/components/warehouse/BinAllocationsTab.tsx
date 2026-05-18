@@ -17,6 +17,7 @@ import {
 import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2, MapPin, ArrowRightLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
+import { useAllToolBinAllocations } from '@/hooks/useAllToolBinAllocations';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -40,6 +41,7 @@ export function BinAllocationsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
+  const { data: toolAllocations = [], isLoading: toolsLoading } = useAllToolBinAllocations();
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
 
@@ -101,7 +103,12 @@ export function BinAllocationsTab() {
 
   const filteredAllocations = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    const base = (binAllocations || []).filter((allocation) => {
+    // Merge item allocations (canonical) with tool allocations (read-only here)
+    const combined: BinAllocationWithDetails[] = [
+      ...(binAllocations || []),
+      ...(toolAllocations || []),
+    ];
+    const base = combined.filter((allocation) => {
       // Warehouse / sub-location scope
       if (scope) {
         const locId = allocation.warehouse_bin?.warehouse_location?.id;
@@ -127,7 +134,7 @@ export function BinAllocationsTab() {
       if (ba !== bb) return ba.localeCompare(bb);
       return (a.warehouse_item?.item_code ?? '').localeCompare(b.warehouse_item?.item_code ?? '');
     });
-  }, [binAllocations, searchTerm, scope]);
+  }, [binAllocations, toolAllocations, searchTerm, scope]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
@@ -138,6 +145,18 @@ export function BinAllocationsTab() {
   };
 
   const columns: ColumnDef<BinAllocationWithDetails>[] = [
+    {
+      id: 'type',
+      header: 'Type',
+      cell: ({ row }) => {
+        const isTool = (row.original as any)._entity_type === 'tool';
+        return (
+          <Badge variant={isTool ? 'outline' : 'secondary'} className="font-normal">
+            {isTool ? 'Tool' : 'Item'}
+          </Badge>
+        );
+      },
+    },
     {
       accessorKey: 'warehouse_item.item_code',
       header: 'Item Code',
@@ -203,54 +222,65 @@ export function BinAllocationsTab() {
     {
       id: 'qr',
       header: 'QR',
-      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setQrAllocation(row.original)}
-          title="Generate QR code"
-        >
-          <QrCode className="h-4 w-4" />
-        </Button>
-      ),
+      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => {
+        const isTool = (row.original as any)._entity_type === 'tool';
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setQrAllocation(row.original)}
+            title={isTool ? 'QR not available for tools here — use Tool Management' : 'Generate QR code'}
+            disabled={isTool}
+          >
+            <QrCode className="h-4 w-4" />
+          </Button>
+        );
+      },
     },
     ...(canDelete ? [{
       id: 'actions',
       header: 'Actions',
-      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMoveAllocation(row.original)}
-            title="Move stock to another bin/warehouse"
-            disabled={(row.original.available_quantity || 0) <= 0}
-          >
-            <ArrowRightLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setAllocationToDelete(row.original.id)}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            title="Delete allocation"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => {
+        const isTool = (row.original as any)._entity_type === 'tool';
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMoveAllocation(row.original)}
+              title={isTool ? 'Move tools from Tool Management' : 'Move stock to another bin/warehouse'}
+              disabled={isTool || (row.original.available_quantity || 0) <= 0}
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAllocationToDelete(row.original.id)}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              title={isTool ? 'Delete tool allocations from Tool Management' : 'Delete allocation'}
+              disabled={isTool}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
     }] as ColumnDef<BinAllocationWithDetails>[] : []),
   ];
 
   const handleBulkPrint = async () => {
-    if (!filteredAllocations.length) {
-      toast.error('No allocations to print');
+    const itemRows = filteredAllocations.filter(
+      (a) => (a as any)._entity_type !== 'tool',
+    );
+    if (!itemRows.length) {
+      toast.error('No item allocations to print (tool rows are excluded)');
       return;
     }
     setBulkPrinting(true);
     try {
       const blob = await generateBulkBinQRCodePdf(
-        filteredAllocations.map((a) => ({
+        itemRows.map((a) => ({
           id: a.id,
           item_code: a.warehouse_item?.item_code,
           item_name: a.warehouse_item?.name,
@@ -261,7 +291,7 @@ export function BinAllocationsTab() {
         }))
       );
       downloadBulkBinQRCodePdf(blob);
-      toast.success(`Generated ${filteredAllocations.length} QR labels`);
+      toast.success(`Generated ${itemRows.length} QR labels`);
     } catch (e) {
       console.error(e);
       toast.error('Failed to generate QR labels');
@@ -343,7 +373,7 @@ export function BinAllocationsTab() {
         <DataTable
           columns={columns}
           data={filteredAllocations}
-          isLoading={isLoading}
+          isLoading={isLoading || toolsLoading}
         />
       </CardContent>
 
