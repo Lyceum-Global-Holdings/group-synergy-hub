@@ -141,7 +141,8 @@ export function BinAllocationsTab() {
       id: 'type',
       header: 'Type',
       cell: ({ row }) => {
-        const isTool = (row.original as any)._entity_type === 'tool';
+        const itemType = (row.original.warehouse_item as any)?.catalog?.item_type;
+        const isTool = itemType === 'tool';
         return (
           <Badge variant={isTool ? 'outline' : 'secondary'} className="font-normal">
             {isTool ? 'Tool' : 'Item'}
