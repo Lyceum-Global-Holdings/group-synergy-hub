@@ -1,47 +1,88 @@
-## Goal
-Let users paste both item codes and opening quantities (and optionally unit cost / notes) in one step from the "Bulk add from catalog" dialog on `/warehouse/inventory`, instead of only pasting codes and then editing qty per row.
+# Show tool bin allocations in Inventory + Bin Allocations
 
-## Solution
-Extend the existing paste flow in `src/components/warehouse/bulk-catalog-import/` to accept tabular paste (Excel/Sheets-friendly TSV or CSV), so each line becomes one fully-populated row.
+## Problem
 
-### Accepted paste formats
-Auto-detect delimiter (`\t`, `,`, or `;`). Each line:
+Tools live in `warehouse_tools` with allocations in `tool_bin_allocations`. The
+Warehouse → **Bin Allocations** and Warehouse → **Inventory** pages only read
+`warehouse_bin_allocations` / `warehouse_items`, so a freshly allocated tool
+(e.g. Ackro jak → bin LAN, qty 35) never appears there. Users have no single
+place to see "what's physically in my warehouse".
 
+## Solution overview
+
+Add a thin DB layer that unions the two allocation sources into a single
+`unified_bin_allocations` view, plus an `entity_type` column (`item` / `tool`).
+Update both pages to read from this view via small RPCs so pagination,
+filtering and realtime stay performant.
+
+```text
+warehouse_bin_allocations ─┐
+                           ├──► unified_bin_allocations (view)
+tool_bin_allocations ──────┘             │
+                                         ├─► list_bin_allocations_unified RPC → Bin Allocations tab
+                                         └─► list_warehouse_inventory_unified RPC → Inventory tab
 ```
-<code>      <opening_qty>   [unit_cost]   [notes]
-ITM-001     50              12.50        Opening from FY26 audit
-5012345678900  10
-ITM-XYZ     0
-```
 
-- Column 1 (required): item code / GTIN / SKU
-- Column 2 (optional): opening qty (number; blank or missing → 0)
-- Column 3 (optional): unit cost
-- Column 4 (optional): notes
-- Single-column paste keeps working (qty defaults to 0) — fully backward compatible.
-- Header row auto-skipped if first cell matches `/code|item|sku|gtin/i`.
+## Changes
 
-Location and bin come from the dialog defaults (already in `useBulkCatalogImport`). If a row has qty > 0 but no default location/bin, it stays in the grid flagged invalid with the existing message ("Location required when qty > 0" / "Bin required when qty > 0") — user fixes inline before submit. This reuses the validator without backend changes.
+### 1. Database (migration)
 
-### File changes (frontend only)
-1. **`PasteCodesDialog.tsx`**
-   - Update title/description to mention multi-column paste with example.
-   - Change `onResolve` signature to pass parsed rows: `{ code: string; opening_qty?: number; unit_cost?: number; notes?: string }[]`.
-   - Add a tiny parser: split lines, detect delimiter per line, trim cells, skip header, coerce numbers (ignore non-numeric qty → 0 with row warning).
-   - Toast summary: "X matched · Y not found · Z with qty".
+- **View `public.unified_bin_allocations`** (`security_invoker=on`) with columns:
+  `id, entity_type ('item'|'tool'), entity_id, entity_code, entity_name,
+  bin_id, location_id, company_id, allocated_quantity, reserved_quantity,
+  available_quantity, notes, created_at, updated_at`.
+  Body: `SELECT … FROM warehouse_bin_allocations a JOIN warehouse_items_full f …
+  UNION ALL SELECT … FROM tool_bin_allocations a JOIN warehouse_tools t …`.
+- **RPC `list_bin_allocations_unified`** (SECURITY INVOKER, keyset paginated
+  on `(created_at desc, id desc)`, filters: `p_company_id`, `p_location_ids
+  uuid[]`, `p_entity_type`, `p_search`, `p_limit`, `p_cursor_created_at`,
+  `p_cursor_id`). Filter-before-paginate.
+- **RPC `list_warehouse_inventory_unified`** — wraps existing
+  `list_warehouse_inventory` and UNION-ALLs aggregated tool rows
+  (one row per tool with `sum(allocated_quantity)` across bins). Same filter
+  signature so the existing hook can swap in.
+- Add `tool_bin_allocations` to the realtime publication if not already there
+  (`verify_realtime_coverage()` check).
+- Indexes: `tool_bin_allocations(company_id, created_at DESC, id DESC)`,
+  `tool_bin_allocations(bin_id)`, `warehouse_tools(company_id, name)`.
 
-2. **`useBulkCatalogImport.ts`**
-   - Rename/extend `seedFromCodes` → `seedFromPaste(entries)`. Same catalog lookup batched in one `.or(...)` query.
-   - When building each `newRow`, pass `opening_qty`, `unit_cost`, `notes` from the entry; default `location_id` / `bin_id` from `defaultsRef`.
-   - Keep `seedFromCodes` as a thin wrapper for any other caller (none today, but safe).
+RLS: relies on existing per-table policies — view uses `security_invoker`, so
+each user only sees rows their existing policies allow.
 
-3. **`BulkCatalogToInventoryDialog.tsx`**
-   - Wire the new resolver signature; no UI rework — same paste button.
+### 2. Frontend
 
-### Out of scope
-- No DB / RPC changes (`bulk_provision_inventory_from_catalog` already accepts `opening_qty`, `unit_cost`, `notes`).
-- No new catalog creation flow (that's the separate Bulk Item Master).
-- No bin auto-selection logic — bin still comes from the row default; qty>0 without a bin stays flagged.
+- **New hook** `src/hooks/useUnifiedBinAllocations.ts` — mirrors
+  `useWarehouseBinAllocations` shape but calls the new RPC; returns rows with
+  `entity_type` discriminator.
+- **`src/components/warehouse/BinAllocationsTab.tsx`**
+  - Swap data source to `useUnifiedBinAllocations`.
+  - Add a **Type** column (badge: "Item" / "Tool").
+  - Add a Type filter (`All / Items / Tools`).
+  - Row actions: hide Move/Delete/QR for tool rows in v1 (link to Tool
+    Management instead) — keeps blast radius small.
+- **`src/hooks/useWarehouseInventoryPage.ts`**
+  - Point at `list_warehouse_inventory_unified`.
+  - Returned rows carry `entity_type`; flatten helper passes it through.
+- **`src/pages/warehouse/Inventory.tsx` / inventory table**
+  - Add Type badge column.
+  - Tool rows render with a "View in Tool Management" affordance and skip
+    item-only actions (edit master, bulk adjust, etc.).
+- **Realtime invalidation**: extend `WAREHOUSE_STOCK_QUERY_KEYS` in
+  `src/hooks/useInvalidateWarehouseStock.ts` with
+  `["tool-bin-allocations"]` and `["warehouse-tools"]`, and have
+  `useToolBinAllocations` call `useInvalidateWarehouseStock()` on success so
+  the unified views refresh everywhere.
 
-### Validation
-Manual: paste a 3-row TSV with mixed columns, confirm rows appear pre-filled, invalid rows surface inline, submit runs through the existing RPC.
+### 3. Memory
+
+Add `mem://architecture/unified-bin-allocations-view` documenting that all
+on-hand reporting (Bin Allocations + Inventory) must read the unified view,
+never the raw tables, so future entity types (assets, partial pieces) plug in
+the same way.
+
+## Out of scope
+
+- Merging `warehouse_tools` into `warehouse_items` (rejected — separate
+  lifecycle, issue/return semantics).
+- Cross-entity transfers (tool ↔ item) — tool moves still go through Tool
+  Management.
