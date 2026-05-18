@@ -451,7 +451,11 @@ async function runJob(sb: SupabaseClient, job: Job, triggeredBy: 'cron' | 'manua
     const errors: string[] = [];
     for (const chatId of chatIds) {
       try {
-        await sendTelegram(botToken, chatId, messageText);
+        if (report.pdf) {
+          await sendTelegramDocument(botToken, chatId, report.pdf, report.filename ?? 'report.pdf', messageText);
+        } else {
+          await sendTelegram(botToken, chatId, messageText);
+        }
         okCount++;
       } catch (e) {
         errors.push(`${chatId}: ${(e as Error).message}`);
