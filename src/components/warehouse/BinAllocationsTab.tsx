@@ -108,10 +108,13 @@ export function BinAllocationsTab() {
         if (!locId || !scope.ids.has(locId)) return false;
       }
       // Free-text search
+      const wi = allocation.warehouse_item as any;
+      const itemCode = (wi?.catalog?.item_code ?? wi?.item_code ?? '') as string;
+      const itemName = (wi?.catalog?.name ?? wi?.name ?? '') as string;
       if (!term) return true;
       return (
-        allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
-        allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
+        itemCode.toLowerCase().includes(term) ||
+        itemName.toLowerCase().includes(term) ||
         allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
         allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
         getLocationPath(allocation).path.toLowerCase().includes(term)
@@ -124,7 +127,9 @@ export function BinAllocationsTab() {
       const ba = a.warehouse_bin?.bin_code ?? '';
       const bb = b.warehouse_bin?.bin_code ?? '';
       if (ba !== bb) return ba.localeCompare(bb);
-      return (a.warehouse_item?.item_code ?? '').localeCompare(b.warehouse_item?.item_code ?? '');
+      const ai = ((a.warehouse_item as any)?.catalog?.item_code ?? (a.warehouse_item as any)?.item_code ?? '') as string;
+      const bi = ((b.warehouse_item as any)?.catalog?.item_code ?? (b.warehouse_item as any)?.item_code ?? '') as string;
+      return ai.localeCompare(bi);
     });
   }, [binAllocations, searchTerm, scope]);
   const { canDelete } = useIsAdminOrHigher();
@@ -151,12 +156,22 @@ export function BinAllocationsTab() {
       },
     },
     {
-      accessorKey: 'warehouse_item.item_code',
+      id: 'item_code',
       header: 'Item Code',
+      accessorFn: (row) =>
+        (row.warehouse_item as any)?.catalog?.item_code ??
+        (row.warehouse_item as any)?.item_code ??
+        '',
+      cell: ({ getValue }) => <span className="font-mono text-sm">{(getValue() as string) || '—'}</span>,
     },
     {
-      accessorKey: 'warehouse_item.name',
+      id: 'item_name',
       header: 'Item Name',
+      accessorFn: (row) =>
+        (row.warehouse_item as any)?.catalog?.name ??
+        (row.warehouse_item as any)?.name ??
+        '',
+      cell: ({ getValue }) => <span>{(getValue() as string) || '—'}</span>,
     },
     {
       id: 'location',
