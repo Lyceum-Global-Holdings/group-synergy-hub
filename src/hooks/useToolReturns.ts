@@ -3,11 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { ToolReturn, CreateToolReturnData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useInvalidateWarehouseStock } from "@/hooks/useInvalidateWarehouseStock";
 
 export function useToolReturns() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const invalidateWarehouseStock = useInvalidateWarehouseStock();
 
   const returnsQuery = useQuery({
     queryKey: ["tool-returns", selectedCompany?.id],
