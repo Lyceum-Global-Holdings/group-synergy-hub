@@ -133,7 +133,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [stockDetailsItem, setStockDetailsItem] = useState<WarehouseItem | null>(null);
   const [isFixOpeningStockDialogOpen, setIsFixOpeningStockDialogOpen] = useState(false);
   const [isStockMovementReportOpen, setIsStockMovementReportOpen] = useState(false);
-  const [isImportCatalogOpen, setIsImportCatalogOpen] = useState(false);
+  
   const [isBulkStockUploadOpen, setIsBulkStockUploadOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -538,9 +538,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             )}
             <Button variant="outline" onClick={() => setIsBulkStockUploadOpen(true)}>
               <Upload className="mr-2 h-4 w-4" /> Upload Stock
-            </Button>
-            <Button onClick={() => setIsImportCatalogOpen(true)}>
-              <PackagePlus className="mr-2 h-4 w-4" /> Import from Catalog
             </Button>
           </div>
         </div>
@@ -1016,14 +1013,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         </Suspense>
       )}
 
-      {isImportCatalogOpen && (
-        <Suspense fallback={null}>
-          <AddFromCatalogDialog
-            open={isImportCatalogOpen}
-            onOpenChange={setIsImportCatalogOpen}
-          />
-        </Suspense>
-      )}
 
       {isBulkStockUploadOpen && (
         <Suspense fallback={null}>
