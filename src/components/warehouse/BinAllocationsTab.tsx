@@ -41,6 +41,7 @@ export function BinAllocationsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
+  const { data: toolAllocations = [], isLoading: toolsLoading } = useAllToolBinAllocations();
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
 
