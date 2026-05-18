@@ -347,7 +347,14 @@ async function runJob(sb: SupabaseClient, job: Job, triggeredBy: 'cron' | 'manua
       await sb.from('telegram_scheduled_jobs').update({ last_run_at: new Date().toISOString() }).eq('id', job.id);
     }
 
-    return { ok: status !== 'failed', preview: messageText.slice(0, 500) };
+    return {
+      ok: status !== 'failed',
+      preview: messageText.slice(0, 500),
+      error: errors.length ? errors.join('; ') : undefined,
+      recipient_count: okCount,
+      total_recipients: chatIds.length,
+      status,
+    };
   } catch (e) {
     const err = (e as Error).message;
     if (runId) await sb.from('telegram_job_runs').update({
