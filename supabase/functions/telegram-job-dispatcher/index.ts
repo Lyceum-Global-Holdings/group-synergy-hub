@@ -170,9 +170,9 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
   if (itemIds.length > 0) {
     const { data: items } = await sb
       .from('warehouse_items_full')
-      .select('id, item_code, name, unit_name')
+      .select('id, item_code, name, base_uom')
       .in('id', itemIds);
-    itemMap = new Map((items ?? []).map((i: any) => [i.id, { code: i.item_code ?? '—', name: i.name ?? '—', uom: i.unit_name ?? '' }]));
+    itemMap = new Map((items ?? []).map((i: any) => [i.id, { code: i.item_code ?? '—', name: i.name ?? '—', uom: i.base_uom ?? '' }]));
   }
 
   // Company name
