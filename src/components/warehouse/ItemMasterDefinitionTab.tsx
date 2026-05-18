@@ -167,10 +167,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useWarehouseItemsLazy(filterParams);
-
-  const countConfig = useWarehouseItemsCount(filterParams);
-  const { data: totalCount = 0 } = useQuery(countConfig);
+  } = useWarehouseItemsLazy({ ...filterParams, sortBy, sortDir });
 
   const items = useMemo(() => {
     if (!infiniteData?.pages) return [];
@@ -187,7 +184,45 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return result;
   }, [infiniteData]);
 
+  // Count is non-critical for first paint — only fetch after the first page renders,
+  // and treat it as fresh for 60s so typing/scrolling doesn't refire it.
+  const countConfig = useWarehouseItemsCount(filterParams);
+  const { data: totalCount = 0 } = useQuery({
+    ...countConfig,
+    enabled: items.length > 0,
+    staleTime: 60_000,
+  });
+
+  // O(1) lookup maps — replaces O(N*M) categories.find / units.find in the row render.
+  const categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories]);
+  const unitById = useMemo(() => new Map(units.map(u => [u.id, u])), [units]);
+
+  // Row virtualization — only visible rows are mounted regardless of how many pages loaded.
+  const VIRTUALIZE_FROM = 50;
+  const shouldVirtualize = items.length > VIRTUALIZE_FROM;
+  const rowVirtualizer = useVirtualizer({
+    count: shouldVirtualize ? items.length : 0,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 48,
+    overscan: 8,
+  });
+
+  // Drive infinite scroll from the virtualizer — prefetch when near the end.
+  const virtualItems = rowVirtualizer.getVirtualItems();
   useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    if (shouldVirtualize) {
+      const last = virtualItems[virtualItems.length - 1];
+      if (last && last.index >= items.length - 10) {
+        fetchNextPage();
+      }
+    }
+  }, [virtualItems, items.length, hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
+
+  // Fallback sentinel for small datasets (non-virtualized path).
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (shouldVirtualize) return;
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -196,11 +231,11 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           fetchNextPage();
         }
       },
-      { threshold: 0.1 }
+      { rootMargin: '200px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
 
   const hasActiveFilters = categoryFilter !== 'all' || statusFilter !== 'all' || supplierFilter !== 'all';
 
