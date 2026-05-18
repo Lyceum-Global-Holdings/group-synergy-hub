@@ -283,6 +283,7 @@ function App() {
                 <Route path="/admin/test-environment" element={<SuperAdminRoute><TestEnvironmentPage /></SuperAdminRoute>} />
                 <Route path="/admin/performance" element={<AdminRoute><PerformanceDashboard /></AdminRoute>} />
                 <Route path="/admin/security" element={<SuperAdminRoute><SecuritySettingsPage /></SuperAdminRoute>} />
+                <Route path="/admin/telegram-reports" element={<AdminRoute><TelegramReportsPage /></AdminRoute>} />
                 <Route path="/admin/training" element={<Training />} />
                 <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
                 <Route path="/admin/training/video-library" element={<VideoLibrary />} />
