@@ -5,11 +5,16 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
 interface Cursor {
-  created_at: string;
+  created_at: string | null;
   id: string;
+  name: string | null;
+  item_code: string | null;
+  stock: number | null;
 }
 
 export type StockMode = 'all' | 'in_stock' | 'zero' | 'low';
+export type InventorySortBy = 'name' | 'item_code' | 'created_at' | 'current_stock';
+export type SortDir = 'asc' | 'desc';
 
 interface UseWarehouseItemsLazyInventoryOptions {
   pageSize?: number;
@@ -20,6 +25,8 @@ interface UseWarehouseItemsLazyInventoryOptions {
   locationId?: string | null;
   stockMode?: StockMode;
   ownerLabel?: string | null;
+  sortBy?: InventorySortBy;
+  sortDir?: SortDir;
 }
 
 const MAX_ITEMS = 20000;
