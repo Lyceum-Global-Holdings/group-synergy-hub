@@ -85,6 +85,12 @@ const loaders: Array<[string, Loader]> = [
   // Production
   ["/production", () => import("@/pages/production/ProductionModule")],
 
+  // Finance (single page; all subpaths share chunk)
+  ["/finance", () => import("@/pages/Accounting")],
+
+  // Sales / TUH extras
+  ["/tuh-modules/finished-goods", () => import("@/pages/tuh-modules/FinishedGoods")],
+
   // Management
   ["/management/dashboards", () => import("@/pages/management/DashboardsKPIs")],
   ["/management/approvals", () => import("@/pages/management/ApprovalConsole")],
@@ -93,23 +99,23 @@ const loaders: Array<[string, Loader]> = [
   ["/management/exceptions", () => import("@/pages/management/Exceptions")],
   ["/management/reports", () => import("@/pages/management/ReportsCenter")],
 
-  // Construction
-  ["/construction/projects", () => import("@/pages/construction/ProjectMaster")],
+  // Construction (paths mirror App.tsx routes)
+  ["/construction/project-master", () => import("@/pages/construction/ProjectMaster")],
   ["/construction/work-orders", () => import("@/pages/construction/WorkOrders")],
   ["/construction/site-management", () => import("@/pages/construction/SiteManagement")],
-  ["/construction/progress", () => import("@/pages/construction/ProgressTracking")],
+  ["/construction/progress-tracking", () => import("@/pages/construction/ProgressTracking")],
   ["/construction/daily-reports", () => import("@/pages/construction/DailySiteReports")],
-  ["/construction/resources/labour", () => import("@/pages/construction/resources/LabourResources")],
-  ["/construction/resources/inventory", () => import("@/pages/construction/resources/InventoryItems")],
-  ["/construction/resources/subcontractors", () => import("@/pages/construction/resources/SubcontractorResources")],
-  ["/construction/resources", () => import("@/pages/construction/ResourceAllocation")],
-  ["/construction/quality", () => import("@/pages/construction/QualityControl")],
-  ["/construction/safety", () => import("@/pages/construction/SafetyManagement")],
+  ["/construction/resource-allocation/labour", () => import("@/pages/construction/resources/LabourResources")],
+  ["/construction/resource-allocation/inventory", () => import("@/pages/construction/resources/InventoryItems")],
+  ["/construction/resource-allocation/subcontractors", () => import("@/pages/construction/resources/SubcontractorResources")],
+  ["/construction/resource-allocation", () => import("@/pages/construction/ResourceAllocation")],
+  ["/construction/quality-control", () => import("@/pages/construction/QualityControl")],
+  ["/construction/safety-management", () => import("@/pages/construction/SafetyManagement")],
 
   // Social media
   ["/social-media/accounts", () => import("@/pages/social-media/AccountRegistry")],
   ["/social-media/access", () => import("@/pages/social-media/AccessManagement")],
-  ["/social-media/nda", () => import("@/pages/social-media/NDACompliance")],
+  ["/social-media/nda-compliance", () => import("@/pages/social-media/NDACompliance")],
   ["/social-media/activity-log", () => import("@/pages/social-media/ActivityLog")],
 ];
 
