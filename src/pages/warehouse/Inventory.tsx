@@ -34,7 +34,11 @@ export default function Inventory() {
           Bulk add from catalog
         </Button>
       </div>
-      <BulkCatalogToInventoryDialog open={bulkOpen} onOpenChange={setBulkOpen} />
+      {bulkOpen && (
+        <Suspense fallback={null}>
+          <BulkCatalogToInventoryDialog open={bulkOpen} onOpenChange={setBulkOpen} />
+        </Suspense>
+      )}
 
       <Suspense
         fallback={
