@@ -163,3 +163,59 @@ export function prefetchCommonRoutesOnIdle(): void {
     ].forEach(preloadRoute);
   });
 }
+
+/**
+ * Idle-warm the sibling routes most likely to be visited next, based on
+ * the current path. Cheap because each loader resolves from cache after
+ * the first call. Keeps total prefetch traffic bounded to one module group.
+ */
+const NEIGHBORS: Array<[string, string[]]> = [
+  [
+    "/warehouse",
+    [
+      "/warehouse/inventory",
+      "/warehouse/item-bin-master",
+      "/warehouse/bin-allocations",
+      "/warehouse/grn",
+      "/warehouse/material-issue",
+      "/warehouse/stock-transfer",
+    ],
+  ],
+  [
+    "/admin",
+    [
+      "/admin/backend",
+      "/admin/users-roles",
+      "/admin/companies",
+      "/admin/modules",
+      "/admin/warehouse-management",
+    ],
+  ],
+  [
+    "/procurement",
+    [
+      "/procurement/purchase-requisition",
+      "/procurement/purchase-order",
+      "/procurement/three-way-match",
+    ],
+  ],
+  [
+    "/construction",
+    [
+      "/construction/project-master",
+      "/construction/site-management",
+      "/construction/daily-reports",
+    ],
+  ],
+];
+
+export function prefetchNeighborRoutesOnIdle(currentPath: string): void {
+  if (typeof window === "undefined" || !currentPath) return;
+  const group = NEIGHBORS.find(([prefix]) => currentPath.startsWith(prefix));
+  if (!group) return;
+  const idle: (cb: () => void) => void =
+    (window as any).requestIdleCallback?.bind(window) ??
+    ((cb: () => void) => setTimeout(cb, 1500));
+  idle(() => group[1].forEach(preloadRoute));
+}
+
