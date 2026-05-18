@@ -260,7 +260,7 @@ export function CompanySidebar() {
                   isActive={currentPath === "/"}
                   className={currentPath === "/" ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/60 text-sidebar-accent-foreground font-medium" : "border-l-[3px] border-l-transparent"}
                 >
-                  <NavLink to="/" className="flex items-center gap-2">
+                  <NavLink to="/" className="flex items-center gap-2" {...navPreloadProps("/")}>
                     <BarChart3 className="h-[18px] w-[18px]" />
                     <span>Dashboard</span>
                   </NavLink>
