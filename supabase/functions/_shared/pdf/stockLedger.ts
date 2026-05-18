@@ -165,7 +165,7 @@ export async function buildStockLedgerPdf(input: LedgerInput): Promise<Uint8Arra
   }
 
   for (const loc of input.sections) {
-    drawSectionLabel(`📍 ${loc.locationName}`, 11);
+    drawSectionLabel(`Location: ${loc.locationName}`, 11);
     for (const item of loc.items) {
       drawSectionLabel(`${item.itemCode} — ${item.itemName}`, 9);
       drawTableHeader();
