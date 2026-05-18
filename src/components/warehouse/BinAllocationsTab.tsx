@@ -146,6 +146,18 @@ export function BinAllocationsTab() {
 
   const columns: ColumnDef<BinAllocationWithDetails>[] = [
     {
+      id: 'type',
+      header: 'Type',
+      cell: ({ row }) => {
+        const isTool = (row.original as any)._entity_type === 'tool';
+        return (
+          <Badge variant={isTool ? 'outline' : 'secondary'} className="font-normal">
+            {isTool ? 'Tool' : 'Item'}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: 'warehouse_item.item_code',
       header: 'Item Code',
     },
