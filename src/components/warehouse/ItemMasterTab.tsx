@@ -628,9 +628,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                     : 'No items found. Create your first item to get started.'}
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredItems.map((item) => (
-                <TableRow key={item.id} data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}>
+            ) : ((() => {
+              const renderRow = (item: typeof filteredItems[number], idx: number) => (
+                <TableRow key={item.id} aria-rowindex={idx + 1} data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}>
+
                   <TableCell>
                     <Checkbox
                       checked={selectedItemIds.has(item.id)}
@@ -877,10 +878,33 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              );
+              if (!shouldVirtualize) {
+                return filteredItems.map((item, idx) => renderRow(item, idx));
+              }
+              const totalSize = rowVirtualizer.getTotalSize();
+              const paddingTop = virtualItems[0]?.start ?? 0;
+              const paddingBottom = totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0);
+              return (
+                <>
+                  {paddingTop > 0 && (
+                    <tr aria-hidden style={{ height: paddingTop }}>
+                      <td colSpan={visibleCount + 1} />
+                    </tr>
+                  )}
+                  {virtualItems.map((vi) => renderRow(filteredItems[vi.index], vi.index))}
+                  {paddingBottom > 0 && (
+                    <tr aria-hidden style={{ height: paddingBottom }}>
+                      <td colSpan={visibleCount + 1} />
+                    </tr>
+                  )}
+                </>
+              );
+            })())}
           </TableBody>
         </Table>
+        </div>
+
 
         {/* Infinite scroll sentinel */}
         <div ref={sentinelRef} className="h-1" />
