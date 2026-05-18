@@ -1,49 +1,113 @@
-# Fix: `column wi.item_code does not exist` (permanent)
+# Scheduled Telegram Reports — Administration Console
 
-## Root cause
+Centralize all automated Telegram report scheduling under **Administration**, supporting multiple report types with independent daily / weekly / monthly schedules per company. The existing DSR Telegram settings (currently under Construction → Site Reports) will be migrated here so there is one source of truth.
 
-Stage 6b dropped the mirrored master columns (`item_code`, `name`, `description`, `category_id`, `unit_id`, brand, etc.) from `public.warehouse_items`. Those fields now live in `warehouse_item_catalog`, accessible via the `warehouse_items_full` view.
+## Goals
 
-Several `report_*` DB functions still SELECT `wi.item_code` / `wi.name` / `wi.unit_id` from `warehouse_items wi`, so any report touching them aborts with `column wi.item_code does not exist`. Confirmed affected functions:
+1. New admin page **Administration → Telegram Reports** (super_admin / admin only).
+2. Support **N scheduled jobs per company**, each with its own report type, frequency, time, timezone, recipients, and on/off toggle.
+3. Ship four report renderers out-of-the-box:
+   - **Daily Warehouse Stock Report** — per warehouse: movements (in/out/transfer/adjustment counts + qty) for the day + closing stock balance.
+   - **Daily Tool Management Report** — per location: tools issued / returned / outstanding / overdue.
+   - **Daily Site Report (DSR)** — reuse existing DSR aggregation (manpower, equipment, materials, progress).
+   - **Daily Stock Transfer Report** — per location: outgoing & incoming transfers with status.
+4. International standards: timezone-aware (IANA tz), idempotent (`last_run_at` + run window), retry-safe, audit-logged, per-company RLS, message size ≤ 4096 chars (chunk or attach PDF for long), structured HTML formatting with localized numbers/dates (ISO 8601 + locale).
 
-- `report_stock_on_hand`
-- `report_inventory_valuation`
-- `report_inventory_aging`
-- `report_abc_classification`
-- `report_cycle_count_variance`
-- `report_batch_traceability`
-- `report_stock_movement_ledger`
-- `calculate_inventory_valuation`
-- `stock_audit_summary`
-- `stock_audit_summary_by_location`
-- `reconcile_stock_batch`
+## UX
 
-## Permanent fix
+`/admin/telegram-reports` — tabs/sections:
 
-Rewrite each function in one migration to read master fields from `public.warehouse_items_full` (the post-Stage-6b view that already merges `warehouse_items` + `warehouse_item_catalog`) instead of bare `warehouse_items`. The view exposes `item_code`, `name`, `description`, `category_id`, `unit_id`, `brand`, etc. as before, so the rewrites are mechanical:
+1. **Connection** — bot token, chat IDs, test connection (moved from Construction).
+2. **Scheduled Jobs** — table of jobs with columns: Report, Frequency, Time, Timezone, Recipients, Last Run, Status, Actions (Edit / Run Now / Toggle / Delete) + "New Schedule" button.
+3. **Run History** — last 100 executions with status, duration, error, recipient count.
+
+Job editor dialog fields: Report Type (select), Frequency (Daily / Weekly + weekday picker / Monthly + day-of-month picker), Send Time + Timezone, Recipient chat IDs (multi), Filters (e.g. specific warehouse / location / company scope), Enabled toggle, "Send test now".
+
+The existing **Construction → Site Reports → Telegram** tab becomes a read-only banner: *"Telegram settings moved to Administration → Telegram Reports"* with a link.
+
+## Architecture
 
 ```text
-FROM warehouse_items wi   →   FROM warehouse_items_full wi
-JOIN warehouse_items wi   →   JOIN warehouse_items_full wi
+┌──────────────────────────────┐       ┌─────────────────────────────┐
+│ /admin/telegram-reports (UI) │──────►│ telegram_scheduled_jobs     │
+│  - jobs CRUD                 │       │ telegram_settings (creds)   │
+│  - run-now / test            │       │ telegram_job_runs (history) │
+└──────────────────────────────┘       └─────────────────────────────┘
+            │                                      ▲
+            │ invoke                               │ writes
+            ▼                                      │
+┌──────────────────────────────┐       ┌─────────────────────────────┐
+│ edge: send-scheduled-report  │──────►│ report renderers (per type) │
+│  (run-now + cron entry)      │       │  - warehouseStockDaily      │
+└──────────────────────────────┘       │  - toolManagementDaily      │
+            ▲                          │  - siteReportDaily (DSR)    │
+            │ every 15 min             │  - stockTransferDaily       │
+┌──────────────────────────────┐       └─────────────────────────────┘
+│ pg_cron → scheduled-telegram │
+│ -reports (dispatcher)        │
+└──────────────────────────────┘
 ```
 
-No column alias changes, no signature changes, no client changes.
+## Technical Plan
 
-## Steps
+### 1. Database (migration)
 
-1. Migration `phase_6b_report_fns_use_view.sql`
-   - For each function above: `CREATE OR REPLACE FUNCTION` with the existing signature and body, only swapping `warehouse_items` → `warehouse_items_full` everywhere the alias `wi` (or equivalent) is used to read master fields. Keep `warehouse_items` where the function writes to it (`UPDATE warehouse_items SET current_stock = …`) — only reads change.
-   - Re-grant `EXECUTE` to `authenticated` to match current grants.
-2. Add a one-off audit query in the migration comment so future regressions are easy to spot:
-   ```sql
-   -- SELECT proname FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-   -- WHERE n.nspname='public' AND pg_get_functiondef(p.oid) ~ 'warehouse_items\s+wi'
-   --   AND pg_get_functiondef(p.oid) ~ 'wi\.(item_code|name|description|category_id|unit_id|brand|manufacturer|barcode|sku)';
-   ```
-3. Update memory (`mem://architecture/warehouse-catalog-source-of-truth` or the Stage 6b note) with a Core-level rule: **"Server-side functions reading item master fields must FROM `warehouse_items_full`, not `warehouse_items`."**
-4. Verify by re-running the failing report from `/reports-center` (and `/admin/performance`) and by re-querying the audit SELECT — it should return 0 rows.
+- New table `public.telegram_scheduled_jobs`:
+  - `id uuid pk`, `company_id uuid fk`, `name text`, `report_type text` (`warehouse_stock_daily` | `tool_management_daily` | `site_report_daily` | `stock_transfer_daily`),
+  - `frequency text` (`daily` | `weekly` | `monthly`), `send_time time`, `timezone text`, `weekday smallint NULL` (0–6), `day_of_month smallint NULL` (1–28),
+  - `filters jsonb` (`{warehouse_ids?, location_ids?, project_ids?}`),
+  - `chat_ids text[]` (overrides company defaults when set),
+  - `is_enabled bool`, `last_run_at timestamptz`, `next_run_at timestamptz`, `created_by uuid`, timestamps.
+  - Indexes: `(is_enabled, next_run_at)`, `(company_id, report_type)`.
+- New table `public.telegram_job_runs` — id, job_id, started_at, finished_at, status (`success`|`partial`|`failed`), recipient_count, error_text, payload_preview. Retention: 100 rows per job (trim trigger).
+- RLS: company-scoped via `can_access_company(company_id)`; INSERT/UPDATE/DELETE restricted to admins via `has_role(auth.uid(),'admin')` OR super_admin.
+- Deprecate `telegram_settings.scheduled_send_*` columns in a later migration — keep for now for backward compat; new logic ignores them once jobs exist.
+- pg_cron entry already exists (`scheduled-telegram-reports` every 15 min) — keep, just point dispatcher at new table.
 
-## Out of scope
+### 2. Edge functions
 
-- No changes to `warehouse_items` schema, RLS, triggers, or client hooks.
-- Tool Management Phase 2c (drop legacy tool tables) is unaffected.
+- **`scheduled-telegram-reports`** (refactor): query `telegram_scheduled_jobs WHERE is_enabled AND next_run_at <= now()`. For each job: compute window (previous business day in tz), render report, send, write `telegram_job_runs`, recompute `next_run_at` from frequency + `send_time` + `timezone` (use `luxon` via `npm:luxon`). Idempotency: skip if `last_run_at` within ½ frequency window.
+- **`send-scheduled-report`** (new): callable from UI for *Run Now* / *Test*. Accepts `{job_id, dry_run?}`. JWT-verified, validates admin role + company scope, calls same renderer pipeline, returns preview when `dry_run`.
+- **Renderers** (`supabase/functions/_shared/reports/`):
+  - `warehouseStockDaily.ts` — read `stock_transactions` for the day grouped by warehouse + `list_warehouse_inventory` for closing balances (filter from `warehouse_items_full`).
+  - `toolManagementDaily.ts` — read `tool_issues`, `tool_returns`, `tool_adjustments` (now unified under warehouse stock per memory) scoped by location.
+  - `siteReportDaily.ts` — reuse the DSR aggregation already in `send-telegram-report`.
+  - `stockTransferDaily.ts` — read `stock_transfers` per origin/destination location.
+  - All return `{title, html, attachments[]}`. HTML uses Telegram-safe subset; chunked at 4000 chars; long reports attached as PDF via existing `lib/reports/pdfRenderer`.
+
+### 3. Frontend
+
+- `src/pages/admin/TelegramReports.tsx` + sub-components: `ConnectionPanel`, `ScheduledJobsTable`, `JobEditorDialog`, `RunHistoryTable`.
+- Hooks: `useTelegramJobs`, `useTelegramJobRuns`, `useRunTelegramJobNow`.
+- Route: `/admin/telegram-reports`, wrapped in `AdminRoute`.
+- Register in `src/constants/moduleConfig.ts` under `administration.submodules`.
+- Sidebar entry under Administration.
+- Construction Telegram tab → deprecation banner + link.
+
+### 4. Security & Standards
+
+- Server-side admin check in edge function (re-derive from JWT, never trust client).
+- Per-company RLS on jobs + runs.
+- Bot token stays write-only in `telegram_settings` (never returned to client).
+- Audit log entry on job create/update/delete/run.
+- ISO 8601 timestamps, `Intl.NumberFormat` for qty/currency, configurable timezone per job (defaults to company tz).
+- Rate-limit Telegram sends (≥ 1s between chats) — Telegram API rule.
+- Idempotency key per `(job_id, scheduled_for)` to prevent duplicates if cron double-fires.
+
+### 5. Memory
+
+Add memory `features/admin/telegram-scheduled-reports.md` describing job model, dispatcher rules, renderer contract; add Core line: *"Telegram report scheduling lives in `telegram_scheduled_jobs` under Administration; DSR-only `telegram_settings.scheduled_send_*` columns are deprecated."*
+
+## Out of Scope (this phase)
+
+- Telegram inbound commands / bot interactivity.
+- WhatsApp / Email parity (can reuse renderer contract later).
+- Custom report builder UI — only the 4 built-in types.
+- Removing deprecated `telegram_settings.scheduled_send_*` columns (separate cleanup migration after one release).
+
+## Rollout
+
+1. Migration + edge function refactor + renderers.
+2. New admin page + sidebar entry + module registration.
+3. Backfill: convert any existing `telegram_settings.scheduled_send_enabled=true` row into a `site_report_daily` job.
+4. Deprecate old construction tab (banner only, no functional change yet).

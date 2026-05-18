@@ -140,6 +140,7 @@ const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityL
 const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
 const SecuritySettingsPage = lazy(() => import("./pages/admin/SecuritySettings"));
+const TelegramReportsPage = lazy(() => import("./pages/admin/TelegramReports"));
 
 // Supplier Portal pages
 const PortalLayout = lazy(() => import("./components/portal/PortalLayout").then((m) => ({ default: m.PortalLayout })));
@@ -282,6 +283,7 @@ function App() {
                 <Route path="/admin/test-environment" element={<SuperAdminRoute><TestEnvironmentPage /></SuperAdminRoute>} />
                 <Route path="/admin/performance" element={<AdminRoute><PerformanceDashboard /></AdminRoute>} />
                 <Route path="/admin/security" element={<SuperAdminRoute><SecuritySettingsPage /></SuperAdminRoute>} />
+                <Route path="/admin/telegram-reports" element={<AdminRoute><TelegramReportsPage /></AdminRoute>} />
                 <Route path="/admin/training" element={<Training />} />
                 <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
                 <Route path="/admin/training/video-library" element={<VideoLibrary />} />

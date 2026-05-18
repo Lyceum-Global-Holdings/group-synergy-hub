@@ -152,7 +152,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'warehouse-management', name: 'Warehouse Management', description: 'Configure warehouse settings', url: '/admin/warehouse-management' },
       { key: 'test-environment', name: 'Test Environment', description: 'Module testing dashboard (Super Admin)', url: '/admin/test-environment' },
       { key: 'performance', name: 'Performance Dashboard', description: 'Web Vitals, slow queries, long tasks', url: '/admin/performance' },
-      { key: 'security-settings', name: 'Security Settings', description: 'Bot protection (Turnstile) and MFA enforcement policy', url: '/admin/security' }
+      { key: 'security-settings', name: 'Security Settings', description: 'Bot protection (Turnstile) and MFA enforcement policy', url: '/admin/security' },
+      { key: 'telegram-reports', name: 'Telegram Reports', description: 'Automated daily/weekly/monthly Telegram reports (warehouse stock, tools, site, transfers)', url: '/admin/telegram-reports' }
     ]
   },
   production: {
