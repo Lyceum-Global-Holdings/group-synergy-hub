@@ -570,9 +570,18 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-x-auto">
+      <div className="border rounded-lg">
+        <div
+          ref={scrollParentRef}
+          className="overflow-auto"
+          style={{ maxHeight: 'calc(100vh - 320px)' }}
+          role="grid"
+          aria-rowcount={filteredItems.length}
+          aria-label="Item master inventory"
+        >
         <Table className="min-w-full [&_td]:py-1.5 [&_th]:py-2">
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-background">
+
             <TableRow>
               <TableHead className="w-[40px]">
                 <Checkbox
