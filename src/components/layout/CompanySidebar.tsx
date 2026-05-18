@@ -395,7 +395,7 @@ function DepartmentCollapsible({
                       isActive={isActive(item.url)}
                       className="flex-1 relative z-[1]"
                     >
-                      <NavLink to={item.url}>{item.title}</NavLink>
+                      <NavLink to={item.url} {...navPreloadProps(item.url)}>{item.title}</NavLink>
                     </SidebarMenuSubButton>
                     {pinTargetCompany && (
                       <span className="relative z-[2]">
