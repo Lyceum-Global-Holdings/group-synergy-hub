@@ -45,16 +45,15 @@ const HEADER_H = 60;
 const FOOTER_H = 22;
 
 const COLS = [
-  { key: "date",    label: "Date",        w: 60,  align: "left"  as const },
-  { key: "docNo",   label: "Doc #",       w: 95,  align: "left"  as const },
-  { key: "refType", label: "Type",        w: 75,  align: "left"  as const },
-  { key: "desc",    label: "Description", w: 195, align: "left"  as const },
-  { key: "in",      label: "In Qty",      w: 55,  align: "right" as const },
-  { key: "out",     label: "Out Qty",     w: 55,  align: "right" as const },
-  { key: "bal",     label: "Balance",     w: 60,  align: "right" as const },
-  { key: "uom",     label: "UOM",         w: 40,  align: "left"  as const },
-  { key: "cost",    label: "Unit Cost",   w: 65,  align: "right" as const },
-  { key: "value",   label: "Value",       w: 80,  align: "right" as const },
+  { key: "date",    label: "Date",        w: 65,  align: "left"  as const },
+  { key: "docNo",   label: "Doc #",       w: 100, align: "left"  as const },
+  { key: "refType", label: "Type",        w: 85,  align: "left"  as const },
+  { key: "desc",    label: "Description", w: 235, align: "left"  as const },
+  { key: "in",      label: "In Qty",      w: 65,  align: "right" as const },
+  { key: "out",     label: "Out Qty",     w: 65,  align: "right" as const },
+  { key: "uom",     label: "UOM",         w: 45,  align: "left"  as const },
+  { key: "cost",    label: "Unit Cost",   w: 75,  align: "right" as const },
+  { key: "value",   label: "Value",       w: 95,  align: "right" as const },
 ];
 const TABLE_W = COLS.reduce((s, c) => s + c.w, 0);
 
