@@ -284,7 +284,7 @@ export function CompanySidebar() {
                     isActive={currentPath.startsWith("/admin/backend")}
                     className={currentPath.startsWith("/admin/backend") ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/60 text-sidebar-accent-foreground font-medium" : "border-l-[3px] border-l-transparent"}
                   >
-                    <NavLink to="/admin/backend" className="flex items-center gap-2">
+                    <NavLink to="/admin/backend" className="flex items-center gap-2" {...navPreloadProps("/admin/backend")}>
                       <Database className="h-[18px] w-[18px]" />
                       <span>Backend Monitor</span>
                     </NavLink>
