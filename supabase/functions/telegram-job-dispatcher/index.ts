@@ -66,6 +66,21 @@ async function sendTelegram(botToken: string, chatId: string, text: string): Pro
   }
 }
 
+
+async function sendTelegramDocument(botToken: string, chatId: string, pdf: Uint8Array, filename: string, caption: string): Promise<void> {
+  const form = new FormData();
+  form.append('chat_id', chatId);
+  form.append('caption', caption.slice(0, 1024));
+  form.append('parse_mode', 'HTML');
+  form.append('document', new Blob([pdf], { type: 'application/pdf' }), filename);
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: form });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Telegram sendDocument ${res.status}: ${body}`);
+  }
+  await new Promise(r => setTimeout(r, 1100));
+}
+
 // ---------- Date helpers ----------
 function previousLocalDay(timezone: string): { from: string; to: string; label: string } {
   // Compute "yesterday" in the given tz as ISO start/end UTC
