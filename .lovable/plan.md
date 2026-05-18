@@ -1,45 +1,52 @@
-## Goal
+# Speed up Item Master on /warehouse/item-bin-master
 
-Make the Item Master table sortable by clickable column headers, with a default sort of **Name ascending**. Keep the existing infinite-scroll + virtualization model.
+## Root cause
 
-## Why server-side sort (not client-only)
+The slow screen is `ItemMasterDefinitionTab.tsx`, not the previously-tuned `ItemMasterTab.tsx`. With 14k+ catalog rows it suffers from:
 
-The Item Master uses keyset infinite scroll via the `list_warehouse_inventory` RPC, currently ordered by `(created_at DESC, id DESC)`. Sorting only what's already loaded on the client would produce a misleading order (later pages would arrive out of place). Sorting must happen in the RPC so each fetched page is globally ordered.
+1. **No row virtualization** — every loaded row becomes a real `<tr>` in the DOM. After scrolling 2–3 pages the browser is laying out 200–300 rich rows (image + 8 cells + tooltip + actions) on every state change.
+2. **Page size 100** — first paint waits for 100 rows + their images.
+3. **O(N×M) lookups in render** — `categories.find(...)` and `units.find(...)` run for every visible row on every render.
+4. **Eager `<img>` thumbnails** — 100 network requests fire alongside the first data response.
+5. **Blocking count query** — `get_warehouse_catalog_count` runs on every keystroke / filter change, competing with the page fetch.
+6. **No server sort control** — RPC orders by `created_at` only; user expects ascending Name like the other tab.
 
-## Scope (in)
+## What we'll change (frontend + 1 small RPC tweak)
 
-1. **DB migration** — extend `list_warehouse_inventory` with sort parameters and keyset cursor parity for the chosen sort:
-   - New params: `_sort_by text DEFAULT 'name'` (allowlist: `name`, `item_code`, `created_at`, `current_stock`), `_sort_dir text DEFAULT 'asc'` (allowlist: `asc`, `desc`).
-   - Cursor changes: add `_cursor_name text` and `_cursor_item_code text`, `_cursor_stock numeric` so keyset works per sort key. `id` stays the tie-breaker (memory rule: cursor must be strictly monotonic — never trust `id` alone).
-   - ORDER BY built from the allowlisted sort key + `id` tie-breaker, ascending or descending consistently in both the windowing clause and the final SELECT.
-   - Filter-before-paginate preserved (memory rule).
-   - Keep existing behavior when callers pass no sort (back-compat default becomes `name asc`).
+### 1. `src/components/warehouse/ItemMasterDefinitionTab.tsx`
+- **Virtualize rows** with `@tanstack/react-virtual` (same pattern already used in `ItemMasterTab.tsx`): only render ~50 visible rows regardless of how many pages have loaded. Use a scroll container ref with `max-h-[calc(100vh-320px)] overflow-auto`, `estimateSize: 48`, `overscan: 8`.
+- **Drive infinite scroll from the virtualizer** (prefetch next page when last virtual row is within 10 of the end) and remove the IntersectionObserver sentinel.
+- **`pageSize = 50`** (matches the inventory tab and user request).
+- **O(1) lookup maps**: `categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])))`, same for `unitById`. Replace `.find()` in render with `Map.get()`.
+- **Lazy thumbnails**: add `loading="lazy"` and `decoding="async"` to the `<img>` tag.
+- **Sortable headers** for Item Code / Name / Status — default `sortBy='name'`, `sortDir='asc'`. Click toggles asc→desc; changing sort resets scroll and refetches from page 1.
+- **Defer count**: keep the count query but mark `enabled: items.length > 0` (or simply drop the badge from the critical path) and add `staleTime: 60_000` so it doesn't re-run while typing. The count is currently shown nowhere visible in the header — confirm and remove if unused; otherwise just lazy-enable it.
+- **Memoize row renderer** (`renderRow(item, virtualIndex)`) and keep `<TableRow>` props referentially stable so React skips re-rendering unchanged rows during scroll.
 
-2. **Hook** — `useWarehouseItemsLazyInventory`:
-   - Accept `sortBy` and `sortDir` options (default `'name'` / `'asc'`).
-   - Include them in the React Query key so changing sort refetches from page 1.
-   - Build the cursor payload from the last row's sort key + `id` and pass to the RPC.
+### 2. `src/hooks/useWarehouseItemsPaged.ts`
+- Default `pageSize` 100 → **50**.
+- Accept optional `sortBy` (`'name' | 'item_code' | 'created_at'`) and `sortDir` (`'asc' | 'desc'`); include in `queryKey` and pass to the RPC. Extend the `Cursor` type with `name`.
+- Keep `gcTime` long, add `staleTime: 30_000`.
 
-3. **UI** — `ItemMasterTab.tsx`:
-   - Sortable headers on **Name**, **Item Code**, **Stock**, **Created**. Click toggles asc → desc → asc. Active header shows an arrow (lucide `ArrowUp` / `ArrowDown`, neutral `ArrowUpDown` when inactive).
-   - Default state on mount: `{ sortBy: 'name', sortDir: 'asc' }`.
-   - Changing sort resets scroll position to top and lets the hook refetch.
-   - Keep all existing filters, virtualization, and infinite-scroll trigger logic untouched.
+### 3. DB migration — extend `get_warehouse_catalog_page`
+- Add allowlisted `p_sort_by` (`name | item_code | created_at`) and `p_sort_dir` (`asc | desc`) params, plus an extra `p_cursor_name` for name-sorted keyset.
+- Compose `ORDER BY <sort_key> <dir>, id <dir>` and matching keyset WHERE so pagination stays strictly monotonic (per the project's keyset-uniqueness rule).
+- Filter-before-paginate preserved. Defaults stay backward-compatible (`name asc`).
+- Ensure supporting index exists: `warehouse_item_catalog(name, id)` and `(item_code, id)` (trigram on `name` already exists per memory).
 
-## Scope (out)
+## Out of scope
+- No changes to `ItemMasterTab.tsx`, Bin/Categories/Units tabs, RBAC, RLS, or any mutation paths.
+- No change to image storage or CDN; just `loading="lazy"`.
+- No new dependencies (`@tanstack/react-virtual` already installed).
 
-- No change to other warehouse tabs, no change to columns, no change to page size, no client-side multi-column sort.
-- No change to filters, search, RBAC, or RLS.
+## Expected impact
+- First paint goes from ~100 hydrated rows + 100 image fetches → ~15 rows + ~15 lazy images.
+- Scroll stays smooth past 1k+ rows because the DOM size is bounded.
+- Filter / search typing no longer blocked by a parallel `COUNT(*)`.
+- Sort is server-side and keyset-stable, so infinite scroll keeps working when sorted by Name.
 
-## Files to touch
-
-- `supabase/migrations/<new timestamp>_warehouse_inventory_sort.sql` — new RPC version with sort params.
-- `src/hooks/useWarehouseItemsLazyInventory.ts` — pass sort + extended cursor.
-- `src/components/warehouse/ItemMasterTab.tsx` — sort state, sortable headers, default `name asc`.
-
-## Validation
-
-- On `/warehouse/item-bin-master`: items load alphabetically by Name ascending on first render.
-- Click Name header → toggles to descending; click Item Code → switches sort key; arrow indicator follows the active column.
-- Infinite scroll continues to append in the new order without duplicates or gaps.
-- Existing filters (category, status, supplier, location, stock mode, search) still work in combination with sort.
+## Files touched
+- `src/components/warehouse/ItemMasterDefinitionTab.tsx` (refactor render + sort UI + virtualization)
+- `src/hooks/useWarehouseItemsPaged.ts` (pageSize 50, sort params, cursor)
+- `supabase/migrations/<new>_catalog_page_sort.sql` (extend RPC with sort + name cursor)
+- `src/integrations/supabase/types.ts` (regenerated after migration)
