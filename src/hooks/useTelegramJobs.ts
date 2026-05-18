@@ -74,13 +74,18 @@ export function useTelegramJobs() {
   const saveJob = useMutation({
     mutationFn: async (input: JobUpsert) => {
       if (!selectedCompany?.id) throw new Error("No company selected");
-      const payload = {
-        ...input,
+      const payload: any = {
+        name: input.name,
+        report_type: input.report_type,
+        frequency: input.frequency,
+        send_time: input.send_time,
+        timezone: input.timezone,
+        is_enabled: input.is_enabled ?? true,
         company_id: selectedCompany.id,
         weekday: input.frequency === "weekly" ? input.weekday ?? 1 : null,
         day_of_month: input.frequency === "monthly" ? input.day_of_month ?? 1 : null,
         chat_ids: input.chat_ids ?? [],
-        filters: input.filters ?? {},
+        filters: (input.filters ?? {}) as any,
       };
       if (input.id) {
         const { data, error } = await supabase
