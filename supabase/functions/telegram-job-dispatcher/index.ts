@@ -2,6 +2,7 @@
 // Invoked by pg_cron every 15 min (no body) OR manually by admin UI ({ job_id, dry_run?, triggered_by? }).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildStockLedgerPdf, type LedgerInput, type LedgerItemSection, type LedgerLocationSection, type LedgerRow } from "../_shared/pdf/stockLedger.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
