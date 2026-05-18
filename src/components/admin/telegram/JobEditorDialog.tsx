@@ -16,7 +16,7 @@ import {
   type TelegramFrequency,
   type TelegramScheduledJob,
 } from "@/hooks/useTelegramJobs";
-import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useEffectiveLocationsForCompany } from "@/hooks/useWarehouseLocations";
 import { useCompany } from "@/contexts/CompanyContext";
 
 const TIMEZONES = [
@@ -37,10 +37,12 @@ interface Props {
 
 export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
   const { selectedCompany } = useCompany();
-  const { locations: allLocations = [] } = useWarehouseLocations();
+  // Use effective (company-scoped) locations — warehouse_locations has no company_id column;
+  // access is resolved via the company_locations / inherit_parent chain server-side.
+  const { data: effectiveLocations = [] } = useEffectiveLocationsForCompany(selectedCompany?.id);
   const locations = useMemo(
-    () => allLocations.filter((l: any) => !selectedCompany?.id || l.company_id === selectedCompany.id),
-    [allLocations, selectedCompany?.id],
+    () => [...effectiveLocations].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+    [effectiveLocations],
   );
 
   const [name, setName] = useState("");
