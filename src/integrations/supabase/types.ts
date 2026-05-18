@@ -18492,6 +18492,7 @@ export type Database = {
           tool_id: string | null
           tool_name_snapshot: string | null
           updated_at: string | null
+          warehouse_item_id: string | null
         }
         Insert: {
           approved_by?: string | null
@@ -18516,6 +18517,7 @@ export type Database = {
           tool_id?: string | null
           tool_name_snapshot?: string | null
           updated_at?: string | null
+          warehouse_item_id?: string | null
         }
         Update: {
           approved_by?: string | null
@@ -18540,6 +18542,7 @@ export type Database = {
           tool_id?: string | null
           tool_name_snapshot?: string | null
           updated_at?: string | null
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -18563,6 +18566,27 @@ export type Database = {
             referencedRelation: "warehouse_tools"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "tool_issues_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_issues_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_issues_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items_full"
+            referencedColumns: ["id"]
+          },
         ]
       }
       tool_returns: {
@@ -18582,6 +18606,7 @@ export type Database = {
           returned_by_name: string | null
           status: string
           updated_at: string | null
+          warehouse_item_id: string | null
         }
         Insert: {
           company_id?: string | null
@@ -18599,6 +18624,7 @@ export type Database = {
           returned_by_name?: string | null
           status?: string
           updated_at?: string | null
+          warehouse_item_id?: string | null
         }
         Update: {
           company_id?: string | null
@@ -18616,6 +18642,7 @@ export type Database = {
           returned_by_name?: string | null
           status?: string
           updated_at?: string | null
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -18630,6 +18657,27 @@ export type Database = {
             columns: ["issue_id"]
             isOneToOne: false
             referencedRelation: "tool_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_returns_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_returns_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_returns_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items_full"
             referencedColumns: ["id"]
           },
         ]
@@ -19571,6 +19619,7 @@ export type Database = {
           is_batch_tracked: boolean
           is_serialized: boolean
           item_code: string
+          item_type: string
           location_id: string | null
           manufacturer: string | null
           max_stock_level: number | null
@@ -19598,6 +19647,7 @@ export type Database = {
           is_batch_tracked?: boolean
           is_serialized?: boolean
           item_code: string
+          item_type?: string
           location_id?: string | null
           manufacturer?: string | null
           max_stock_level?: number | null
@@ -19625,6 +19675,7 @@ export type Database = {
           is_batch_tracked?: boolean
           is_serialized?: boolean
           item_code?: string
+          item_type?: string
           location_id?: string | null
           manufacturer?: string | null
           max_stock_level?: number | null
@@ -19817,10 +19868,12 @@ export type Database = {
           base_uom: string | null
           catalog_item_id: string
           company_id: string | null
+          condition: string | null
           created_at: string
           created_by: string | null
           current_stock: number | null
           id: string
+          is_loanable: boolean
           location_id: string | null
           max_stock_level: number | null
           min_stock_level: number | null
@@ -19839,10 +19892,12 @@ export type Database = {
           base_uom?: string | null
           catalog_item_id: string
           company_id?: string | null
+          condition?: string | null
           created_at?: string
           created_by?: string | null
           current_stock?: number | null
           id?: string
+          is_loanable?: boolean
           location_id?: string | null
           max_stock_level?: number | null
           min_stock_level?: number | null
@@ -19861,10 +19916,12 @@ export type Database = {
           base_uom?: string | null
           catalog_item_id?: string
           company_id?: string | null
+          condition?: string | null
           created_at?: string
           created_by?: string | null
           current_stock?: number | null
           id?: string
+          is_loanable?: boolean
           location_id?: string | null
           max_stock_level?: number | null
           min_stock_level?: number | null
@@ -21422,10 +21479,12 @@ export type Database = {
           base_uom: string | null
           catalog_item_id: string
           company_id: string | null
+          condition: string | null
           created_at: string
           created_by: string | null
           current_stock: number | null
           id: string
+          is_loanable: boolean
           location_id: string | null
           max_stock_level: number | null
           min_stock_level: number | null
