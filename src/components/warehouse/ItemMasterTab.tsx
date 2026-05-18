@@ -150,7 +150,26 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [ownerLabelFilter, setOwnerLabelFilter] = useState<string>("");
   const [debouncedOwnerLabel, setDebouncedOwnerLabel] = useState<string>("");
   const [stockMode, setStockMode] = useState<'all' | 'in_stock' | 'zero' | 'low'>("all");
+  const [sortBy, setSortBy] = useState<'name' | 'item_code' | 'created_at' | 'current_stock'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+
+  const handleSort = (key: 'name' | 'item_code' | 'created_at' | 'current_stock') => {
+    if (sortBy === key) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
+  };
+
+  const SortIcon = ({ k }: { k: 'name' | 'item_code' | 'created_at' | 'current_stock' }) => {
+    if (sortBy !== k) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 opacity-50" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="ml-1 inline h-3.5 w-3.5" />
+      : <ArrowDown className="ml-1 inline h-3.5 w-3.5" />;
+  };
 
   const toggleColumn = (key: InvColumnKey) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
