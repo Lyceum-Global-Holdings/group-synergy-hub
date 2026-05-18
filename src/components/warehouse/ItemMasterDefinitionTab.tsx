@@ -84,7 +84,26 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'item_code' | 'created_at'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+
+  const handleSort = (key: 'name' | 'item_code' | 'created_at') => {
+    if (sortBy === key) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
+  };
+
+  const SortIcon = ({ k }: { k: 'name' | 'item_code' | 'created_at' }) => {
+    if (sortBy !== k) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 opacity-50" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="ml-1 inline h-3.5 w-3.5" />
+      : <ArrowDown className="ml-1 inline h-3.5 w-3.5" />;
+  };
 
   const toggleColumn = (key: ColumnKey) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
