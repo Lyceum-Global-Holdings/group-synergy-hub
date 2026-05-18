@@ -18294,6 +18294,121 @@ export type Database = {
           },
         ]
       }
+      telegram_job_runs: {
+        Row: {
+          company_id: string
+          error_text: string | null
+          finished_at: string | null
+          id: string
+          job_id: string
+          payload_preview: string | null
+          recipient_count: number
+          started_at: string
+          status: string
+          triggered_by: string
+        }
+        Insert: {
+          company_id: string
+          error_text?: string | null
+          finished_at?: string | null
+          id?: string
+          job_id: string
+          payload_preview?: string | null
+          recipient_count?: number
+          started_at?: string
+          status?: string
+          triggered_by?: string
+        }
+        Update: {
+          company_id?: string
+          error_text?: string | null
+          finished_at?: string | null
+          id?: string
+          job_id?: string
+          payload_preview?: string | null
+          recipient_count?: number
+          started_at?: string
+          status?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_job_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_scheduled_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_scheduled_jobs: {
+        Row: {
+          chat_ids: string[]
+          company_id: string
+          created_at: string
+          created_by: string | null
+          day_of_month: number | null
+          filters: Json
+          frequency: string
+          id: string
+          is_enabled: boolean
+          last_run_at: string | null
+          name: string
+          next_run_at: string | null
+          report_type: string
+          send_time: string
+          timezone: string
+          updated_at: string
+          weekday: number | null
+        }
+        Insert: {
+          chat_ids?: string[]
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          filters?: Json
+          frequency: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          name: string
+          next_run_at?: string | null
+          report_type: string
+          send_time?: string
+          timezone?: string
+          updated_at?: string
+          weekday?: number | null
+        }
+        Update: {
+          chat_ids?: string[]
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          filters?: Json
+          frequency?: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string | null
+          report_type?: string
+          send_time?: string
+          timezone?: string
+          updated_at?: string
+          weekday?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_scheduled_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_settings: {
         Row: {
           bot_token: string | null
@@ -21221,6 +21336,17 @@ export type Database = {
           id: string
           item_code: string
         }[]
+      }
+      compute_telegram_job_next_run: {
+        Args: {
+          p_day_of_month: number
+          p_frequency: string
+          p_from?: string
+          p_send_time: string
+          p_timezone: string
+          p_weekday: number
+        }
+        Returns: string
       }
       consume_mfa_recovery_code: { Args: { p_code: string }; Returns: boolean }
       consume_partial_piece: {
