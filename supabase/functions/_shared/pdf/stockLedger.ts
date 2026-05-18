@@ -66,15 +66,27 @@ const TABLE_W = COLS.reduce((s, c) => s + c.w, 0);
 const fmtN = (n: number, d = 2) =>
   (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 
+function sanitize(s: string): string {
+  // pdf-lib StandardFonts only support WinAnsi. Strip anything outside it (emoji, CJK, etc.)
+  // and replace common typographic chars with ASCII equivalents.
+  return String(s ?? "")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
+}
+
 function truncate(s: string, font: PDFFont, size: number, maxW: number): string {
+  s = sanitize(s);
   if (font.widthOfTextAtSize(s, size) <= maxW) return s;
   let lo = 0, hi = s.length;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if (font.widthOfTextAtSize(s.slice(0, mid) + "…", size) <= maxW) lo = mid;
+    if (font.widthOfTextAtSize(s.slice(0, mid) + "...", size) <= maxW) lo = mid;
     else hi = mid - 1;
   }
-  return s.slice(0, lo) + "…";
+  return s.slice(0, lo) + "...";
 }
 
 export async function buildStockLedgerPdf(input: LedgerInput): Promise<Uint8Array> {
