@@ -161,6 +161,9 @@ function RouteChangeTracker() {
   const location = useLocation();
   useEffect(() => {
     markRouteChange(location.pathname);
+    // Warm sibling routes (same module group) on every navigation so the
+    // next click within the module resolves from cache.
+    prefetchNeighborRoutesOnIdle(location.pathname);
   }, [location.pathname]);
   useEffect(() => {
     prefetchCommonRoutesOnIdle();
