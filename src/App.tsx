@@ -48,7 +48,7 @@ import MfaEnforcementGate from "./components/auth/MfaEnforcementGate";
 import { Loader2 } from "lucide-react";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { markRouteChange } from "@/lib/perfTelemetry";
-import { prefetchCommonRoutesOnIdle } from "@/lib/routePreload";
+import { prefetchCommonRoutesOnIdle, prefetchNeighborRoutesOnIdle } from "@/lib/routePreload";
 import { RouteSkeleton } from "@/components/layout/RouteSkeleton";
 
 // Lazy load all page components for code splitting
