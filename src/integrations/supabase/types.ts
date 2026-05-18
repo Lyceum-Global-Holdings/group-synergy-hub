@@ -21910,8 +21910,11 @@ export type Database = {
           p_cursor_code?: string
           p_cursor_created?: string
           p_cursor_id?: string
+          p_cursor_name?: string
           p_limit?: number
           p_search?: string
+          p_sort_by?: string
+          p_sort_dir?: string
           p_status?: string
           p_supplier_id?: string
         }
