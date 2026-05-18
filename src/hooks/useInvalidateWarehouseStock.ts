@@ -20,6 +20,9 @@ export const WAREHOUSE_STOCK_QUERY_KEYS = [
   ["stock-transfer-requests"],
   ["warehouse-catalog"],
   ["warehouse-locations-stock"],
+  ["tool-bin-allocations"],
+  ["tool-bin-allocations-all"],
+  ["warehouse-tools"],
 ] as const;
 
 export function useInvalidateWarehouseStock() {
