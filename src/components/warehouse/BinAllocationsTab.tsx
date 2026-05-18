@@ -270,14 +270,17 @@ export function BinAllocationsTab() {
   ];
 
   const handleBulkPrint = async () => {
-    if (!filteredAllocations.length) {
-      toast.error('No allocations to print');
+    const itemRows = filteredAllocations.filter(
+      (a) => (a as any)._entity_type !== 'tool',
+    );
+    if (!itemRows.length) {
+      toast.error('No item allocations to print (tool rows are excluded)');
       return;
     }
     setBulkPrinting(true);
     try {
       const blob = await generateBulkBinQRCodePdf(
-        filteredAllocations.map((a) => ({
+        itemRows.map((a) => ({
           id: a.id,
           item_code: a.warehouse_item?.item_code,
           item_name: a.warehouse_item?.name,
@@ -288,7 +291,7 @@ export function BinAllocationsTab() {
         }))
       );
       downloadBulkBinQRCodePdf(blob);
-      toast.success(`Generated ${filteredAllocations.length} QR labels`);
+      toast.success(`Generated ${itemRows.length} QR labels`);
     } catch (e) {
       console.error(e);
       toast.error('Failed to generate QR labels');
