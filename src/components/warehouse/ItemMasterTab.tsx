@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -217,12 +218,38 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return allItems.filter(item => item.bins?.some(b => b.bin_code === binFilter));
   }, [allItems, binFilter]);
 
-  // IntersectionObserver sentinel for infinite scroll
+  // Virtualized scroll container — only the visible ~50 rows are mounted
+  // even when thousands of items have been loaded across infinite pages.
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const VIRTUALIZE_FROM = 100;
+  const shouldVirtualize = filteredItems.length > VIRTUALIZE_FROM;
+
+  const rowVirtualizer = useVirtualizer({
+    count: shouldVirtualize ? filteredItems.length : 0,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 56,
+    overscan: 8,
+  });
+
+  // Prefetch the next server page when the user scrolls near the end of the
+  // currently materialized rows (TanStack Virtual + useInfiniteQuery pattern).
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    if (shouldVirtualize) {
+      const last = virtualItems[virtualItems.length - 1];
+      if (last && last.index >= filteredItems.length - 10) {
+        fetchNextPage();
+      }
+    }
+  }, [virtualItems, filteredItems.length, hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
+
+  // Fallback sentinel for the non-virtualized (small dataset) path.
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (shouldVirtualize) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
@@ -231,10 +258,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       },
       { rootMargin: '200px' }
     );
-
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
+
 
   const { locations: allLocations = [] } = useWarehouseLocations();
   const locationNameById = useMemo(
@@ -543,9 +570,18 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-x-auto">
+      <div className="border rounded-lg">
+        <div
+          ref={scrollParentRef}
+          className="overflow-auto"
+          style={{ maxHeight: 'calc(100vh - 320px)' }}
+          role="grid"
+          aria-rowcount={filteredItems.length}
+          aria-label="Item master inventory"
+        >
         <Table className="min-w-full [&_td]:py-1.5 [&_th]:py-2">
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-background">
+
             <TableRow>
               <TableHead className="w-[40px]">
                 <Checkbox
@@ -592,9 +628,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                     : 'No items found. Create your first item to get started.'}
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredItems.map((item) => (
-                <TableRow key={item.id} data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}>
+            ) : ((() => {
+              const renderRow = (item: typeof filteredItems[number], idx: number) => (
+                <TableRow key={item.id} aria-rowindex={idx + 1} data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}>
+
                   <TableCell>
                     <Checkbox
                       checked={selectedItemIds.has(item.id)}
@@ -841,10 +878,33 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              );
+              if (!shouldVirtualize) {
+                return filteredItems.map((item, idx) => renderRow(item, idx));
+              }
+              const totalSize = rowVirtualizer.getTotalSize();
+              const paddingTop = virtualItems[0]?.start ?? 0;
+              const paddingBottom = totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0);
+              return (
+                <>
+                  {paddingTop > 0 && (
+                    <tr aria-hidden style={{ height: paddingTop }}>
+                      <td colSpan={visibleCount + 1} />
+                    </tr>
+                  )}
+                  {virtualItems.map((vi) => renderRow(filteredItems[vi.index], vi.index))}
+                  {paddingBottom > 0 && (
+                    <tr aria-hidden style={{ height: paddingBottom }}>
+                      <td colSpan={visibleCount + 1} />
+                    </tr>
+                  )}
+                </>
+              );
+            })())}
           </TableBody>
         </Table>
+        </div>
+
 
         {/* Infinite scroll sentinel */}
         <div ref={sentinelRef} className="h-1" />
