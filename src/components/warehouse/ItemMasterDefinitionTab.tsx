@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, Loader2, Columns3 } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, Loader2, Columns3, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -83,7 +84,26 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'item_code' | 'created_at'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+
+  const handleSort = (key: 'name' | 'item_code' | 'created_at') => {
+    if (sortBy === key) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
+  };
+
+  const SortIcon = ({ k }: { k: 'name' | 'item_code' | 'created_at' }) => {
+    if (sortBy !== k) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 opacity-50" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="ml-1 inline h-3.5 w-3.5" />
+      : <ArrowDown className="ml-1 inline h-3.5 w-3.5" />;
+  };
 
   const toggleColumn = (key: ColumnKey) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
@@ -147,10 +167,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useWarehouseItemsLazy(filterParams);
-
-  const countConfig = useWarehouseItemsCount(filterParams);
-  const { data: totalCount = 0 } = useQuery(countConfig);
+  } = useWarehouseItemsLazy({ ...filterParams, sortBy, sortDir });
 
   const items = useMemo(() => {
     if (!infiniteData?.pages) return [];
@@ -167,7 +184,45 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return result;
   }, [infiniteData]);
 
+  // Count is non-critical for first paint — only fetch after the first page renders,
+  // and treat it as fresh for 60s so typing/scrolling doesn't refire it.
+  const countConfig = useWarehouseItemsCount(filterParams);
+  const { data: totalCount = 0 } = useQuery({
+    ...countConfig,
+    enabled: items.length > 0,
+    staleTime: 60_000,
+  });
+
+  // O(1) lookup maps — replaces O(N*M) categories.find / units.find in the row render.
+  const categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories]);
+  const unitById = useMemo(() => new Map(units.map(u => [u.id, u])), [units]);
+
+  // Row virtualization — only visible rows are mounted regardless of how many pages loaded.
+  const VIRTUALIZE_FROM = 50;
+  const shouldVirtualize = items.length > VIRTUALIZE_FROM;
+  const rowVirtualizer = useVirtualizer({
+    count: shouldVirtualize ? items.length : 0,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 48,
+    overscan: 8,
+  });
+
+  // Drive infinite scroll from the virtualizer — prefetch when near the end.
+  const virtualItems = rowVirtualizer.getVirtualItems();
   useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    if (shouldVirtualize) {
+      const last = virtualItems[virtualItems.length - 1];
+      if (last && last.index >= items.length - 10) {
+        fetchNextPage();
+      }
+    }
+  }, [virtualItems, items.length, hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
+
+  // Fallback sentinel for small datasets (non-virtualized path).
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (shouldVirtualize) return;
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -176,11 +231,11 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           fetchNextPage();
         }
       },
-      { threshold: 0.1 }
+      { rootMargin: '200px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
 
   const hasActiveFilters = categoryFilter !== 'all' || statusFilter !== 'all' || supplierFilter !== 'all';
 
@@ -192,6 +247,107 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
+
+  const renderRow = useCallback((item: CatalogItem, idx: number) => {
+    const category = categoryById.get(item.category_id ?? '');
+    const unit = unitById.get(item.unit_id ?? '');
+    return (
+      <TableRow key={item.id} aria-rowindex={idx + 1}>
+        {col('photo') && (
+          <TableCell>
+            {item.image_url ? (
+              <button onClick={() => setPreviewImage({ url: item.image_url!, name: item.name })} className="cursor-pointer">
+                <img src={item.image_url} alt={item.name} loading="lazy" decoding="async" className="h-7 w-7 rounded object-cover" />
+              </button>
+            ) : (
+              <div className="h-7 w-7 rounded bg-muted flex items-center justify-center">
+                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            )}
+          </TableCell>
+        )}
+        {col('item_code') && <TableCell className="font-mono text-xs">{item.item_code}</TableCell>}
+        <TableCell>
+          <div className="space-y-0.5">
+            <div className="font-medium">{item.name}</div>
+            {item.description && (
+              <div className="text-xs text-muted-foreground line-clamp-1">
+                {item.description}
+              </div>
+            )}
+          </div>
+        </TableCell>
+        {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
+        {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
+        {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
+        {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
+        {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
+        {col('status') && (
+          <TableCell>
+            <Badge variant="outline" className={getStatusColor(item.status || 'active')}>
+              {item.status || 'active'}
+            </Badge>
+          </TableCell>
+        )}
+        <TableCell>
+          <div className="flex items-center justify-end gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewingItem(item)}>
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View Details</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit Item</TooltipContent>
+              </Tooltip>
+              {canDelete && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingItem(item)} disabled={isDeleting || isMarkingInactive}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Item</TooltipContent>
+                </Tooltip>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToInventory?.(item.id)}>
+                    <Package className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View in Inventory</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToBins?.(item.id)}>
+                    <MapPin className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View Bin Allocations</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setStockMovementItem(item)}>
+                    <History className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Stock Movement History</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }, [categoryById, unitById, visibleColumns, canDelete, isDeleting, isMarkingInactive, onNavigateToInventory, onNavigateToBins]);
 
   const handleDownloadExcel = useCallback(async () => {
     setIsExporting(true);
@@ -344,13 +500,28 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </div>
       </div>
 
-      <div className="rounded-md border overflow-auto">
+      <div
+        ref={scrollParentRef}
+        className="rounded-md border overflow-auto max-h-[calc(100vh-320px)]"
+        role="grid"
+        aria-rowcount={items.length}
+      >
         <Table className="[&_td]:py-1.5 [&_th]:py-2">
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow>
               {col('photo') && <TableHead className="w-10"></TableHead>}
-              {col('item_code') && <TableHead>Item Code</TableHead>}
-              <TableHead>Name</TableHead>
+              {col('item_code') && (
+                <TableHead aria-sort={sortBy === 'item_code' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                  <button type="button" onClick={() => handleSort('item_code')} className="inline-flex items-center font-medium hover:text-foreground">
+                    Item Code<SortIcon k="item_code" />
+                  </button>
+                </TableHead>
+              )}
+              <TableHead aria-sort={sortBy === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                <button type="button" onClick={() => handleSort('name')} className="inline-flex items-center font-medium hover:text-foreground">
+                  Name<SortIcon k="name" />
+                </button>
+              </TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
               {col('unit_cost') && <TableHead className="text-right">Unit Cost</TableHead>}
@@ -369,109 +540,37 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <TableRow>
                 <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">No items found</TableCell>
               </TableRow>
-            ) : items.map(item => {
-              const category = categories.find(c => c.id === item.category_id);
-              const unit = units.find(u => u.id === item.unit_id);
-              return (
-                <TableRow key={item.id}>
-                  {col('photo') && (
-                    <TableCell>
-                      {item.image_url ? (
-                        <button onClick={() => setPreviewImage({ url: item.image_url!, name: item.name })} className="cursor-pointer">
-                          <img src={item.image_url} alt={item.name} className="h-7 w-7 rounded object-cover" />
-                        </button>
-                      ) : (
-                        <div className="h-7 w-7 rounded bg-muted flex items-center justify-center">
-                          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
+            ) : shouldVirtualize ? (
+              <>
+                {(() => {
+                  const vItems = rowVirtualizer.getVirtualItems();
+                  const totalSize = rowVirtualizer.getTotalSize();
+                  const paddingTop = vItems.length > 0 ? vItems[0].start : 0;
+                  const paddingBottom = vItems.length > 0 ? totalSize - vItems[vItems.length - 1].end : 0;
+                  return (
+                    <>
+                      {paddingTop > 0 && (
+                        <TableRow style={{ height: paddingTop }}>
+                          <TableCell colSpan={visibleCount} className="p-0" />
+                        </TableRow>
                       )}
-                    </TableCell>
-                  )}
-                  {col('item_code') && <TableCell className="font-mono text-xs">{item.item_code}</TableCell>}
-                  <TableCell>
-                    <div className="space-y-0.5">
-                      <div className="font-medium">{item.name}</div>
-                      {item.description && (
-                        <div className="text-xs text-muted-foreground line-clamp-1">
-                          {item.description}
-                        </div>
+                      {vItems.map(v => renderRow(items[v.index], v.index))}
+                      {paddingBottom > 0 && (
+                        <TableRow style={{ height: paddingBottom }}>
+                          <TableCell colSpan={visibleCount} className="p-0" />
+                        </TableRow>
                       )}
-                    </div>
-                  </TableCell>
-                  {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
-                  {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
-                  {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
-                  {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
-                  {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
-                  {col('status') && (
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusColor(item.status || 'active')}>
-                        {item.status || 'active'}
-                      </Badge>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewingItem(item)}>
-                                  <Eye className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>View Details</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Edit Item</TooltipContent>
-                            </Tooltip>
-                            {canDelete && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingItem(item)} disabled={isDeleting || isMarkingInactive}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete Item</TooltipContent>
-                              </Tooltip>
-                            )}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToInventory?.(item.id)}>
-                                  <Package className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>View in Inventory</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToBins?.(item.id)}>
-                                  <MapPin className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>View Bin Allocations</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setStockMovementItem(item)}>
-                                  <History className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Stock Movement History</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                    </>
+                  );
+                })()}
+              </>
+            ) : (
+              items.map((item, idx) => renderRow(item, idx))
+            )}
           </TableBody>
         </Table>
       </div>
+
 
       <div className="flex flex-col items-center gap-2">
         <div className="text-sm text-muted-foreground">

@@ -2,9 +2,13 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CatalogItem } from '@/types/itemBin';
 
+export type CatalogSortBy = 'name' | 'item_code' | 'created_at';
+export type CatalogSortDir = 'asc' | 'desc';
+
 interface Cursor {
-  created_at: string;
-  item_code: string;
+  created_at: string | null;
+  item_code: string | null;
+  name: string | null;
   id: string;
 }
 
@@ -17,6 +21,8 @@ interface Filters {
 
 interface UseWarehouseItemsLazyOptions extends Filters {
   pageSize?: number;
+  sortBy?: CatalogSortBy;
+  sortDir?: CatalogSortDir;
 }
 
 function rpcArgs(filters: Filters) {
@@ -58,27 +64,32 @@ function mapRow(row: CatalogPageRow): CatalogItem {
 }
 
 /**
- * Infinite-scroll hook: fetches catalog items in batches using a strictly monotonic
- * keyset cursor (created_at, item_code, id). Defends against ~14k bulk-imported rows
- * sharing one created_at — random UUIDs alone cannot tiebreak a bucket that large.
+ * Infinite-scroll hook with server-side sort. The keyset cursor advances on
+ * (sort_key, id) in the same direction as the ORDER BY so pagination remains
+ * strictly monotonic across name/item_code/created_at sorts.
  */
 export function useWarehouseItemsLazy({
-  pageSize = 100,
+  pageSize = 50,
   search,
   categoryId,
   status,
   supplierId,
+  sortBy = 'name',
+  sortDir = 'asc',
 }: UseWarehouseItemsLazyOptions) {
   return useInfiniteQuery({
-    queryKey: ['warehouse-item-catalog', 'lazy', search, categoryId, status, supplierId],
+    queryKey: ['warehouse-item-catalog', 'lazy', search, categoryId, status, supplierId, sortBy, sortDir],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
-      const { data, error } = await supabase.rpc('get_warehouse_catalog_page', {
+      const { data, error } = await supabase.rpc('get_warehouse_catalog_page' as any, {
         ...rpcArgs({ search, categoryId, status, supplierId }),
         p_cursor_created: pageParam?.created_at ?? null,
         p_cursor_code: pageParam?.item_code ?? null,
         p_cursor_id: pageParam?.id ?? null,
         p_limit: pageSize,
-      });
+        p_sort_by: sortBy,
+        p_sort_dir: sortDir,
+        p_cursor_name: pageParam?.name ?? null,
+      } as any);
       if (error) throw error;
 
       const rows = (data ?? []) as CatalogPageRow[];
@@ -86,12 +97,19 @@ export function useWarehouseItemsLazy({
       let nextCursor: Cursor | null = null;
       if (rows.length === pageSize) {
         const last = rows[rows.length - 1];
-        nextCursor = { created_at: last.created_at, item_code: last.item_code, id: last.id };
+        nextCursor = {
+          created_at: last.created_at ?? null,
+          item_code: last.item_code ?? null,
+          name: last.name ?? null,
+          id: last.id,
+        };
       }
       return { items, nextCursor };
     },
     initialPageParam: null as Cursor | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
   });
 }
 
@@ -111,8 +129,7 @@ export function useWarehouseItemsCount(filters: Filters) {
 
 /**
  * Fetch ALL catalog items matching filters via the same keyset RPC (for Excel export).
- * Guaranteed to terminate: every batch advances the (created_at, item_code, id) tuple,
- * and the loop stops as soon as a batch returns fewer than batchSize rows.
+ * Default sort name asc keeps the export deterministic.
  */
 export async function fetchAllWarehouseItemsBatched(filters: Filters): Promise<CatalogItem[]> {
   const batchSize = 1000;
@@ -120,15 +137,17 @@ export async function fetchAllWarehouseItemsBatched(filters: Filters): Promise<C
   const seen = new Set<string>();
   let cursor: Cursor | null = null;
 
-  // Hard safety cap to prevent runaway loops; ~500k rows max.
   for (let i = 0; i < 500; i += 1) {
-    const { data, error } = await supabase.rpc('get_warehouse_catalog_page', {
+    const { data, error } = await supabase.rpc('get_warehouse_catalog_page' as any, {
       ...rpcArgs(filters),
       p_cursor_created: cursor?.created_at ?? null,
       p_cursor_code: cursor?.item_code ?? null,
       p_cursor_id: cursor?.id ?? null,
       p_limit: batchSize,
-    });
+      p_sort_by: 'name',
+      p_sort_dir: 'asc',
+      p_cursor_name: cursor?.name ?? null,
+    } as any);
     if (error) throw error;
 
     const rows = (data ?? []) as CatalogPageRow[];
@@ -141,7 +160,12 @@ export async function fetchAllWarehouseItemsBatched(filters: Filters): Promise<C
 
     if (rows.length < batchSize) break;
     const last = rows[rows.length - 1];
-    cursor = { created_at: last.created_at, item_code: last.item_code, id: last.id };
+    cursor = {
+      created_at: last.created_at ?? null,
+      item_code: last.item_code ?? null,
+      name: last.name ?? null,
+      id: last.id,
+    };
   }
 
   return all;
