@@ -44,16 +44,17 @@ const ROW_H = 13;
 const HEADER_H = 60;
 const FOOTER_H = 22;
 
+// Page width 841.89 - 2*28 margin = 785.89pt available
 const COLS = [
-  { key: "date",    label: "Date",        w: 65,  align: "left"  as const },
-  { key: "docNo",   label: "Doc #",       w: 100, align: "left"  as const },
-  { key: "refType", label: "Type",        w: 85,  align: "left"  as const },
-  { key: "desc",    label: "Description", w: 235, align: "left"  as const },
-  { key: "in",      label: "In Qty",      w: 65,  align: "right" as const },
-  { key: "out",     label: "Out Qty",     w: 65,  align: "right" as const },
-  { key: "uom",     label: "UOM",         w: 45,  align: "left"  as const },
-  { key: "cost",    label: "Unit Cost",   w: 75,  align: "right" as const },
-  { key: "value",   label: "Value",       w: 95,  align: "right" as const },
+  { key: "date",    label: "Date",        w: 60,  align: "left"  as const },
+  { key: "docNo",   label: "Doc #",       w: 85,  align: "left"  as const },
+  { key: "refType", label: "Type",        w: 70,  align: "left"  as const },
+  { key: "desc",    label: "Description", w: 210, align: "left"  as const },
+  { key: "in",      label: "In Qty",      w: 60,  align: "right" as const },
+  { key: "out",     label: "Out Qty",     w: 60,  align: "right" as const },
+  { key: "uom",     label: "UOM",         w: 40,  align: "left"  as const },
+  { key: "cost",    label: "Unit Cost",   w: 70,  align: "right" as const },
+  { key: "value",   label: "Value",       w: 80,  align: "right" as const },
 ];
 const TABLE_W = COLS.reduce((s, c) => s + c.w, 0);
 
@@ -170,7 +171,6 @@ export async function buildStockLedgerPdf(input: LedgerInput): Promise<Uint8Arra
   }
 
   for (const loc of input.sections) {
-    drawSectionLabel(`Location: ${loc.locationName}`, 11);
     for (const item of loc.items) {
       drawSectionLabel(`${item.itemCode} — ${item.itemName}`, 9);
       drawTableHeader();

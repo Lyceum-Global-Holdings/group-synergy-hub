@@ -82,32 +82,32 @@ async function sendTelegramDocument(botToken: string, chatId: string, pdf: Uint8
 }
 
 // ---------- Date helpers ----------
-function previousLocalDay(timezone: string): { from: string; to: string; label: string } {
-  // Compute "yesterday" in the given tz as ISO start/end UTC
+function currentLocalDay(timezone: string): { from: string; to: string; label: string } {
+  // Compute "today" in the given tz as ISO start/end UTC (inclusive of activity up to now).
   const now = new Date();
-  // Use Intl to extract Y-M-D in tz
   const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const parts = fmt.formatToParts(now);
   const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
   const today = `${get('year')}-${get('month')}-${get('day')}`;
   const todayDate = new Date(`${today}T00:00:00Z`);
-  const yest = new Date(todayDate);
-  yest.setUTCDate(yest.getUTCDate() - 1);
-  const yYMD = yest.toISOString().slice(0, 10);
-  // We treat the local day boundaries as UTC for query simplicity (acceptable for daily reports).
-  return { from: `${yYMD}T00:00:00Z`, to: `${today}T00:00:00Z`, label: yYMD };
+  const tomorrow = new Date(todayDate);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  return { from: `${today}T00:00:00Z`, to: tomorrow.toISOString(), label: today };
 }
 
+// Backwards-compatible alias used by other renderers.
+const previousLocalDay = currentLocalDay;
+
 function periodForJob(job: Job): { from: string; to: string; label: string; labelFrom: string; labelTo: string } {
-  const day = previousLocalDay(job.timezone);
+  const day = currentLocalDay(job.timezone);
   if (job.frequency === 'daily') {
     return { ...day, labelFrom: day.label, labelTo: day.label };
   }
-  // For weekly: previous 7 days; monthly: previous 30 days (anchored to "yesterday")
+  // For weekly: trailing 7 days ending today; monthly: trailing 30 days ending today.
   const days = job.frequency === 'weekly' ? 7 : 30;
-  const toDate = new Date(day.to);
+  const toDate = new Date(`${day.label}T00:00:00Z`);
   const fromDate = new Date(toDate);
-  fromDate.setUTCDate(fromDate.getUTCDate() - days);
+  fromDate.setUTCDate(fromDate.getUTCDate() - (days - 1));
   const fromYMD = fromDate.toISOString().slice(0, 10);
   return {
     from: `${fromYMD}T00:00:00Z`,
