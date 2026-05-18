@@ -1,34 +1,45 @@
 ## Goal
-Item Master already requests 50 rows per page from the server, but after several scroll-loads the DOM holds hundreds–thousands of rich `<tr>` nodes (images, tooltips, badges, per-row buttons), which causes the slowness the user is feeling. Add **row virtualization** so only ~50 rows are ever mounted in the DOM, while keeping the existing 50-row server pages and infinite-scroll behavior. This follows the project's existing `VirtualTable`/TanStack Virtual pattern and matches WAI-ARIA Grid + TanStack Virtual best practices.
 
-## Why virtualization (not classic pagination)
-- Server already paginates via `useWarehouseItemsLazyInventory({ pageSize: 50 })` — pages stay at 50 rows.
-- Slowness is rendering cost: ~12 columns × heavy cells × N rows. Virtualization caps mounted rows at ~viewport + overscan (≈30–60 rows).
-- Matches Core memory: "Lists ≥200 rows use shared VirtualTable; never roll custom virtualizer."
+Make the Item Master table sortable by clickable column headers, with a default sort of **Name ascending**. Keep the existing infinite-scroll + virtualization model.
 
-## Approach (no behavior change, only rendering)
+## Why server-side sort (not client-only)
 
-### `src/components/warehouse/ItemMasterTab.tsx`
+The Item Master uses keyset infinite scroll via the `list_warehouse_inventory` RPC, currently ordered by `(created_at DESC, id DESC)`. Sorting only what's already loaded on the client would produce a misleading order (later pages would arrive out of place). Sorting must happen in the RPC so each fetched page is globally ordered.
 
-1. **Wrap the table in a fixed-height scroll container** (e.g., `max-h-[70vh] overflow-auto`) used as the virtualizer's scroll element. Keep `overflow-x-auto` for column overflow.
-2. **Use `useVirtualizer` from `@tanstack/react-virtual`** (already a project dep via shared `VirtualTable`):
-   - `count = filteredItems.length`
-   - `estimateSize: () => 56` (current row ~py-1.5 + content)
-   - `overscan: 8`
-   - `getScrollElement` = the wrapper ref
-3. **Render rows using top/bottom spacer `<tr>` pattern** (same technique used by `src/components/shared/VirtualTable.tsx`) so native `<table>` layout, sticky `<thead>`, column widths, and the existing rich cells (photo, bins, per-location stock, action buttons) all keep working untouched.
-4. **Apply ARIA Grid semantics**: `role="grid"`, `aria-rowcount={filteredItems.length}`, and `aria-rowindex` on each rendered row, so screen readers announce "row N of total" even though only ~50 rows are mounted.
-5. **Replace the IntersectionObserver sentinel** with a virtualizer-driven trigger: in a `useEffect`, look at `rowVirtualizer.getVirtualItems()`; when the last virtual row's index is within 10 of `filteredItems.length - 1` and `hasNextPage && !isFetchingNextPage`, call `fetchNextPage()`. This is the TanStack-recommended way to combine `useInfiniteQuery` + `useVirtualizer`.
-6. **Keep all other state, filters, dialogs, mutations, selection, columns, and the 50-per-page server cap unchanged.** No hook/API/RPC changes.
+## Scope (in)
 
-### Threshold guard
-- Use a small `virtualizeFromRowCount = 100` short-circuit: if fewer than 100 rows are loaded, render the table the existing non-virtual way (zero virtualization overhead for small datasets). Above that, switch to virtualized rows.
+1. **DB migration** — extend `list_warehouse_inventory` with sort parameters and keyset cursor parity for the chosen sort:
+   - New params: `_sort_by text DEFAULT 'name'` (allowlist: `name`, `item_code`, `created_at`, `current_stock`), `_sort_dir text DEFAULT 'asc'` (allowlist: `asc`, `desc`).
+   - Cursor changes: add `_cursor_name text` and `_cursor_item_code text`, `_cursor_stock numeric` so keyset works per sort key. `id` stays the tie-breaker (memory rule: cursor must be strictly monotonic — never trust `id` alone).
+   - ORDER BY built from the allowlisted sort key + `id` tie-breaker, ascending or descending consistently in both the windowing clause and the final SELECT.
+   - Filter-before-paginate preserved (memory rule).
+   - Keep existing behavior when callers pass no sort (back-compat default becomes `name asc`).
 
-## Out of scope
-- No DB, RPC, or `useWarehouseItemsLazyInventory` changes.
-- No change to page size (stays at 50) or to filters/search/columns.
-- No conversion to classic numbered pagination.
-- No refactor of `BinAllocationsTab` or other warehouse tabs in this pass.
+2. **Hook** — `useWarehouseItemsLazyInventory`:
+   - Accept `sortBy` and `sortDir` options (default `'name'` / `'asc'`).
+   - Include them in the React Query key so changing sort refetches from page 1.
+   - Build the cursor payload from the last row's sort key + `id` and pass to the RPC.
+
+3. **UI** — `ItemMasterTab.tsx`:
+   - Sortable headers on **Name**, **Item Code**, **Stock**, **Created**. Click toggles asc → desc → asc. Active header shows an arrow (lucide `ArrowUp` / `ArrowDown`, neutral `ArrowUpDown` when inactive).
+   - Default state on mount: `{ sortBy: 'name', sortDir: 'asc' }`.
+   - Changing sort resets scroll position to top and lets the hook refetch.
+   - Keep all existing filters, virtualization, and infinite-scroll trigger logic untouched.
+
+## Scope (out)
+
+- No change to other warehouse tabs, no change to columns, no change to page size, no client-side multi-column sort.
+- No change to filters, search, RBAC, or RLS.
+
+## Files to touch
+
+- `supabase/migrations/<new timestamp>_warehouse_inventory_sort.sql` — new RPC version with sort params.
+- `src/hooks/useWarehouseItemsLazyInventory.ts` — pass sort + extended cursor.
+- `src/components/warehouse/ItemMasterTab.tsx` — sort state, sortable headers, default `name asc`.
 
 ## Validation
-- Verify on `/warehouse/item-bin-master` after edit: scroll through inventory, confirm rows render smoothly, infinite-scroll still appends the next 50, selection/edit/delete/stock-adjustment dialogs still open, sticky header stays, and DevTools shows only ~30–60 `<tr>` nodes in the table body regardless of total loaded.
+
+- On `/warehouse/item-bin-master`: items load alphabetically by Name ascending on first render.
+- Click Name header → toggles to descending; click Item Code → switches sort key; arrow indicator follows the active column.
+- Infinite scroll continues to append in the new order without duplicates or gaps.
+- Existing filters (category, status, supplier, location, stock mode, search) still work in combination with sort.
