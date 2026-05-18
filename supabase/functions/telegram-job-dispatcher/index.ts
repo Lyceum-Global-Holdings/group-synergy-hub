@@ -98,6 +98,26 @@ function previousLocalDay(timezone: string): { from: string; to: string; label: 
   return { from: `${yYMD}T00:00:00Z`, to: `${today}T00:00:00Z`, label: yYMD };
 }
 
+function periodForJob(job: Job): { from: string; to: string; label: string; labelFrom: string; labelTo: string } {
+  const day = previousLocalDay(job.timezone);
+  if (job.frequency === 'daily') {
+    return { ...day, labelFrom: day.label, labelTo: day.label };
+  }
+  // For weekly: previous 7 days; monthly: previous 30 days (anchored to "yesterday")
+  const days = job.frequency === 'weekly' ? 7 : 30;
+  const toDate = new Date(day.to);
+  const fromDate = new Date(toDate);
+  fromDate.setUTCDate(fromDate.getUTCDate() - days);
+  const fromYMD = fromDate.toISOString().slice(0, 10);
+  return {
+    from: `${fromYMD}T00:00:00Z`,
+    to: day.to,
+    label: `${fromYMD} → ${day.label}`,
+    labelFrom: fromYMD,
+    labelTo: day.label,
+  };
+}
+
 function esc(s: unknown): string {
   return String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
 }
