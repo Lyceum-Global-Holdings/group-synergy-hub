@@ -222,42 +222,50 @@ export function BinAllocationsTab() {
     {
       id: 'qr',
       header: 'QR',
-      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setQrAllocation(row.original)}
-          title="Generate QR code"
-        >
-          <QrCode className="h-4 w-4" />
-        </Button>
-      ),
+      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => {
+        const isTool = (row.original as any)._entity_type === 'tool';
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setQrAllocation(row.original)}
+            title={isTool ? 'QR not available for tools here — use Tool Management' : 'Generate QR code'}
+            disabled={isTool}
+          >
+            <QrCode className="h-4 w-4" />
+          </Button>
+        );
+      },
     },
     ...(canDelete ? [{
       id: 'actions',
       header: 'Actions',
-      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMoveAllocation(row.original)}
-            title="Move stock to another bin/warehouse"
-            disabled={(row.original.available_quantity || 0) <= 0}
-          >
-            <ArrowRightLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setAllocationToDelete(row.original.id)}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            title="Delete allocation"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => {
+        const isTool = (row.original as any)._entity_type === 'tool';
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMoveAllocation(row.original)}
+              title={isTool ? 'Move tools from Tool Management' : 'Move stock to another bin/warehouse'}
+              disabled={isTool || (row.original.available_quantity || 0) <= 0}
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAllocationToDelete(row.original.id)}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              title={isTool ? 'Delete tool allocations from Tool Management' : 'Delete allocation'}
+              disabled={isTool}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
     }] as ColumnDef<BinAllocationWithDetails>[] : []),
   ];
 
