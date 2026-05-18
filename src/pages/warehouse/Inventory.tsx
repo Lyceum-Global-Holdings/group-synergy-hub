@@ -3,10 +3,16 @@ import { Loader2, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 import { Button } from '@/components/ui/button';
-import { BulkCatalogToInventoryDialog } from '@/components/warehouse/bulk-catalog-import/BulkCatalogToInventoryDialog';
 
 const ItemMasterTab = lazy(() =>
   import('@/components/warehouse/ItemMasterTab').then((m) => ({ default: m.ItemMasterTab })),
+);
+// Defer the bulk-catalog dialog chunk until the user actually clicks the
+// "Bulk add from catalog" button. It pulls in a heavy grid + RPC client.
+const BulkCatalogToInventoryDialog = lazy(() =>
+  import('@/components/warehouse/bulk-catalog-import/BulkCatalogToInventoryDialog').then((m) => ({
+    default: m.BulkCatalogToInventoryDialog,
+  })),
 );
 
 export default function Inventory() {
