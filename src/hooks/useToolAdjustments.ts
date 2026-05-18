@@ -96,6 +96,7 @@ export function useToolAdjustments() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      invalidateWarehouseStock();
       toast({ title: "Success", description: "Tool quantity adjusted successfully" });
     },
     onError: (error: any) => {
