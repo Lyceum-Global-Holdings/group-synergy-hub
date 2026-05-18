@@ -1,6 +1,6 @@
 ---
 name: Telegram Scheduled Reports
-description: Multi-job Telegram report scheduler under Administration; jobs table + dispatcher edge function + 5-min cron
+description: Multi-job Telegram report scheduler under Administration; jobs table + dispatcher edge function + 5-min cron; warehouse_stock_daily renders a PDF Stock Movement Ledger (IAS 2 / SAP MB51) and is delivered via Telegram sendDocument
 type: feature
 ---
 # Telegram Scheduled Reports (Administration)
@@ -41,3 +41,9 @@ Migration auto-creates a `site_report_daily` job for every company that had `tel
 - Bot token never leaves the server — `telegram_settings.bot_token` is read only by the dispatcher with the service-role key.
 - Manual `dry_run` returns the rendered HTML preview without sending; logged with status=success and triggered_by=test.
 - `last_run_at` is only updated for cron + manual runs (NOT test/dry_run), so `next_run_at` stays anchored to the schedule.
+
+## PDF Delivery (warehouse_stock_daily)
+- `filters.format` ∈ {`pdf` (default), `text`}; `filters.location_ids: string[]` scopes the report (empty = all company locations); `filters.currency` (default `AED`).
+- PDF built in edge function via `pdf-lib` (esm.sh) in `supabase/functions/_shared/pdf/stockLedger.ts` — A4 landscape, per-location → per-item ledger with Opening / Movements / Closing rows + grand totals.
+- Sent to Telegram via `sendDocument` (multipart) with the HTML caption (≤1024 chars). Falls back to `sendMessage` text summary when `format='text'` or no movements.
+- Reads `qty_before`/`qty_after` directly from `stock_transactions` (immutable ledger) — never recomputed.

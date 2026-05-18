@@ -1,113 +1,90 @@
-# Scheduled Telegram Reports — Administration Console
+## Goal
+Send the **Warehouse Stock Movement Ledger** report as a **PDF attachment** through Telegram, scoped to a **user-selected warehouse location**, formatted to international ledger standards (opening qty → movements → closing qty, per item, per location).
 
-Centralize all automated Telegram report scheduling under **Administration**, supporting multiple report types with independent daily / weekly / monthly schedules per company. The existing DSR Telegram settings (currently under Construction → Site Reports) will be migrated here so there is one source of truth.
+## 1. Job editor — add Location filter
 
-## Goals
+In `src/components/admin/telegram/JobEditorDialog.tsx`:
+- Add a **Warehouse Location** picker (multi-select) that appears only when `report_type` is `warehouse_stock_daily`, `tool_management_daily`, or `stock_transfer_daily`.
+- Source from existing `useWarehouseLocations` (company-scoped); options include "All locations".
+- Persist selection into `filters.location_ids: string[]` on the job (JSONB column already exists — no migration needed).
+- Add a **Format** toggle (`text` | `pdf`) saved to `filters.format` (default `pdf` for warehouse stock).
 
-1. New admin page **Administration → Telegram Reports** (super_admin / admin only).
-2. Support **N scheduled jobs per company**, each with its own report type, frequency, time, timezone, recipients, and on/off toggle.
-3. Ship four report renderers out-of-the-box:
-   - **Daily Warehouse Stock Report** — per warehouse: movements (in/out/transfer/adjustment counts + qty) for the day + closing stock balance.
-   - **Daily Tool Management Report** — per location: tools issued / returned / outstanding / overdue.
-   - **Daily Site Report (DSR)** — reuse existing DSR aggregation (manpower, equipment, materials, progress).
-   - **Daily Stock Transfer Report** — per location: outgoing & incoming transfers with status.
-4. International standards: timezone-aware (IANA tz), idempotent (`last_run_at` + run window), retry-safe, audit-logged, per-company RLS, message size ≤ 4096 chars (chunk or attach PDF for long), structured HTML formatting with localized numbers/dates (ISO 8601 + locale).
+## 2. Dispatcher — PDF rendering & sendDocument
 
-## UX
+In `supabase/functions/telegram-job-dispatcher/index.ts`:
 
-`/admin/telegram-reports` — tabs/sections:
-
-1. **Connection** — bot token, chat IDs, test connection (moved from Construction).
-2. **Scheduled Jobs** — table of jobs with columns: Report, Frequency, Time, Timezone, Recipients, Last Run, Status, Actions (Edit / Run Now / Toggle / Delete) + "New Schedule" button.
-3. **Run History** — last 100 executions with status, duration, error, recipient count.
-
-Job editor dialog fields: Report Type (select), Frequency (Daily / Weekly + weekday picker / Monthly + day-of-month picker), Send Time + Timezone, Recipient chat IDs (multi), Filters (e.g. specific warehouse / location / company scope), Enabled toggle, "Send test now".
-
-The existing **Construction → Site Reports → Telegram** tab becomes a read-only banner: *"Telegram settings moved to Administration → Telegram Reports"* with a link.
-
-## Architecture
-
-```text
-┌──────────────────────────────┐       ┌─────────────────────────────┐
-│ /admin/telegram-reports (UI) │──────►│ telegram_scheduled_jobs     │
-│  - jobs CRUD                 │       │ telegram_settings (creds)   │
-│  - run-now / test            │       │ telegram_job_runs (history) │
-└──────────────────────────────┘       └─────────────────────────────┘
-            │                                      ▲
-            │ invoke                               │ writes
-            ▼                                      │
-┌──────────────────────────────┐       ┌─────────────────────────────┐
-│ edge: send-scheduled-report  │──────►│ report renderers (per type) │
-│  (run-now + cron entry)      │       │  - warehouseStockDaily      │
-└──────────────────────────────┘       │  - toolManagementDaily      │
-            ▲                          │  - siteReportDaily (DSR)    │
-            │ every 15 min             │  - stockTransferDaily       │
-┌──────────────────────────────┐       └─────────────────────────────┘
-│ pg_cron → scheduled-telegram │
-│ -reports (dispatcher)        │
-└──────────────────────────────┘
+### 2a. Renderer signature change
+```ts
+interface RenderedReport {
+  title: string;
+  html: string;              // Telegram fallback / summary caption
+  pdf?: Uint8Array;          // when filters.format === 'pdf'
+  filename?: string;         // e.g. "Stock-Movement-Ledger-2026-05-17.pdf"
+}
 ```
 
-## Technical Plan
+### 2b. Warehouse Stock Movement Ledger (international format)
+Query window = previous local day (or week/month) in tz, filtered by `filters.location_ids`.
 
-### 1. Database (migration)
+For each selected location → for each item with activity OR non-zero stock:
+| Date | Doc # | Ref Type | Description | In Qty | Out Qty | Balance | UOM | Unit Cost | Value |
 
-- New table `public.telegram_scheduled_jobs`:
-  - `id uuid pk`, `company_id uuid fk`, `name text`, `report_type text` (`warehouse_stock_daily` | `tool_management_daily` | `site_report_daily` | `stock_transfer_daily`),
-  - `frequency text` (`daily` | `weekly` | `monthly`), `send_time time`, `timezone text`, `weekday smallint NULL` (0–6), `day_of_month smallint NULL` (1–28),
-  - `filters jsonb` (`{warehouse_ids?, location_ids?, project_ids?}`),
-  - `chat_ids text[]` (overrides company defaults when set),
-  - `is_enabled bool`, `last_run_at timestamptz`, `next_run_at timestamptz`, `created_by uuid`, timestamps.
-  - Indexes: `(is_enabled, next_run_at)`, `(company_id, report_type)`.
-- New table `public.telegram_job_runs` — id, job_id, started_at, finished_at, status (`success`|`partial`|`failed`), recipient_count, error_text, payload_preview. Retention: 100 rows per job (trim trigger).
-- RLS: company-scoped via `can_access_company(company_id)`; INSERT/UPDATE/DELETE restricted to admins via `has_role(auth.uid(),'admin')` OR super_admin.
-- Deprecate `telegram_settings.scheduled_send_*` columns in a later migration — keep for now for backward compat; new logic ignores them once jobs exist.
-- pg_cron entry already exists (`scheduled-telegram-reports` every 15 min) — keep, just point dispatcher at new table.
+Sections per location:
+1. **Header** — Company, Location, Period, Generated-at (ISO 8601), Page x/y
+2. **Opening balance** row (sum of `stock_transactions.qty_before` of first txn of period, or `current_stock` snapshot at period start)
+3. **Movement rows** ordered by `created_at`
+4. **Closing balance** row + totals (In, Out, Net)
+5. **Summary table** — items grouped, totals per item & grand total value (FIFO/WAC unit cost from `warehouse_items_full.average_cost`)
 
-### 2. Edge functions
+Standards followed: **IAS 2 / SAP MB51 Material Document List** layout — debit/credit columns, running balance, signed page numbers, doc reference, reason code.
 
-- **`scheduled-telegram-reports`** (refactor): query `telegram_scheduled_jobs WHERE is_enabled AND next_run_at <= now()`. For each job: compute window (previous business day in tz), render report, send, write `telegram_job_runs`, recompute `next_run_at` from frequency + `send_time` + `timezone` (use `luxon` via `npm:luxon`). Idempotency: skip if `last_run_at` within ½ frequency window.
-- **`send-scheduled-report`** (new): callable from UI for *Run Now* / *Test*. Accepts `{job_id, dry_run?}`. JWT-verified, validates admin role + company scope, calls same renderer pipeline, returns preview when `dry_run`.
-- **Renderers** (`supabase/functions/_shared/reports/`):
-  - `warehouseStockDaily.ts` — read `stock_transactions` for the day grouped by warehouse + `list_warehouse_inventory` for closing balances (filter from `warehouse_items_full`).
-  - `toolManagementDaily.ts` — read `tool_issues`, `tool_returns`, `tool_adjustments` (now unified under warehouse stock per memory) scoped by location.
-  - `siteReportDaily.ts` — reuse the DSR aggregation already in `send-telegram-report`.
-  - `stockTransferDaily.ts` — read `stock_transfers` per origin/destination location.
-  - All return `{title, html, attachments[]}`. HTML uses Telegram-safe subset; chunked at 4000 chars; long reports attached as PDF via existing `lib/reports/pdfRenderer`.
+### 2c. PDF generator
+Use `https://esm.sh/pdf-lib@1.17.1` (Deno-compatible, no native deps).
+Helper module: `supabase/functions/_shared/pdf/stockLedger.ts`:
+- A4 landscape, Helvetica, 9pt body / 11pt header.
+- Auto-paginate rows (max ~35 rows/page), repeat column headers each page.
+- Footer: page x/y + "Generated by Lyceum Global Holdings — ISO 8601 timestamp".
+- Returns `Uint8Array`.
 
-### 3. Frontend
+### 2d. Telegram delivery
+Replace `sendMessage` path with conditional:
+- If `pdf` present → `sendDocument` (multipart/form-data) with:
+  - `document` = PDF blob
+  - `caption` = short HTML summary (Period, Location count, Items, Net movement value) — capped 1024 chars
+  - `parse_mode = HTML`
+- Else fall back to existing chunked `sendMessage`.
+- Keep 1.1 s rate-limit between chats.
 
-- `src/pages/admin/TelegramReports.tsx` + sub-components: `ConnectionPanel`, `ScheduledJobsTable`, `JobEditorDialog`, `RunHistoryTable`.
-- Hooks: `useTelegramJobs`, `useTelegramJobRuns`, `useRunTelegramJobNow`.
-- Route: `/admin/telegram-reports`, wrapped in `AdminRoute`.
-- Register in `src/constants/moduleConfig.ts` under `administration.submodules`.
-- Sidebar entry under Administration.
-- Construction Telegram tab → deprecation banner + link.
+## 3. Caption / summary text
+Compact KPI block (always sent, regardless of format):
+```
+📦 Stock Movement Ledger — 2026-05-17
+Location: Main Warehouse (+2)
+Items moved: 47 | Receipts: 312 | Issues: 188
+Net value change: AED 41,250.00
+```
 
-### 4. Security & Standards
+## 4. Backfill / safety
+- Existing jobs without `filters.format` default to `pdf` for `warehouse_stock_daily` and `text` for others (handled in renderer, no DB write).
+- Dry-run path returns base64 PDF preview in `payload_preview` (first 500 chars of base64) + a `download_url` field if we later wire storage; for now, dry-run sends to admin's own chat only.
 
-- Server-side admin check in edge function (re-derive from JWT, never trust client).
-- Per-company RLS on jobs + runs.
-- Bot token stays write-only in `telegram_settings` (never returned to client).
-- Audit log entry on job create/update/delete/run.
-- ISO 8601 timestamps, `Intl.NumberFormat` for qty/currency, configurable timezone per job (defaults to company tz).
-- Rate-limit Telegram sends (≥ 1s between chats) — Telegram API rule.
-- Idempotency key per `(job_id, scheduled_for)` to prevent duplicates if cron double-fires.
+## 5. Out of scope (separate request)
+- Storing generated PDFs in Supabase Storage for audit (can add later).
+- Excel/CSV alternatives.
+- Tool/Site/Transfer reports keep current HTML text format unless `filters.format = 'pdf'` is set (future symmetric work).
 
-### 5. Memory
+## Technical notes
+- `pdf-lib` chosen over `jspdf` — works in Deno edge runtime, ~300 KB, no canvas dependency.
+- Multipart upload built with `FormData` + `Blob`, supported natively in Deno.
+- Telegram document size limit 50 MB — well above any realistic daily ledger.
+- All numeric formatting via `Intl.NumberFormat(locale, { minimumFractionDigits: 2 })`.
+- Memory `mem://architecture/stock-ledger-immutable-balances` enforced — read `qty_before/qty_after` from `stock_transactions`, never recompute client-side.
 
-Add memory `features/admin/telegram-scheduled-reports.md` describing job model, dispatcher rules, renderer contract; add Core line: *"Telegram report scheduling lives in `telegram_scheduled_jobs` under Administration; DSR-only `telegram_settings.scheduled_send_*` columns are deprecated."*
+## Files touched
+- `supabase/functions/telegram-job-dispatcher/index.ts` (renderer + sendDocument)
+- `supabase/functions/_shared/pdf/stockLedger.ts` *(new)*
+- `src/components/admin/telegram/JobEditorDialog.tsx` (Location picker + Format toggle)
+- `src/hooks/useTelegramJobs.ts` (extend `JobUpsert.filters` typing)
+- `.lovable/memory/features/admin/telegram-scheduled-reports.md` (document PDF path)
 
-## Out of Scope (this phase)
-
-- Telegram inbound commands / bot interactivity.
-- WhatsApp / Email parity (can reuse renderer contract later).
-- Custom report builder UI — only the 4 built-in types.
-- Removing deprecated `telegram_settings.scheduled_send_*` columns (separate cleanup migration after one release).
-
-## Rollout
-
-1. Migration + edge function refactor + renderers.
-2. New admin page + sidebar entry + module registration.
-3. Backfill: convert any existing `telegram_settings.scheduled_send_enabled=true` row into a `site_report_daily` job.
-4. Deprecate old construction tab (banner only, no functional change yet).
+No database migration required (uses existing `filters jsonb`).

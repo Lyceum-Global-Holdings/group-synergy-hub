@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Plus } from "lucide-react";
 import {
   REPORT_TYPE_LABELS,
@@ -14,12 +16,17 @@ import {
   type TelegramFrequency,
   type TelegramScheduledJob,
 } from "@/hooks/useTelegramJobs";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const TIMEZONES = [
   "UTC", "Asia/Dubai", "Asia/Kolkata", "Asia/Colombo", "Asia/Singapore", "Asia/Tokyo",
   "Europe/London", "Europe/Paris", "America/New_York", "America/Los_Angeles",
 ];
 const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+const LOCATION_AWARE: TelegramReportType[] = ["warehouse_stock_daily", "tool_management_daily", "stock_transfer_daily"];
+const PDF_CAPABLE: TelegramReportType[] = ["warehouse_stock_daily"];
 
 interface Props {
   open: boolean;
@@ -29,6 +36,13 @@ interface Props {
 }
 
 export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
+  const { selectedCompany } = useCompany();
+  const { locations: allLocations = [] } = useWarehouseLocations();
+  const locations = useMemo(
+    () => allLocations.filter((l: any) => !selectedCompany?.id || l.company_id === selectedCompany.id),
+    [allLocations, selectedCompany?.id],
+  );
+
   const [name, setName] = useState("");
   const [reportType, setReportType] = useState<TelegramReportType>("warehouse_stock_daily");
   const [frequency, setFrequency] = useState<TelegramFrequency>("daily");
@@ -39,9 +53,13 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
   const [chatIds, setChatIds] = useState<string[]>([]);
   const [newChatId, setNewChatId] = useState("");
   const [isEnabled, setIsEnabled] = useState(true);
+  const [locationIds, setLocationIds] = useState<string[]>([]);
+  const [format, setFormat] = useState<"pdf" | "text">("pdf");
+  const [currency, setCurrency] = useState<string>("AED");
 
   useEffect(() => {
     if (!open) return;
+    const f = (job?.filters ?? {}) as { location_ids?: string[]; format?: "pdf" | "text"; currency?: string };
     if (job) {
       setName(job.name);
       setReportType(job.report_type);
@@ -52,6 +70,9 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
       setDayOfMonth(job.day_of_month ?? 1);
       setChatIds(job.chat_ids ?? []);
       setIsEnabled(job.is_enabled);
+      setLocationIds(Array.isArray(f.location_ids) ? f.location_ids : []);
+      setFormat(f.format ?? (PDF_CAPABLE.includes(job.report_type) ? "pdf" : "text"));
+      setCurrency(f.currency ?? "AED");
     } else {
       setName("");
       setReportType("warehouse_stock_daily");
@@ -62,6 +83,9 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
       setDayOfMonth(1);
       setChatIds([]);
       setIsEnabled(true);
+      setLocationIds([]);
+      setFormat("pdf");
+      setCurrency("AED");
     }
   }, [open, job]);
 
@@ -71,8 +95,18 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
     setNewChatId("");
   };
 
+  const toggleLocation = (id: string) => {
+    setLocationIds(locationIds.includes(id) ? locationIds.filter((x) => x !== id) : [...locationIds, id]);
+  };
+
   const handleSave = () => {
     if (!name.trim()) return;
+    const filters: Record<string, unknown> = {};
+    if (LOCATION_AWARE.includes(reportType)) filters.location_ids = locationIds;
+    if (PDF_CAPABLE.includes(reportType)) {
+      filters.format = format;
+      if (currency.trim()) filters.currency = currency.trim().toUpperCase();
+    }
     onSave({
       id: job?.id,
       name: name.trim(),
@@ -84,12 +118,16 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
       day_of_month: frequency === "monthly" ? dayOfMonth : null,
       chat_ids: chatIds,
       is_enabled: isEnabled,
+      filters,
     });
   };
 
+  const showLocation = LOCATION_AWARE.includes(reportType);
+  const showFormat = PDF_CAPABLE.includes(reportType);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{job ? "Edit Schedule" : "New Schedule"}</DialogTitle>
         </DialogHeader>
@@ -109,6 +147,43 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
               </SelectContent>
             </Select>
           </div>
+
+          {showFormat && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Delivery Format</Label>
+                <Select value={format} onValueChange={(v) => setFormat(v as "pdf" | "text")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">PDF Attachment (Stock Movement Ledger)</SelectItem>
+                    <SelectItem value="text">Text Summary</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Currency</Label>
+                <Input value={currency} onChange={(e) => setCurrency(e.target.value)} maxLength={6} placeholder="AED" />
+              </div>
+            </div>
+          )}
+
+          {showLocation && (
+            <div>
+              <Label>Warehouse Locations {locationIds.length === 0 && <span className="text-muted-foreground text-xs">(empty = all)</span>}</Label>
+              <ScrollArea className="h-40 rounded border border-border p-2 mt-1">
+                {locations.length === 0 && <p className="text-xs text-muted-foreground">No locations available for this company.</p>}
+                <div className="space-y-1">
+                  {locations.map((l: any) => (
+                    <label key={l.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox checked={locationIds.includes(l.id)} onCheckedChange={() => toggleLocation(l.id)} />
+                      <span>{l.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Frequency</Label>

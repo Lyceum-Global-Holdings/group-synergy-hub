@@ -2,6 +2,7 @@
 // Invoked by pg_cron every 15 min (no body) OR manually by admin UI ({ job_id, dry_run?, triggered_by? }).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildStockLedgerPdf, type LedgerInput, type LedgerItemSection, type LedgerLocationSection, type LedgerRow } from "../_shared/pdf/stockLedger.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +34,9 @@ interface Job {
 
 interface RenderedReport {
   title: string;
-  html: string;
+  html: string;          // caption (PDF) or full body (text mode)
+  pdf?: Uint8Array;      // when filters.format === 'pdf'
+  filename?: string;
 }
 
 // ---------- Telegram send ----------
@@ -63,6 +66,21 @@ async function sendTelegram(botToken: string, chatId: string, text: string): Pro
   }
 }
 
+
+async function sendTelegramDocument(botToken: string, chatId: string, pdf: Uint8Array, filename: string, caption: string): Promise<void> {
+  const form = new FormData();
+  form.append('chat_id', chatId);
+  form.append('caption', caption.slice(0, 1024));
+  form.append('parse_mode', 'HTML');
+  form.append('document', new Blob([pdf], { type: 'application/pdf' }), filename);
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: form });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Telegram sendDocument ${res.status}: ${body}`);
+  }
+  await new Promise(r => setTimeout(r, 1100));
+}
+
 // ---------- Date helpers ----------
 function previousLocalDay(timezone: string): { from: string; to: string; label: string } {
   // Compute "yesterday" in the given tz as ISO start/end UTC
@@ -80,6 +98,26 @@ function previousLocalDay(timezone: string): { from: string; to: string; label: 
   return { from: `${yYMD}T00:00:00Z`, to: `${today}T00:00:00Z`, label: yYMD };
 }
 
+function periodForJob(job: Job): { from: string; to: string; label: string; labelFrom: string; labelTo: string } {
+  const day = previousLocalDay(job.timezone);
+  if (job.frequency === 'daily') {
+    return { ...day, labelFrom: day.label, labelTo: day.label };
+  }
+  // For weekly: previous 7 days; monthly: previous 30 days (anchored to "yesterday")
+  const days = job.frequency === 'weekly' ? 7 : 30;
+  const toDate = new Date(day.to);
+  const fromDate = new Date(toDate);
+  fromDate.setUTCDate(fromDate.getUTCDate() - days);
+  const fromYMD = fromDate.toISOString().slice(0, 10);
+  return {
+    from: `${fromYMD}T00:00:00Z`,
+    to: day.to,
+    label: `${fromYMD} → ${day.label}`,
+    labelFrom: fromYMD,
+    labelTo: day.label,
+  };
+}
+
 function esc(s: unknown): string {
   return String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
 }
@@ -90,74 +128,161 @@ function fmtNum(n: number | null | undefined, digits = 2): string {
 }
 
 // ---------- Renderers ----------
+const TX_TYPE_LABEL: Record<string, string> = {
+  goods_receipt: 'GR',
+  material_issue: 'ISSUE',
+  project_issue: 'PROJ-ISSUE',
+  material_return: 'RETURN',
+  project_return: 'PROJ-RETURN',
+  adjustment: 'ADJUST',
+  transfer_in: 'TRF-IN',
+  transfer_out: 'TRF-OUT',
+  opening_balance: 'OPEN',
+};
+
 async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<RenderedReport> {
-  const { from, to, label } = previousLocalDay(job.timezone);
-  // Movements grouped by warehouse location
-  const { data: txs, error } = await sb
+  const { from, to, label, labelFrom, labelTo } = periodForJob(job);
+  const filters = (job.filters ?? {}) as { location_ids?: string[]; format?: 'pdf' | 'text'; currency?: string };
+  const format = filters.format ?? 'pdf';
+  const locationIds = Array.isArray(filters.location_ids) ? filters.location_ids.filter(Boolean) : [];
+
+  // Movements in period
+  let txQuery = sb
     .from('stock_transactions')
-    .select('id, transaction_type, quantity_change, total_value, location_id, item_id, created_at')
+    .select('id, transaction_type, quantity_change, total_value, unit_cost, qty_before, qty_after, location_id, item_id, reference_no, reference_type, created_at')
     .eq('company_id', job.company_id)
     .gte('created_at', from)
-    .lt('created_at', to);
+    .lt('created_at', to)
+    .order('created_at', { ascending: true });
+  if (locationIds.length > 0) txQuery = txQuery.in('location_id', locationIds);
+  const { data: txs, error } = await txQuery;
   if (error) throw error;
 
-  const { data: locs } = await sb
-    .from('warehouse_locations')
-    .select('id, name, location_type')
-    .eq('company_id', job.company_id);
-  const locMap = new Map((locs ?? []).map((l: any) => [l.id, l.name]));
+  // Locations
+  let locQuery = sb.from('warehouse_locations').select('id, name').eq('company_id', job.company_id);
+  if (locationIds.length > 0) locQuery = locQuery.in('id', locationIds);
+  const { data: locs } = await locQuery;
+  const locMap = new Map<string, string>((locs ?? []).map((l: any) => [l.id, l.name]));
 
-  type Bucket = { in: number; out: number; adj: number; tIn: number; tOut: number; count: number };
-  const byLoc = new Map<string, Bucket>();
+  // Items referenced
+  const itemIds = Array.from(new Set((txs ?? []).map((t: any) => t.item_id).filter(Boolean)));
+  let itemMap = new Map<string, { code: string; name: string; uom: string }>();
+  if (itemIds.length > 0) {
+    const { data: items } = await sb
+      .from('warehouse_items_full')
+      .select('id, item_code, name, base_uom')
+      .in('id', itemIds);
+    itemMap = new Map((items ?? []).map((i: any) => [i.id, { code: i.item_code ?? '—', name: i.name ?? '—', uom: i.base_uom ?? '' }]));
+  }
+
+  // Company name
+  const { data: company } = await sb.from('companies').select('name').eq('id', job.company_id).maybeSingle();
+  const companyName = (company as any)?.name ?? 'Company';
+  const currency = filters.currency ?? 'AED';
+
+  // Group: location → item → rows (sorted)
+  type Key = string;
+  const groups = new Map<Key, { locationId: string; locationName: string; itemId: string; rows: any[] }>();
   for (const t of (txs ?? []) as any[]) {
-    const key = t.location_id ?? 'unassigned';
-    const b = byLoc.get(key) ?? { in: 0, out: 0, adj: 0, tIn: 0, tOut: 0, count: 0 };
-    b.count++;
-    const q = Number(t.quantity_change) || 0;
-    switch (t.transaction_type) {
-      case 'goods_receipt': b.in += q; break;
-      case 'material_issue':
-      case 'project_issue': b.out += Math.abs(q); break;
-      case 'material_return':
-      case 'project_return': b.in += q; break;
-      case 'adjustment': b.adj += q; break;
-      case 'transfer_in': b.tIn += q; break;
-      case 'transfer_out': b.tOut += Math.abs(q); break;
-    }
-    byLoc.set(key, b);
+    const locId = t.location_id ?? 'unassigned';
+    const locName = locMap.get(locId) ?? 'Unassigned';
+    const itemId = t.item_id ?? 'unknown';
+    const k = `${locId}::${itemId}`;
+    let g = groups.get(k);
+    if (!g) { g = { locationId: locId, locationName: locName, itemId, rows: [] }; groups.set(k, g); }
+    g.rows.push(t);
   }
 
-  let html = `<b>📦 Daily Warehouse Stock Report</b>\n<i>Date: ${esc(label)}</i>\n\n`;
-  if (byLoc.size === 0) {
-    html += '<i>No stock movements recorded.</i>';
-  } else {
-    for (const [locId, b] of byLoc) {
-      html += `<b>${esc(locMap.get(locId) ?? 'Unassigned')}</b>\n`;
-      html += `  Movements: ${b.count}\n`;
-      html += `  Receipts: +${fmtNum(b.in)} | Issues: -${fmtNum(b.out)}\n`;
-      html += `  Transfers: +${fmtNum(b.tIn)} / -${fmtNum(b.tOut)}\n`;
-      html += `  Adjustments: ${b.adj >= 0 ? '+' : ''}${fmtNum(b.adj)}\n\n`;
-    }
+  // Build sections
+  const sectionsMap = new Map<string, LedgerLocationSection>();
+  let grandIn = 0, grandOut = 0, grandNetValue = 0;
+  for (const g of groups.values()) {
+    const item = itemMap.get(g.itemId) ?? { code: g.itemId.slice(0, 8), name: 'Unknown item', uom: '' };
+    const first = g.rows[0];
+    const last = g.rows[g.rows.length - 1];
+    const openingQty = Number(first?.qty_before ?? 0);
+    const closingQty = Number(last?.qty_after ?? openingQty);
+
+    let totalIn = 0, totalOut = 0;
+    const ledgerRows: LedgerRow[] = g.rows.map((t: any) => {
+      const q = Number(t.quantity_change) || 0;
+      const isIn = q > 0;
+      if (isIn) totalIn += q; else totalOut += Math.abs(q);
+      const unitCost = Number(t.unit_cost) || 0;
+      const value = Number(t.total_value) || Math.abs(q) * unitCost;
+      return {
+        date: t.created_at,
+        docNo: t.reference_no ?? '—',
+        refType: TX_TYPE_LABEL[t.transaction_type] ?? t.transaction_type,
+        description: t.reference_type ?? '',
+        inQty: isIn ? q : 0,
+        outQty: isIn ? 0 : Math.abs(q),
+        balance: Number(t.qty_after ?? 0),
+        uom: item.uom,
+        unitCost,
+        value,
+      };
+    });
+    grandIn += totalIn;
+    grandOut += totalOut;
+    grandNetValue += ledgerRows.reduce((s, r) => s + (r.inQty ? r.value : -r.value), 0);
+
+    const itemSection: LedgerItemSection = {
+      itemCode: item.code,
+      itemName: item.name,
+      uom: item.uom,
+      openingQty,
+      openingValue: openingQty * (Number(first?.unit_cost) || 0),
+      rows: ledgerRows,
+      closingQty,
+      closingValue: closingQty * (Number(last?.unit_cost) || 0),
+      totalIn,
+      totalOut,
+    };
+
+    let loc = sectionsMap.get(g.locationId);
+    if (!loc) { loc = { locationName: g.locationName, items: [] }; sectionsMap.set(g.locationId, loc); }
+    loc.items.push(itemSection);
   }
 
-  // Closing balance summary (top 10 by value)
-  const { data: bal } = await sb
-    .from('warehouse_items')
-    .select('id, current_stock, unit_cost')
-    .eq('company_id', job.company_id)
-    .gt('current_stock', 0)
-    .order('current_stock', { ascending: false })
-    .limit(10);
+  // Caption (always)
+  const itemCount = groups.size;
+  const locCount = sectionsMap.size;
+  const caption =
+    `<b>📦 Stock Movement Ledger — ${esc(label)}</b>\n` +
+    `Company: ${esc(companyName)}\n` +
+    `Locations: ${locCount}${locationIds.length ? ` (filtered)` : ' (all)'}\n` +
+    `Items moved: ${itemCount} | Receipts: ${fmtNum(grandIn)} | Issues: ${fmtNum(grandOut)}\n` +
+    `Net movement value: ${esc(currency)} ${fmtNum(grandNetValue)}`;
 
-  const totalValue = (bal ?? []).reduce(
-    (s: number, r: any) => s + (Number(r.current_stock) || 0) * (Number(r.unit_cost) || 0),
-    0,
-  );
-  html += `<b>Closing Balance Snapshot</b>\n`;
-  html += `Tracked SKUs in stock: ${(bal ?? []).length}+\n`;
-  html += `Top-10 inventory value: ${fmtNum(totalValue)}\n`;
+  if (format === 'text' || itemCount === 0) {
+    // Text fallback / no movements
+    let html = caption + '\n\n';
+    if (itemCount === 0) html += '<i>No stock movements recorded.</i>';
+    else {
+      for (const loc of sectionsMap.values()) {
+        html += `\n<b>${esc(loc.locationName)}</b>\n`;
+        for (const it of loc.items) {
+          html += `  • ${esc(it.itemCode)} ${esc(it.itemName)}: open ${fmtNum(it.openingQty)} → close ${fmtNum(it.closingQty)} (in +${fmtNum(it.totalIn)} / out -${fmtNum(it.totalOut)})\n`;
+        }
+      }
+    }
+    return { title: 'Stock Movement Ledger', html };
+  }
 
-  return { title: 'Daily Warehouse Stock Report', html };
+  // Build PDF
+  const ledgerInput: LedgerInput = {
+    companyName,
+    periodFrom: labelFrom,
+    periodTo: labelTo,
+    generatedAt: new Date().toISOString(),
+    currency,
+    sections: Array.from(sectionsMap.values()),
+    totals: { in: grandIn, out: grandOut, netValue: grandNetValue },
+  };
+  const pdf = await buildStockLedgerPdf(ledgerInput);
+  const filename = `Stock-Movement-Ledger_${labelFrom}_to_${labelTo}.pdf`;
+  return { title: 'Stock Movement Ledger', html: caption, pdf, filename };
 }
 
 async function renderToolManagementDaily(sb: SupabaseClient, job: Job): Promise<RenderedReport> {
@@ -326,7 +451,11 @@ async function runJob(sb: SupabaseClient, job: Job, triggeredBy: 'cron' | 'manua
     const errors: string[] = [];
     for (const chatId of chatIds) {
       try {
-        await sendTelegram(botToken, chatId, messageText);
+        if (report.pdf) {
+          await sendTelegramDocument(botToken, chatId, report.pdf, report.filename ?? 'report.pdf', messageText);
+        } else {
+          await sendTelegram(botToken, chatId, messageText);
+        }
         okCount++;
       } catch (e) {
         errors.push(`${chatId}: ${(e as Error).message}`);
