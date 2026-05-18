@@ -37,6 +37,7 @@ import { useUserPins } from "@/hooks/useSidebarPins";
 import { PinnedSubmodulesGroup } from "./PinnedSubmodulesGroup";
 import { SidebarPinButton } from "./SidebarPinButton";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { navPreloadProps } from "@/lib/navPreload";
 
 type SubModuleChild = {
   key: string;
