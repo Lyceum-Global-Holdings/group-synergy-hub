@@ -254,7 +254,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
       for (const loc of sectionsMap.values()) {
         html += `\n<b>${esc(loc.locationName)}</b>\n`;
         for (const it of loc.items) {
-          html += `  • ${esc(it.itemCode)} ${esc(it.itemName)}: open ${fmtNum(it.openingQty)} → close ${fmtNum(it.closingQty)} (in +${fmtNum(it.totalIn)} / out -${fmtNum(it.totalOut)})\n`;
+          html += `  • ${esc(it.itemCode)} ${esc(it.itemName)}: in +${fmtNum(it.totalIn)} / out -${fmtNum(it.totalOut)}\n`;
         }
       }
     }
