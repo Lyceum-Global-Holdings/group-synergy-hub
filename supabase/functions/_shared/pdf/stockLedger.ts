@@ -9,7 +9,6 @@ export interface LedgerRow {
   description: string;
   inQty: number;
   outQty: number;
-  balance: number;
   uom: string;
   unitCost: number;
   value: number;
@@ -19,11 +18,7 @@ export interface LedgerItemSection {
   itemCode: string;
   itemName: string;
   uom: string;
-  openingQty: number;
-  openingValue: number;
   rows: LedgerRow[];
-  closingQty: number;
-  closingValue: number;
   totalIn: number;
   totalOut: number;
 }
