@@ -5,11 +5,16 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
 interface Cursor {
-  created_at: string;
+  created_at: string | null;
   id: string;
+  name: string | null;
+  item_code: string | null;
+  stock: number | null;
 }
 
 export type StockMode = 'all' | 'in_stock' | 'zero' | 'low';
+export type InventorySortBy = 'name' | 'item_code' | 'created_at' | 'current_stock';
+export type SortDir = 'asc' | 'desc';
 
 interface UseWarehouseItemsLazyInventoryOptions {
   pageSize?: number;
@@ -20,6 +25,8 @@ interface UseWarehouseItemsLazyInventoryOptions {
   locationId?: string | null;
   stockMode?: StockMode;
   ownerLabel?: string | null;
+  sortBy?: InventorySortBy;
+  sortDir?: SortDir;
 }
 
 const MAX_ITEMS = 20000;
@@ -41,6 +48,8 @@ export function useWarehouseItemsLazyInventory({
   locationId,
   stockMode = 'all',
   ownerLabel = null,
+  sortBy = 'name',
+  sortDir = 'asc',
 }: UseWarehouseItemsLazyInventoryOptions) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
@@ -61,6 +70,8 @@ export function useWarehouseItemsLazyInventory({
       supplierId,
       stockMode,
       ownerLabel,
+      sortBy,
+      sortDir,
     ],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       const permittedLocationIds = permissions && !permissions.viewAllLocations
@@ -84,6 +95,11 @@ export function useWarehouseItemsLazyInventory({
         _stock_mode: stockMode,
         _supplier_id: supplierId && supplierId !== 'all' ? supplierId : null,
         _owner_label: ownerLabel && ownerLabel.trim() ? ownerLabel.trim() : null,
+        _sort_by: sortBy,
+        _sort_dir: sortDir,
+        _cursor_name: pageParam?.name ?? null,
+        _cursor_item_code: pageParam?.item_code ?? null,
+        _cursor_stock: pageParam?.stock ?? null,
       } as any);
       if (error) throw error;
 
@@ -99,8 +115,14 @@ export function useWarehouseItemsLazyInventory({
 
       let nextCursor: Cursor | null = null;
       if (enrichedItems.length === pageSize) {
-        const last = enrichedItems[enrichedItems.length - 1];
-        nextCursor = { created_at: last.created_at!, id: last.id };
+        const last = enrichedItems[enrichedItems.length - 1] as any;
+        nextCursor = {
+          created_at: last.created_at ?? null,
+          id: last.id,
+          name: last.name ?? null,
+          item_code: last.item_code ?? null,
+          stock: typeof last.current_stock === 'number' ? last.current_stock : Number(last.current_stock ?? 0),
+        };
       }
 
       return { items: enrichedItems, nextCursor };

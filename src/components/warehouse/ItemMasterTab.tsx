@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, Loader2, Columns3, Upload, CheckSquare } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, Loader2, Columns3, Upload, CheckSquare, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -150,7 +150,26 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [ownerLabelFilter, setOwnerLabelFilter] = useState<string>("");
   const [debouncedOwnerLabel, setDebouncedOwnerLabel] = useState<string>("");
   const [stockMode, setStockMode] = useState<'all' | 'in_stock' | 'zero' | 'low'>("all");
+  const [sortBy, setSortBy] = useState<'name' | 'item_code' | 'created_at' | 'current_stock'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+
+  const handleSort = (key: 'name' | 'item_code' | 'created_at' | 'current_stock') => {
+    if (sortBy === key) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir('asc');
+    }
+    if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
+  };
+
+  const SortIcon = ({ k }: { k: 'name' | 'item_code' | 'created_at' | 'current_stock' }) => {
+    if (sortBy !== k) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 opacity-50" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="ml-1 inline h-3.5 w-3.5" />
+      : <ArrowDown className="ml-1 inline h-3.5 w-3.5" />;
+  };
 
   const toggleColumn = (key: InvColumnKey) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
@@ -188,6 +207,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     locationId: globalLocationId,
     stockMode,
     ownerLabel: debouncedOwnerLabel || null,
+    sortBy,
+    sortDir,
   });
 
   // Keep mutations via the old hook with fetching disabled
@@ -590,13 +611,44 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 />
               </TableHead>
               {col('photo') && <TableHead className="w-[50px]">Photo</TableHead>}
-              {col('item_code') && <TableHead>Item Code</TableHead>}
-              <TableHead>Name</TableHead>
+              {col('item_code') && (
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => handleSort('item_code')}
+                    className="inline-flex items-center font-medium hover:text-foreground"
+                    aria-sort={sortBy === 'item_code' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  >
+                    Item Code<SortIcon k="item_code" />
+                  </button>
+                </TableHead>
+              )}
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => handleSort('name')}
+                  className="inline-flex items-center font-medium hover:text-foreground"
+                  aria-sort={sortBy === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  Name<SortIcon k="name" />
+                </button>
+              </TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
               {col('bin') && <TableHead>Bin</TableHead>}
               {col('stock_owner') && <TableHead>Stock Owner</TableHead>}
-              {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
+              {col('current_stock') && (
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('current_stock')}
+                    className="inline-flex items-center font-medium hover:text-foreground"
+                    aria-sort={sortBy === 'current_stock' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  >
+                    Current Stock<SortIcon k="current_stock" />
+                  </button>
+                </TableHead>
+              )}
               {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
               {col('status') && <TableHead>Status</TableHead>}
               <TableHead className="w-[100px]">Actions</TableHead>
