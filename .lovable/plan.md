@@ -1,88 +1,134 @@
-# Show tool bin allocations in Inventory + Bin Allocations
+# Unify tools into the warehouse inventory (SAP-style material type)
 
-## Problem
+## Why
 
-Tools live in `warehouse_tools` with allocations in `tool_bin_allocations`. The
-Warehouse → **Bin Allocations** and Warehouse → **Inventory** pages only read
-`warehouse_bin_allocations` / `warehouse_items`, so a freshly allocated tool
-(e.g. Ackro jak → bin LAN, qty 35) never appears there. Users have no single
-place to see "what's physically in my warehouse".
+The previous fix merged tools into Bin Allocations / Inventory at the read
+layer, but tools still live in their own `warehouse_tools` /
+`tool_bin_allocations` tables. That means every stock workflow — adjust,
+transfer, GRN, putaway, audit, FIFO, ledger, valuation — is duplicated or
+unavailable for tools. International WMS practice (SAP MM, Oracle, NetSuite)
+keeps **one material master**, and differentiates behavior via a
+**material type** (`ERSA`/`NLAG`/`HIBE` for tools/consumables). The same
+items table powers stock; the "tool" character is an attribute, not a
+parallel table.
 
-## Solution overview
-
-Add a thin DB layer that unions the two allocation sources into a single
-`unified_bin_allocations` view, plus an `entity_type` column (`item` / `tool`).
-Update both pages to read from this view via small RPCs so pagination,
-filtering and realtime stay performant.
+## Target architecture
 
 ```text
-warehouse_bin_allocations ─┐
-                           ├──► unified_bin_allocations (view)
-tool_bin_allocations ──────┘             │
-                                         ├─► list_bin_allocations_unified RPC → Bin Allocations tab
-                                         └─► list_warehouse_inventory_unified RPC → Inventory tab
+warehouse_item_catalog        (master)         ← tools live here, item_type='tool'
+        │
+        ├─ warehouse_items           (per-company on-hand row)
+        │       │
+        │       └─ warehouse_bin_allocations   (per-bin qty)
+        │
+        └─ stock_transactions (ledger)  • valuation • reorder • audit  ─┐
+                                                                       │
+Tool-specific lifecycle stays separate (loanable behavior):            │
+   tool_issues / tool_returns  ── now reference warehouse_items.id ────┘
 ```
 
-## Changes
+Result: stock, bins, transfers, GRN, audits, valuation — all one path.
+Issue/Return is the only tool-specific workflow and keeps its own tables,
+but those tables now point at `warehouse_items`.
 
-### 1. Database (migration)
+## Migration plan (one migration, reversible-safe)
 
-- **View `public.unified_bin_allocations`** (`security_invoker=on`) with columns:
-  `id, entity_type ('item'|'tool'), entity_id, entity_code, entity_name,
-  bin_id, location_id, company_id, allocated_quantity, reserved_quantity,
-  available_quantity, notes, created_at, updated_at`.
-  Body: `SELECT … FROM warehouse_bin_allocations a JOIN warehouse_items_full f …
-  UNION ALL SELECT … FROM tool_bin_allocations a JOIN warehouse_tools t …`.
-- **RPC `list_bin_allocations_unified`** (SECURITY INVOKER, keyset paginated
-  on `(created_at desc, id desc)`, filters: `p_company_id`, `p_location_ids
-  uuid[]`, `p_entity_type`, `p_search`, `p_limit`, `p_cursor_created_at`,
-  `p_cursor_id`). Filter-before-paginate.
-- **RPC `list_warehouse_inventory_unified`** — wraps existing
-  `list_warehouse_inventory` and UNION-ALLs aggregated tool rows
-  (one row per tool with `sum(allocated_quantity)` across bins). Same filter
-  signature so the existing hook can swap in.
-- Add `tool_bin_allocations` to the realtime publication if not already there
-  (`verify_realtime_coverage()` check).
-- Indexes: `tool_bin_allocations(company_id, created_at DESC, id DESC)`,
-  `tool_bin_allocations(bin_id)`, `warehouse_tools(company_id, name)`.
+### Schema
 
-RLS: relies on existing per-table policies — view uses `security_invoker`, so
-each user only sees rows their existing policies allow.
+1. Add `warehouse_item_catalog.item_type text default 'item' check (item_type in ('item','tool'))` and an index on it.
+2. Add `warehouse_items.is_loanable boolean default false` (true for tools)
+   and `warehouse_items.condition text` (good/fair/poor/damaged), so tool
+   metadata survives the move.
+3. Add `tool_issues.warehouse_item_id uuid` and
+   `tool_returns.warehouse_item_id uuid` (nullable for now, FK to
+   `warehouse_items` ON DELETE RESTRICT).
 
-### 2. Frontend
+### Data backfill (idempotent SQL)
 
-- **New hook** `src/hooks/useUnifiedBinAllocations.ts` — mirrors
-  `useWarehouseBinAllocations` shape but calls the new RPC; returns rows with
-  `entity_type` discriminator.
-- **`src/components/warehouse/BinAllocationsTab.tsx`**
-  - Swap data source to `useUnifiedBinAllocations`.
-  - Add a **Type** column (badge: "Item" / "Tool").
-  - Add a Type filter (`All / Items / Tools`).
-  - Row actions: hide Move/Delete/QR for tool rows in v1 (link to Tool
-    Management instead) — keeps blast radius small.
-- **`src/hooks/useWarehouseInventoryPage.ts`**
-  - Point at `list_warehouse_inventory_unified`.
-  - Returned rows carry `entity_type`; flatten helper passes it through.
-- **`src/pages/warehouse/Inventory.tsx` / inventory table**
-  - Add Type badge column.
-  - Tool rows render with a "View in Tool Management" affordance and skip
-    item-only actions (edit master, bulk adjust, etc.).
-- **Realtime invalidation**: extend `WAREHOUSE_STOCK_QUERY_KEYS` in
-  `src/hooks/useInvalidateWarehouseStock.ts` with
-  `["tool-bin-allocations"]` and `["warehouse-tools"]`, and have
-  `useToolBinAllocations` call `useInvalidateWarehouseStock()` on success so
-  the unified views refresh everywhere.
+4. For every `warehouse_tools` row:
+   - Insert/find a `warehouse_item_catalog` row keyed by `tool_code` →
+     `item_code`, `item_type='tool'`, mapping category, unit, brand,
+     description, image, unit_cost.
+   - Insert a per-company `warehouse_items` row (one per tool row) with
+     `is_loanable=true`, `condition`, `location_id`, `current_stock =
+     total_quantity`, `available_quantity = available_quantity`. Use the
+     existing `upsert_warehouse_inventory` RPC.
+   - Copy each `tool_bin_allocations` row → `warehouse_bin_allocations`
+     using the new `warehouse_item_id`. Skip if already present.
+   - Set `tool_issues.warehouse_item_id` and `tool_returns.warehouse_item_id`
+     via the `tool_id → warehouse_item_id` map.
+5. Verify counts; emit a NOTICE per orphaned row (none expected — there are
+   206 tools, 1 allocation, 4 issues, 4 returns).
 
-### 3. Memory
+### Compatibility
 
-Add `mem://architecture/unified-bin-allocations-view` documenting that all
-on-hand reporting (Bin Allocations + Inventory) must read the unified view,
-never the raw tables, so future entity types (assets, partial pieces) plug in
-the same way.
+6. Replace `warehouse_tools` with a **view** (`security_invoker=on`) over
+   `warehouse_items` filtered by `is_loanable=true`, exposing the legacy
+   column names (`tool_code`, `total_quantity`, `available_quantity`,
+   `issued_quantity`, `condition`, …) so the existing Tool Management UI
+   keeps working without a frontend rewrite. Same trick for
+   `tool_bin_allocations` → view over `warehouse_bin_allocations` filtered
+   to loanable items.
+7. After the FE swap (Phase 2) the legacy view can be dropped.
+
+### RLS
+
+8. Catalog visibility (`is_loanable` rows) reuses the existing
+   `warehouse_item_catalog` policy — already global with company-scoped
+   inventory. No new policy needed.
+
+## Frontend changes
+
+### Tool Management page
+
+- `useWarehouseTools` now reads from `warehouse_items` with
+  `catalog.item_type='tool'` (or via the compat view in Phase 1). Type
+  surface stays the same so existing dialogs (Add Tool, Issue, Return,
+  Allocate to Bin, Move, QR) compile unchanged.
+- `AllocateToolToBinDialog` switches to the standard
+  `useWarehouseBinAllocations.createAllocation` mutation.
+- `MoveToolBetweenBinsDialog` calls the standard move flow.
+- `IssueToolDialog` / `ReturnToolDialog` continue using
+  `tool_issues` / `tool_returns`, but now write `warehouse_item_id` and
+  call `stock_transactions` (out=issue, in=return) so the **standard
+  ledger** records the movement and `available_quantity` reflects loans.
+- "Add Tool" routes through the standard catalog + inventory create flow
+  with `item_type='tool'`, `is_loanable=true`.
+
+### Warehouse → Inventory page
+
+- Remove the temporary `Tools` tab and `ToolsInventoryOnHand` component.
+- Tools now appear naturally in the main inventory list with a "Tool"
+  badge (driven by `catalog.item_type`). Add a Type filter (All / Items /
+  Tools) to the existing filter bar.
+
+### Bin Allocations page
+
+- Remove `useAllToolBinAllocations` merge and the `_entity_type` shim —
+  tools now flow through `warehouse_bin_allocations` and appear
+  automatically. Keep the Type column, sourced from `catalog.item_type`.
+
+### Cleanup
+
+- Delete: `useAllToolBinAllocations.ts`, `ToolsInventoryOnHand.tsx`.
+- Trim `WAREHOUSE_STOCK_QUERY_KEYS` back to item keys; the old
+  `tool-bin-allocations*` keys stay only for the Issue/Return hooks.
+- Update memory: replace `unified-on-hand-tools-merge` with a new
+  `tools-as-warehouse-items` rule documenting that tools = items with
+  `item_type='tool'` + `is_loanable=true`, and that every stock workflow
+  uses the standard item path.
+
+## Rollout (two-phase, no downtime)
+
+**Phase 1 (this migration + small FE):** schema + backfill + compat views.
+Tool Management UI keeps working unchanged. Inventory, Bin Allocations,
+GRN, transfers, audits immediately see tools as first-class stock.
+
+**Phase 2 (follow-up):** rewrite Tool Management hooks/dialogs to call the
+standard item APIs directly, drop the compat views, drop
+`warehouse_tools` and `tool_bin_allocations` tables.
 
 ## Out of scope
 
-- Merging `warehouse_tools` into `warehouse_items` (rejected — separate
-  lifecycle, issue/return semantics).
-- Cross-entity transfers (tool ↔ item) — tool moves still go through Tool
-  Management.
+- Serial-number tracking per tool unit (existing tools are bulk-quantity).
+- Calibration / depreciation schedules (asset module already covers this).

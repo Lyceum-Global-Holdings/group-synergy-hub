@@ -24,7 +24,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
           warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
             id,
             company_id,
-            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, item_type)
           ),
           warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(
             bin_code,
@@ -90,7 +90,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         *,
         warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
             id,
-            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, item_type)
           )
       `)
       .eq('bin_id', binId)
