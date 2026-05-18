@@ -35,6 +35,21 @@ GRN, transfers, audits all use the standard warehouse_items /
 warehouse_bin_allocations queries; tools appear automatically with a Type
 badge driven by `warehouse_item_catalog.item_type`.
 
-Phase 2b (future): rewrite Tool Management hooks to call standard item APIs
-directly, then drop `warehouse_tools`, `tool_bin_allocations`, the four
-sync trigger functions, and the `warehouse_item_id` cache column.
+Phase 2b (current — stock-flow slice): tool Issue, Return, and Adjustment
+flows now post to the unified inventory ledger in addition to the legacy
+warehouse_tools writes. Three SECURITY DEFINER RPCs handle this:
+`tool_issue_post_ledger`, `tool_return_post_ledger`, and
+`tool_adjustment_post_ledger`. They mutate `warehouse_bin_allocations`
+(reserved_quantity for loans; allocated_quantity for write-offs/adjustments)
+and `warehouse_items.current_stock`, then insert `stock_transactions` rows
+(`material_issue` / `material_return` / `adjustment`) so tool movements show
+up in unified stock views, ledger, and valuation. Hooks
+(`useToolIssues`, `useToolReturns`, `useToolAdjustments`) call these RPCs
+and invalidate warehouse stock caches on success. Legacy
+`warehouse_tools` / `tool_bin_allocations` tables are still maintained by
+the existing hook code + sync triggers — no FKs or read paths changed.
+
+Phase 2c (future): drop `tool_id` FKs in favor of `warehouse_item_id`, drop
+`warehouse_tools` + `tool_bin_allocations` + the four sync trigger
+functions + `get_warehouse_tools_list`, and rewrite Tool Management read
+paths to query `warehouse_items` directly.
