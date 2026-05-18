@@ -611,13 +611,44 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 />
               </TableHead>
               {col('photo') && <TableHead className="w-[50px]">Photo</TableHead>}
-              {col('item_code') && <TableHead>Item Code</TableHead>}
-              <TableHead>Name</TableHead>
+              {col('item_code') && (
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => handleSort('item_code')}
+                    className="inline-flex items-center font-medium hover:text-foreground"
+                    aria-sort={sortBy === 'item_code' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  >
+                    Item Code<SortIcon k="item_code" />
+                  </button>
+                </TableHead>
+              )}
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => handleSort('name')}
+                  className="inline-flex items-center font-medium hover:text-foreground"
+                  aria-sort={sortBy === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                >
+                  Name<SortIcon k="name" />
+                </button>
+              </TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
               {col('bin') && <TableHead>Bin</TableHead>}
               {col('stock_owner') && <TableHead>Stock Owner</TableHead>}
-              {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
+              {col('current_stock') && (
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('current_stock')}
+                    className="inline-flex items-center font-medium hover:text-foreground"
+                    aria-sort={sortBy === 'current_stock' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  >
+                    Current Stock<SortIcon k="current_stock" />
+                  </button>
+                </TableHead>
+              )}
               {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
               {col('status') && <TableHead>Status</TableHead>}
               <TableHead className="w-[100px]">Actions</TableHead>
