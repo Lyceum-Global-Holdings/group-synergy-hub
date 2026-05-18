@@ -101,12 +101,7 @@ export function BinAllocationsTab() {
 
   const filteredAllocations = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    // Merge item allocations (canonical) with tool allocations (read-only here)
-    const combined: BinAllocationWithDetails[] = [
-      ...(binAllocations || []),
-      ...(toolAllocations || []),
-    ];
-    const base = combined.filter((allocation) => {
+    const base = (binAllocations || []).filter((allocation) => {
       // Warehouse / sub-location scope
       if (scope) {
         const locId = allocation.warehouse_bin?.warehouse_location?.id;
@@ -122,7 +117,6 @@ export function BinAllocationsTab() {
         getLocationPath(allocation).path.toLowerCase().includes(term)
       );
     });
-    // Group by location path → bin code → item code for predictable WMS layout
     return [...base].sort((a, b) => {
       const pa = getLocationPath(a).path;
       const pb = getLocationPath(b).path;
@@ -132,7 +126,7 @@ export function BinAllocationsTab() {
       if (ba !== bb) return ba.localeCompare(bb);
       return (a.warehouse_item?.item_code ?? '').localeCompare(b.warehouse_item?.item_code ?? '');
     });
-  }, [binAllocations, toolAllocations, searchTerm, scope]);
+  }, [binAllocations, searchTerm, scope]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
