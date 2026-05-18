@@ -1,4 +1,8 @@
-// Tool Bin Allocations Hook — manages bin-level stock allocations for tools
+// Tool Bin Allocations Hook — Phase 2a
+// All writes go through the standard `warehouse_bin_allocations` table via
+// `useWarehouseBinAllocations`. The legacy `tool_bin_allocations` table is
+// kept in sync by the existing DB triggers, so this hook only READS from it
+// for the per-tool detail panel until Phase 2b drops the legacy table.
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +22,23 @@ interface MoveInput {
   from_bin_id: string;
   to_bin_id: string;
   quantity: number;
+}
+
+/** Resolve the warehouse_items.id linked to a warehouse_tools.id (Phase 2a cache). */
+async function resolveWarehouseItemId(toolId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("warehouse_tools")
+    .select("warehouse_item_id")
+    .eq("id", toolId)
+    .single();
+  if (error) throw error;
+  const id = (data as any)?.warehouse_item_id as string | null;
+  if (!id) {
+    throw new Error(
+      "This tool is not yet linked to the standard inventory. Refresh the page and try again."
+    );
+  }
+  return id;
 }
 
 export function useToolBinAllocations(toolId?: string) {
@@ -41,7 +62,7 @@ export function useToolBinAllocations(toolId?: string) {
     },
   });
 
-  // Realtime: invalidate on any change to this tool's allocations
+  // Realtime — listen on the canonical warehouse_bin_allocations table.
   useEffect(() => {
     if (!toolId) return;
 
@@ -49,15 +70,12 @@ export function useToolBinAllocations(toolId?: string) {
       .channel(`tool-bin-allocations-${toolId}-${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tool_bin_allocations",
-          filter: `tool_id=eq.${toolId}`,
-        },
+        { event: "*", schema: "public", table: "warehouse_bin_allocations" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations", toolId] });
+          queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
           queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+          queryClient.invalidateQueries({ queryKey: ["warehouse-bin-allocations"] });
         }
       )
       .subscribe();
@@ -67,24 +85,34 @@ export function useToolBinAllocations(toolId?: string) {
     };
   }, [toolId, queryClient]);
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
+    queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
+    queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+    queryClient.invalidateQueries({ queryKey: ["warehouse-bin-allocations"] });
+    queryClient.invalidateQueries({ queryKey: ["warehouse-items"] });
+  };
+
   const allocateMutation = useMutation({
     mutationFn: async (input: AllocateInput) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not authenticated");
+      const warehouseItemId = await resolveWarehouseItemId(input.tool_id);
 
-      // Upsert: increment if exists
+      // Upsert into the standard table; (warehouse_item_id, bin_id) is unique.
       const { data: existing } = await supabase
-        .from("tool_bin_allocations")
+        .from("warehouse_bin_allocations")
         .select("id, allocated_quantity")
-        .eq("tool_id", input.tool_id)
+        .eq("warehouse_item_id", warehouseItemId)
         .eq("bin_id", input.bin_id)
         .maybeSingle();
 
       if (existing) {
         const { data, error } = await supabase
-          .from("tool_bin_allocations")
+          .from("warehouse_bin_allocations")
           .update({
-            allocated_quantity: Number(existing.allocated_quantity) + input.allocated_quantity,
+            allocated_quantity:
+              Number(existing.allocated_quantity) + input.allocated_quantity,
             notes: input.notes ?? null,
           })
           .eq("id", existing.id)
@@ -95,9 +123,9 @@ export function useToolBinAllocations(toolId?: string) {
       }
 
       const { data, error } = await supabase
-        .from("tool_bin_allocations")
+        .from("warehouse_bin_allocations")
         .insert({
-          tool_id: input.tool_id,
+          warehouse_item_id: warehouseItemId,
           bin_id: input.bin_id,
           allocated_quantity: input.allocated_quantity,
           notes: input.notes ?? null,
@@ -110,9 +138,7 @@ export function useToolBinAllocations(toolId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
-      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
-      queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      invalidateAll();
       toast({ title: "Allocated", description: "Bin allocation saved." });
     },
     onError: (err: any) => {
@@ -126,11 +152,14 @@ export function useToolBinAllocations(toolId?: string) {
 
   const moveMutation = useMutation({
     mutationFn: async (input: MoveInput) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const warehouseItemId = await resolveWarehouseItemId(input.tool_id);
+
       // 1. Lock source allocation
       const { data: source, error: srcErr } = await supabase
-        .from("tool_bin_allocations")
+        .from("warehouse_bin_allocations")
         .select("id, allocated_quantity, available_quantity, company_id")
-        .eq("tool_id", input.tool_id)
+        .eq("warehouse_item_id", warehouseItemId)
         .eq("bin_id", input.from_bin_id)
         .single();
       if (srcErr) throw srcErr;
@@ -143,47 +172,47 @@ export function useToolBinAllocations(toolId?: string) {
 
       // 2. Decrement source
       const { error: decErr } = await supabase
-        .from("tool_bin_allocations")
+        .from("warehouse_bin_allocations")
         .update({
-          allocated_quantity: Number(source.allocated_quantity) - input.quantity,
+          allocated_quantity:
+            Number(source.allocated_quantity) - input.quantity,
         })
         .eq("id", source.id);
       if (decErr) throw decErr;
 
       // 3. Upsert destination
       const { data: dest } = await supabase
-        .from("tool_bin_allocations")
+        .from("warehouse_bin_allocations")
         .select("id, allocated_quantity")
-        .eq("tool_id", input.tool_id)
+        .eq("warehouse_item_id", warehouseItemId)
         .eq("bin_id", input.to_bin_id)
         .maybeSingle();
 
       if (dest) {
         const { error: incErr } = await supabase
-          .from("tool_bin_allocations")
+          .from("warehouse_bin_allocations")
           .update({
             allocated_quantity: Number(dest.allocated_quantity) + input.quantity,
           })
           .eq("id", dest.id);
         if (incErr) throw incErr;
       } else {
-        const { data: userData } = await supabase.auth.getUser();
-        const { error: insErr } = await supabase.from("tool_bin_allocations").insert({
-          tool_id: input.tool_id,
-          bin_id: input.to_bin_id,
-          allocated_quantity: input.quantity,
-          company_id: source.company_id ?? selectedCompany?.id ?? null,
-          created_by: userData.user?.id ?? null,
-        });
+        const { error: insErr } = await supabase
+          .from("warehouse_bin_allocations")
+          .insert({
+            warehouse_item_id: warehouseItemId,
+            bin_id: input.to_bin_id,
+            allocated_quantity: input.quantity,
+            company_id: source.company_id ?? selectedCompany?.id ?? null,
+            created_by: userData.user?.id ?? null,
+          });
         if (insErr) throw insErr;
       }
 
       return { ok: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
-      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
-      queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      invalidateAll();
       toast({ title: "Moved", description: "Stock moved between bins." });
     },
     onError: (err: any) => {
@@ -196,11 +225,34 @@ export function useToolBinAllocations(toolId?: string) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async (allocationId: string) => {
+    // Accepts either the legacy tool_bin_allocations.id OR
+    // a `{ tool_id, bin_id }` pair (preferred).
+    mutationFn: async (
+      input: string | { tool_id: string; bin_id: string }
+    ) => {
+      let warehouseItemId: string;
+      let binId: string;
+
+      if (typeof input === "string") {
+        // Legacy id — look up the row to get tool_id+bin_id, then resolve.
+        const { data: legacy, error } = await supabase
+          .from("tool_bin_allocations")
+          .select("tool_id, bin_id")
+          .eq("id", input)
+          .single();
+        if (error) throw error;
+        warehouseItemId = await resolveWarehouseItemId(legacy.tool_id);
+        binId = legacy.bin_id;
+      } else {
+        warehouseItemId = await resolveWarehouseItemId(input.tool_id);
+        binId = input.bin_id;
+      }
+
       const { data, error } = await supabase
-        .from("tool_bin_allocations")
+        .from("warehouse_bin_allocations")
         .delete()
-        .eq("id", allocationId)
+        .eq("warehouse_item_id", warehouseItemId)
+        .eq("bin_id", binId)
         .select("id");
       if (error) throw error;
       if (!data || data.length === 0) {
@@ -209,9 +261,7 @@ export function useToolBinAllocations(toolId?: string) {
       return data[0];
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
-      queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations-all"] });
-      queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      invalidateAll();
       toast({ title: "Removed", description: "Bin allocation removed." });
     },
     onError: (err: any) => {
