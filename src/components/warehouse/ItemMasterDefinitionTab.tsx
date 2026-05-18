@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, Loader2, Columns3 } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, Loader2, Columns3, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
