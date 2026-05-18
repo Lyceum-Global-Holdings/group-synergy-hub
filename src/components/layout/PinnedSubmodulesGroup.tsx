@@ -140,7 +140,7 @@ function SortablePinRow({ pin, active, reorderDisabled, companyCode }: SortableP
             : "border-l-[3px] border-l-transparent"
         )}
       >
-        <NavLink to={pin.submodule_url} className="flex items-center gap-2">
+        <NavLink to={pin.submodule_url} className="flex items-center gap-2" {...navPreloadProps(pin.submodule_url)}>
           <ModuleIcon className="h-[18px] w-[18px] shrink-0" />
           <span className="truncate text-sm flex-1">{pin.submodule_title}</span>
           {companyCode && (
