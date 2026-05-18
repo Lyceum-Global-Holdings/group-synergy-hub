@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { preloadRoute } from "@/lib/routePreload";
 import {
   Building2,
   Calculator,
@@ -153,7 +154,12 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={currentPath === "/"}>
-                  <NavLink to="/" className="flex items-center gap-2">
+                  <NavLink
+                    to="/"
+                    className="flex items-center gap-2"
+                    onMouseEnter={() => preloadRoute("/")}
+                    onFocus={() => preloadRoute("/")}
+                  >
                     <BarChart3 className="h-4 w-4" />
                     <span>Dashboard</span>
                   </NavLink>
@@ -193,7 +199,14 @@ export function AppSidebar() {
                               asChild
                               isActive={isActive(item.url)}
                             >
-                              <NavLink to={item.url}>{item.title}</NavLink>
+                              <NavLink
+                                to={item.url}
+                                onMouseEnter={() => preloadRoute(item.url)}
+                                onFocus={() => preloadRoute(item.url)}
+                                onTouchStart={() => preloadRoute(item.url)}
+                              >
+                                {item.title}
+                              </NavLink>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
@@ -214,7 +227,13 @@ export function AppSidebar() {
               {visibleAdminItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} className="flex items-center gap-2">
+                    <NavLink
+                      to={item.url}
+                      className="flex items-center gap-2"
+                      onMouseEnter={() => preloadRoute(item.url)}
+                      onFocus={() => preloadRoute(item.url)}
+                      onTouchStart={() => preloadRoute(item.url)}
+                    >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </NavLink>

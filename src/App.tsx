@@ -48,6 +48,8 @@ import MfaEnforcementGate from "./components/auth/MfaEnforcementGate";
 import { Loader2 } from "lucide-react";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { markRouteChange } from "@/lib/perfTelemetry";
+import { prefetchCommonRoutesOnIdle } from "@/lib/routePreload";
+import { RouteSkeleton } from "@/components/layout/RouteSkeleton";
 
 // Lazy load all page components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -160,6 +162,9 @@ function RouteChangeTracker() {
   useEffect(() => {
     markRouteChange(location.pathname);
   }, [location.pathname]);
+  useEffect(() => {
+    prefetchCommonRoutesOnIdle();
+  }, []);
   return null;
 }
 
@@ -193,7 +198,7 @@ const ProtectedLayout = () => (
         <LocationFilterProvider>
           <AppLayout>
             <MfaEnforcementGate>
-              <Suspense fallback={null}>
+              <Suspense fallback={<RouteSkeleton />}>
                 <Outlet />
               </Suspense>
             </MfaEnforcementGate>
