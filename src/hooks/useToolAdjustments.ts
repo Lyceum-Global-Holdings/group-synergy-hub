@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { WarehouseTool, ToolAdjustment } from "@/types/toolManagement";
+import { useInvalidateWarehouseStock } from "@/hooks/useInvalidateWarehouseStock";
 
 export interface CreateToolAdjustmentData {
   tool: WarehouseTool;
@@ -16,6 +17,7 @@ export function useToolAdjustments() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const invalidateWarehouseStock = useInvalidateWarehouseStock();
 
   const createAdjustmentMutation = useMutation({
     mutationFn: async (data: CreateToolAdjustmentData) => {
@@ -71,10 +73,30 @@ export function useToolAdjustments() {
         .single();
 
       if (adjustmentError) throw adjustmentError;
+
+      // Phase 2b: post to unified inventory ledger
+      const warehouseItemId = (tool as any)?.warehouse_item_id ?? null;
+      if (warehouseItemId) {
+        const delta = adjustmentType === "increase" ? quantity : -quantity;
+        const { error: ledgerError } = await supabase.rpc(
+          "tool_adjustment_post_ledger",
+          {
+            p_warehouse_item_id: warehouseItemId,
+            p_delta: delta,
+            p_reason: reason,
+            p_reference_id: adjustment.id,
+            p_company_id: selectedCompany?.id ?? null,
+            p_notes: notes ?? null,
+          },
+        );
+        if (ledgerError) console.error("tool ledger (adjustment) failed", ledgerError);
+      }
+
       return adjustment;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      invalidateWarehouseStock();
       toast({ title: "Success", description: "Tool quantity adjusted successfully" });
     },
     onError: (error: any) => {

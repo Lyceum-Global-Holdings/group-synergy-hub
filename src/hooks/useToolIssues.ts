@@ -3,11 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { ToolIssue, CreateToolIssueData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useInvalidateWarehouseStock } from "@/hooks/useInvalidateWarehouseStock";
 
 export function useToolIssues() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const invalidateWarehouseStock = useInvalidateWarehouseStock();
 
   const issuesQuery = useQuery({
     queryKey: ["tool-issues", selectedCompany?.id],
@@ -120,12 +122,36 @@ export function useToolIssues() {
         if (updateError) throw updateError;
       }
 
+      // Phase 2b: post to unified inventory ledger via standard tables
+      const warehouseItemId =
+        (tool as any)?.warehouse_item_id ??
+        (await supabase
+          .from("warehouse_tools")
+          .select("warehouse_item_id")
+          .eq("id", issueData.tool_id)
+          .single()).data?.warehouse_item_id;
+
+      if (warehouseItemId) {
+        const { error: ledgerError } = await supabase.rpc(
+          "tool_issue_post_ledger",
+          {
+            p_warehouse_item_id: warehouseItemId,
+            p_quantity: issueData.quantity_issued,
+            p_reference_id: issue.id,
+            p_company_id: selectedCompany?.id || issueData.company_id,
+            p_notes: `Tool issue ${issueNumber}`,
+          },
+        );
+        if (ledgerError) console.error("tool ledger (issue) failed", ledgerError);
+      }
+
       return issue;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tool-issues"] });
       queryClient.invalidateQueries({ queryKey: ["tool-issues-active"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      invalidateWarehouseStock();
       toast({ title: "Success", description: "Tool issued successfully" });
     },
     onError: (error: any) => {
