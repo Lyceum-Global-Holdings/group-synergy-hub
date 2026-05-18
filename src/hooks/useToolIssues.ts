@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ToolIssue, CreateToolIssueData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useInvalidateWarehouseStock } from "@/hooks/useInvalidateWarehouseStock";
 
 export function useToolIssues() {
   const { toast } = useToast();
