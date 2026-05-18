@@ -23071,6 +23071,38 @@ export type Database = {
           variance: number
         }[]
       }
+      tool_adjustment_post_ledger: {
+        Args: {
+          p_company_id: string
+          p_delta: number
+          p_notes?: string
+          p_reason: string
+          p_reference_id: string
+          p_warehouse_item_id: string
+        }
+        Returns: undefined
+      }
+      tool_issue_post_ledger: {
+        Args: {
+          p_company_id: string
+          p_notes?: string
+          p_quantity: number
+          p_reference_id: string
+          p_warehouse_item_id: string
+        }
+        Returns: undefined
+      }
+      tool_return_post_ledger: {
+        Args: {
+          p_company_id: string
+          p_condition: string
+          p_notes?: string
+          p_quantity: number
+          p_reference_id: string
+          p_warehouse_item_id: string
+        }
+        Returns: undefined
+      }
       transfer_assets_to_department: {
         Args: { p_request_id: string }
         Returns: Json
