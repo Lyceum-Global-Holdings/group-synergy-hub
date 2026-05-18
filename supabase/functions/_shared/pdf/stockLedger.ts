@@ -174,23 +174,18 @@ export async function buildStockLedgerPdf(input: LedgerInput): Promise<Uint8Arra
     for (const item of loc.items) {
       drawSectionLabel(`${item.itemCode} — ${item.itemName}`, 9);
       drawTableHeader();
-      // Opening
-      drawRow([
-        input.periodFrom, "—", "OPENING", "Opening Balance",
-        "", "", fmtN(item.openingQty), item.uom, "", fmtN(item.openingValue),
-      ], { bold: true, bg: [0.96, 0.97, 0.99] });
       // Movements
       for (const r of item.rows) {
         drawRow([
           r.date.slice(0, 10), r.docNo, r.refType, r.description,
           r.inQty ? fmtN(r.inQty) : "", r.outQty ? fmtN(r.outQty) : "",
-          fmtN(r.balance), r.uom, fmtN(r.unitCost), fmtN(r.value),
+          r.uom, fmtN(r.unitCost), fmtN(r.value),
         ]);
       }
-      // Closing + totals
+      // Subtotal
       drawRow([
-        input.periodTo, "—", "CLOSING", `Closing Balance — In: ${fmtN(item.totalIn)} | Out: ${fmtN(item.totalOut)}`,
-        fmtN(item.totalIn), fmtN(item.totalOut), fmtN(item.closingQty), item.uom, "", fmtN(item.closingValue),
+        "", "", "TOTAL", `In: ${fmtN(item.totalIn)} | Out: ${fmtN(item.totalOut)}`,
+        fmtN(item.totalIn), fmtN(item.totalOut), item.uom, "", "",
       ], { bold: true, bg: [0.93, 0.96, 0.93] });
       y -= 6; // spacing between items
     }
