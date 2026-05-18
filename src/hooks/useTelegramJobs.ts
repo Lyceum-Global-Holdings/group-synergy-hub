@@ -136,10 +136,11 @@ export function useTelegramJobs() {
     mutationFn: async ({ jobId, dryRun }: { jobId: string; dryRun?: boolean }) => {
       const res = await invokeEdgeFunction<{ ok: boolean; preview?: string; error?: string }>(
         "telegram-job-dispatcher",
-        { job_id: jobId, dry_run: !!dryRun },
+        { body: { job_id: jobId, dry_run: !!dryRun } },
       );
-      if (!res?.ok) throw new Error(res?.error || "Failed to run job");
-      return res;
+      if (res.error) throw new Error(res.error.message || "Failed to run job");
+      if (!res.data?.ok) throw new Error(res.data?.error || "Failed to run job");
+      return res.data;
     },
     onSuccess: (res, vars) => {
       qc.invalidateQueries({ queryKey: ["telegram-job-runs"] });
