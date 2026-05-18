@@ -37,7 +37,7 @@ interface Props {
 
 export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
   const { selectedCompany } = useCompany();
-  const { data: allLocations = [] } = useWarehouseLocations();
+  const { locations: allLocations = [] } = useWarehouseLocations();
   const locations = useMemo(
     () => allLocations.filter((l: any) => !selectedCompany?.id || l.company_id === selectedCompany.id),
     [allLocations, selectedCompany?.id],
