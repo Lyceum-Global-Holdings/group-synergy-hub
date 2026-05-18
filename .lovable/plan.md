@@ -1,66 +1,42 @@
-# Speed up submodule navigation
+## Goal
+Make submodule clicks from the left menu open immediately, following enterprise SPA performance standards: prefetch on user intent, avoid mounting hidden heavy modules, and keep the shell visible while content loads.
 
-The wait after clicking a sidebar submodule is mostly two things stacked back-to-back:
+## Findings
+- The active left menu is `CompanySidebar`, not the older `AppSidebar`. `AppSidebar` has preload handlers, but `CompanySidebar` links do not, so most real submodule clicks still wait for lazy JS chunks after click.
+- Finance uses one large `Accounting` page that eagerly imports every finance submodule, so clicking any finance submodule loads all finance modules at once.
+- Some configured routes are missing or mismatched in `routePreload` (`/finance`, several construction URLs, `finished-goods`, `nda-compliance`, child routes), so prefetch coverage is incomplete.
+- Pinned submodule links also do not preload.
 
-1. **JS chunk download** — each page is `React.lazy(...)`, so the browser fetches its JS bundle on the first click.
-2. **Page boot data fetch** — the page mounts and only then fires its Supabase queries; until they resolve the page is blank or shows a spinner.
+## Implementation Plan
+1. **Wire route preloading into the real sidebar**
+   - Add `preloadRoute` to `CompanySidebar`.
+   - Attach `onMouseEnter`, `onFocus`, and `onTouchStart` to Dashboard, Super Admin, normal submodule links, nested child links, and pinned submodule links.
+   - Add optional `onMouseDown`/pointer-down preloading so even very fast clicks start the chunk fetch before navigation.
 
-We'll attack both, without breaking the current code-split architecture.
+2. **Make route preload coverage complete and maintainable**
+   - Update `src/lib/routePreload.ts` to include all routes exposed by `moduleConfig` and `App.tsx`, including:
+     - `/finance` and `/finance/*`
+     - `/tuh-modules/finished-goods`
+     - construction routes using actual paths (`project-master`, `progress-tracking`, `resource-allocation/*`, etc.)
+     - social media `/social-media/nda-compliance`
+     - admin/training and management dynamic dashboard routes.
+   - Keep longest-prefix matching for child/detail routes.
 
-## What we'll do
+3. **Lazy-load Finance internals**
+   - Convert `src/pages/Accounting.tsx` module imports to `React.lazy`.
+   - Render only the active finance tab component instead of mounting all tab contents.
+   - Add a compact tab fallback so the page frame appears immediately.
+   - Map finance sidebar URLs to `tab` query params where needed, or ensure `/finance/*` selects the correct tab without loading unrelated finance modules.
 
-### 1. Prefetch chunks on intent (biggest win)
-- Convert each `React.lazy(() => import(...))` entry in `src/App.tsx` to use a small `lazyWithPrefetch` helper that exposes the underlying `import()` so we can trigger it on demand.
-- In `src/components/layout/AppSidebar.tsx`, attach `onMouseEnter` / `onFocus` / `onTouchStart` to each `NavLink` to call the matching prefetch. By the time the user actually clicks, the JS chunk is usually already in cache → click feels instant.
-- Add an `requestIdleCallback`-driven background prefetch for the user's top modules (Warehouse, Procurement, Finance) after the dashboard is idle.
+4. **Improve first-click behavior for high-use module groups**
+   - When a sidebar department is expanded or hovered, preload the first few visible submodules in that group during idle time.
+   - Keep the existing idle warm-up but align it with actual hot routes.
 
-### 2. Render a route shell instantly
-- Replace the current page-wide spinner fallback with a lightweight skeleton (header + table skeleton) inside `<Suspense fallback={...}>` so the layout paints immediately and only the content area shows loading. Perceived latency drops dramatically even when the chunk still has to download.
-- Keep `AppLayout` (sidebar/header) outside the Suspense boundary so it never re-renders on navigation.
+5. **Verify performance**
+   - Use browser performance profiling after implementation to compare click-to-content and resource loading.
+   - Confirm no broken route mapping and no blank content while chunks load.
 
-### 3. Make first paint of each page cheaper
-- Audit the 3–4 slowest submodules (Inventory, GRN, StockAudit, ItemBinMaster) for:
-  - Top-level `useEffect` chains that block first render → move to `useDeferredValue` / `startTransition`.
-  - Heavy children (tabs, dialogs) that should also be `lazy` inside the page so the first tab renders before the others' code is parsed.
-  - React Query calls that can opt into `placeholderData: keepPreviousData` so re-entering a page shows old data while it refreshes.
-
-### 4. Warm the data cache from the sidebar
-- For a small set of "expensive list" pages, on sidebar hover also call `queryClient.prefetchQuery(...)` for the page's primary list RPC (e.g. `list_warehouse_inventory`). On click, the page mounts with data already in cache → no spinner.
-
-### 5. Lock in the improvement
-- Add a tiny perf marker via the existing `markRouteChange` to log click→first-content time, so we can confirm the win in the PerfOverlay and catch regressions.
-
-## Out of scope
-- No backend/RLS/RPC changes. No design changes. No new dependencies.
-
-## Technical notes
-
-```ts
-// src/lib/lazyWithPrefetch.ts
-export function lazyWithPrefetch<T extends React.ComponentType<any>>(
-  loader: () => Promise<{ default: T }>,
-) {
-  const Component = React.lazy(loader);
-  (Component as any).preload = loader;
-  return Component as React.LazyExoticComponent<T> & { preload: () => Promise<unknown> };
-}
-```
-
-Sidebar wiring:
-```tsx
-<NavLink
-  to={item.url}
-  onMouseEnter={() => item.preload?.()}
-  onFocus={() => item.preload?.()}
->
-```
-
-Each `departments[].items[]` entry gets an optional `preload` field pointing at the matching `lazyWithPrefetch` component's `.preload`.
-
-## Rollout order
-1. Add `lazyWithPrefetch` + convert `App.tsx` lazies.
-2. Wire sidebar hover/focus prefetch.
-3. Swap Suspense fallback to a skeleton shell.
-4. Add React Query `prefetchQuery` warmers for the top 4–6 heaviest pages.
-5. Idle-time background prefetch for the user's home department.
-6. Verify with PerfOverlay; iterate on any page still >500ms click→paint.
+## Technical Notes
+- No database/RLS changes are needed.
+- No new dependencies are needed.
+- This keeps the current lazy-loading strategy, but applies it correctly to the sidebar users actually click and removes eager loading inside the finance route.

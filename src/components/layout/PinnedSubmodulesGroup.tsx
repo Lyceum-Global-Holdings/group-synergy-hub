@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useReorderPins, type PinnedSubmodule } from "@/hooks/useSidebarPins";
 import { moduleConfig } from "@/constants/moduleConfig";
 import { useCompany } from "@/contexts/CompanyContext";
+import { navPreloadProps } from "@/lib/navPreload";
 
 interface PinnedGroupProps {
   /** Pins for the active scope (specific company or union for "all"). */
@@ -139,7 +140,7 @@ function SortablePinRow({ pin, active, reorderDisabled, companyCode }: SortableP
             : "border-l-[3px] border-l-transparent"
         )}
       >
-        <NavLink to={pin.submodule_url} className="flex items-center gap-2">
+        <NavLink to={pin.submodule_url} className="flex items-center gap-2" {...navPreloadProps(pin.submodule_url)}>
           <ModuleIcon className="h-[18px] w-[18px] shrink-0" />
           <span className="truncate text-sm flex-1">{pin.submodule_title}</span>
           {companyCode && (

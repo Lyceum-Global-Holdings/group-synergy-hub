@@ -37,6 +37,7 @@ import { useUserPins } from "@/hooks/useSidebarPins";
 import { PinnedSubmodulesGroup } from "./PinnedSubmodulesGroup";
 import { SidebarPinButton } from "./SidebarPinButton";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { navPreloadProps } from "@/lib/navPreload";
 
 type SubModuleChild = {
   key: string;
@@ -259,7 +260,7 @@ export function CompanySidebar() {
                   isActive={currentPath === "/"}
                   className={currentPath === "/" ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/60 text-sidebar-accent-foreground font-medium" : "border-l-[3px] border-l-transparent"}
                 >
-                  <NavLink to="/" className="flex items-center gap-2">
+                  <NavLink to="/" className="flex items-center gap-2" {...navPreloadProps("/")}>
                     <BarChart3 className="h-[18px] w-[18px]" />
                     <span>Dashboard</span>
                   </NavLink>
@@ -283,7 +284,7 @@ export function CompanySidebar() {
                     isActive={currentPath.startsWith("/admin/backend")}
                     className={currentPath.startsWith("/admin/backend") ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/60 text-sidebar-accent-foreground font-medium" : "border-l-[3px] border-l-transparent"}
                   >
-                    <NavLink to="/admin/backend" className="flex items-center gap-2">
+                    <NavLink to="/admin/backend" className="flex items-center gap-2" {...navPreloadProps("/admin/backend")}>
                       <Database className="h-[18px] w-[18px]" />
                       <span>Backend Monitor</span>
                     </NavLink>
@@ -394,7 +395,7 @@ function DepartmentCollapsible({
                       isActive={isActive(item.url)}
                       className="flex-1 relative z-[1]"
                     >
-                      <NavLink to={item.url}>{item.title}</NavLink>
+                      <NavLink to={item.url} {...navPreloadProps(item.url)}>{item.title}</NavLink>
                     </SidebarMenuSubButton>
                     {pinTargetCompany && (
                       <span className="relative z-[2]">
@@ -477,6 +478,7 @@ function NestedSubItem({
               >
                 <NavLink
                   to={child.url}
+                  {...navPreloadProps(child.url)}
                   className={`flex-1 block text-xs py-1.5 px-2 rounded-sm transition-colors relative z-[1] ${
                     isActive(child.url)
                       ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'

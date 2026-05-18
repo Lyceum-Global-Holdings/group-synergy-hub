@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -14,37 +15,49 @@ import {
   Store,
   ClipboardCheck,
   Zap,
+  Loader2,
 } from "lucide-react";
 
-import GLModule from "@/components/accounting/gl/GLModule";
-import ARModule from "@/components/accounting/ar/ARModule";
-import APModule from "@/components/accounting/ap/APModule";
-import SellingModule from "@/components/accounting/selling/SellingModule";
-import InventoryModule from "@/components/accounting/inventory/InventoryModule";
-import ProcurementModule from "@/components/accounting/procurement/ProcurementModule";
-import BankingModule from "@/components/accounting/banking/BankingModule";
-import FixedAssetsModule from "@/components/accounting/assets/FixedAssetsModule";
-import ReportsModule from "@/components/accounting/reports/ReportsModule";
-import SettingsModule from "@/components/accounting/settings/SettingsModule";
-import ExpensesModule from "@/components/accounting/expenses/ExpensesModule";
-import QualityModule from "@/components/accounting/quality/QualityModule";
-import AutomationModule from "@/components/accounting/automation/AutomationModule";
+// Lazy-load every finance sub-module so opening Finance only fetches the
+// active tab's chunk + data, not all 13 modules at once.
+const GLModule = lazy(() => import("@/components/accounting/gl/GLModule"));
+const ARModule = lazy(() => import("@/components/accounting/ar/ARModule"));
+const APModule = lazy(() => import("@/components/accounting/ap/APModule"));
+const SellingModule = lazy(() => import("@/components/accounting/selling/SellingModule"));
+const InventoryModule = lazy(() => import("@/components/accounting/inventory/InventoryModule"));
+const ProcurementModule = lazy(() => import("@/components/accounting/procurement/ProcurementModule"));
+const BankingModule = lazy(() => import("@/components/accounting/banking/BankingModule"));
+const FixedAssetsModule = lazy(() => import("@/components/accounting/assets/FixedAssetsModule"));
+const ReportsModule = lazy(() => import("@/components/accounting/reports/ReportsModule"));
+const SettingsModule = lazy(() => import("@/components/accounting/settings/SettingsModule"));
+const ExpensesModule = lazy(() => import("@/components/accounting/expenses/ExpensesModule"));
+const QualityModule = lazy(() => import("@/components/accounting/quality/QualityModule"));
+const AutomationModule = lazy(() => import("@/components/accounting/automation/AutomationModule"));
 
 const primaryTabs = [
-  { id: "gl", label: "General Ledger", icon: BookOpen },
-  { id: "ar", label: "AR", icon: Users },
-  { id: "ap", label: "AP", icon: FileText },
-  { id: "selling", label: "Selling", icon: Store },
-  { id: "expenses", label: "Expenses", icon: Receipt },
-  { id: "inventory", label: "Inventory", icon: Package },
-  { id: "procurement", label: "Procurement", icon: ShoppingCart },
-  { id: "banking", label: "Banking", icon: Building2 },
-  { id: "assets", label: "Fixed Assets", icon: Box },
-  { id: "quality", label: "Quality", icon: ClipboardCheck },
-  { id: "automation", label: "Automation", icon: Zap },
-  { id: "reports", label: "Reports", icon: BarChart3 },
-  { id: "settings", label: "Settings", icon: Settings },
-];
+  { id: "gl", label: "General Ledger", icon: BookOpen, Component: GLModule },
+  { id: "ar", label: "AR", icon: Users, Component: ARModule },
+  { id: "ap", label: "AP", icon: FileText, Component: APModule },
+  { id: "selling", label: "Selling", icon: Store, Component: SellingModule },
+  { id: "expenses", label: "Expenses", icon: Receipt, Component: ExpensesModule },
+  { id: "inventory", label: "Inventory", icon: Package, Component: InventoryModule },
+  { id: "procurement", label: "Procurement", icon: ShoppingCart, Component: ProcurementModule },
+  { id: "banking", label: "Banking", icon: Building2, Component: BankingModule },
+  { id: "assets", label: "Fixed Assets", icon: Box, Component: FixedAssetsModule },
+  { id: "quality", label: "Quality", icon: ClipboardCheck, Component: QualityModule },
+  { id: "automation", label: "Automation", icon: Zap, Component: AutomationModule },
+  { id: "reports", label: "Reports", icon: BarChart3, Component: ReportsModule },
+  { id: "settings", label: "Settings", icon: Settings, Component: SettingsModule },
+] as const;
+
+function TabFallback() {
+  return (
+    <div className="flex items-center justify-center py-16 text-muted-foreground">
+      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+      Loading…
+    </div>
+  );
+}
 
 export default function Accounting() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -59,19 +72,16 @@ export default function Accounting() {
     setSearchParams({ tab: activeTab, sub });
   };
 
+  const active = primaryTabs.find((t) => t.id === activeTab) ?? primaryTabs[0];
+  const ActiveComponent = active.Component;
+
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          Finance & Accounting
-        </h1>
-        <p className="text-muted-foreground">
-          Enterprise Accounting Module
-        </p>
+        <h1 className="text-2xl font-bold text-foreground">Finance & Accounting</h1>
+        <p className="text-muted-foreground">Enterprise Accounting Module</p>
       </div>
 
-      {/* Primary Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="h-auto p-1 bg-muted/50 flex flex-wrap gap-1 justify-start w-full">
           {primaryTabs.map((tab) => {
@@ -89,56 +99,14 @@ export default function Accounting() {
           })}
         </TabsList>
 
-        <TabsContent value="gl" className="mt-6">
-          <GLModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="ar" className="mt-6">
-          <ARModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="ap" className="mt-6">
-          <APModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="expenses" className="mt-6">
-          <ExpensesModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="selling" className="mt-6">
-          <SellingModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="inventory" className="mt-6">
-          <InventoryModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="procurement" className="mt-6">
-          <ProcurementModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="banking" className="mt-6">
-          <BankingModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="assets" className="mt-6">
-          <FixedAssetsModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="quality" className="mt-6">
-          <QualityModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="automation" className="mt-6">
-          <AutomationModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="reports" className="mt-6">
-          <ReportsModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
-        </TabsContent>
-
-        <TabsContent value="settings" className="mt-6">
-          <SettingsModule activeSubTab={activeSubTab} onSubTabChange={handleSubTabChange} />
+        {/* Render only the active tab to avoid mounting all 13 finance modules at once */}
+        <TabsContent value={activeTab} className="mt-6" forceMount>
+          <Suspense fallback={<TabFallback />}>
+            <ActiveComponent
+              activeSubTab={activeSubTab}
+              onSubTabChange={handleSubTabChange}
+            />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
