@@ -1,6 +1,6 @@
 ---
 name: Telegram Scheduled Reports
-description: Multi-job Telegram report scheduler under Administration; jobs table + dispatcher edge function + 5-min cron
+description: Multi-job Telegram report scheduler under Administration; jobs table + dispatcher edge function + 5-min cron; warehouse_stock_daily renders a PDF Stock Movement Ledger (IAS 2 / SAP MB51) and is delivered via Telegram sendDocument
 type: feature
 ---
 # Telegram Scheduled Reports (Administration)
