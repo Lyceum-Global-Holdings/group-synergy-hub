@@ -218,12 +218,38 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return allItems.filter(item => item.bins?.some(b => b.bin_code === binFilter));
   }, [allItems, binFilter]);
 
-  // IntersectionObserver sentinel for infinite scroll
+  // Virtualized scroll container — only the visible ~50 rows are mounted
+  // even when thousands of items have been loaded across infinite pages.
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const VIRTUALIZE_FROM = 100;
+  const shouldVirtualize = filteredItems.length > VIRTUALIZE_FROM;
+
+  const rowVirtualizer = useVirtualizer({
+    count: shouldVirtualize ? filteredItems.length : 0,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 56,
+    overscan: 8,
+  });
+
+  // Prefetch the next server page when the user scrolls near the end of the
+  // currently materialized rows (TanStack Virtual + useInfiniteQuery pattern).
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    if (shouldVirtualize) {
+      const last = virtualItems[virtualItems.length - 1];
+      if (last && last.index >= filteredItems.length - 10) {
+        fetchNextPage();
+      }
+    }
+  }, [virtualItems, filteredItems.length, hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
+
+  // Fallback sentinel for the non-virtualized (small dataset) path.
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (shouldVirtualize) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
@@ -232,10 +258,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       },
       { rootMargin: '200px' }
     );
-
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, shouldVirtualize]);
+
 
   const { locations: allLocations = [] } = useWarehouseLocations();
   const locationNameById = useMemo(
