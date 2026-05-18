@@ -20350,6 +20350,7 @@ export type Database = {
           unit_cost: number | null
           unit_id: string | null
           updated_at: string | null
+          warehouse_item_id: string | null
         }
         Insert: {
           available_quantity?: number
@@ -20371,6 +20372,7 @@ export type Database = {
           unit_cost?: number | null
           unit_id?: string | null
           updated_at?: string | null
+          warehouse_item_id?: string | null
         }
         Update: {
           available_quantity?: number
@@ -20392,6 +20394,7 @@ export type Database = {
           unit_cost?: number | null
           unit_id?: string | null
           updated_at?: string | null
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -20427,6 +20430,27 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "item_units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_tools_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_tools_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_tools_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items_full"
             referencedColumns: ["id"]
           },
         ]
@@ -21793,6 +21817,7 @@ export type Database = {
         }
         Returns: {
           available_quantity: number
+          catalog_item_id: string
           category_id: string
           category_name: string
           company_id: string
@@ -21814,6 +21839,7 @@ export type Database = {
           unit_id: string
           unit_name: string
           updated_at: string
+          warehouse_item_id: string
         }[]
       }
       has_construction_access: { Args: { _user_id: string }; Returns: boolean }

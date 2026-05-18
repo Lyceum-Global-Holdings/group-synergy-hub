@@ -16,6 +16,8 @@ export interface WarehouseTool {
   company_id: string | null;
   /** Phase 9 — provenance link back to warehouse_item_catalog row. */
   catalog_item_id?: string | null;
+  /** Phase 2a — cached link to the standard warehouse_items row. */
+  warehouse_item_id?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
