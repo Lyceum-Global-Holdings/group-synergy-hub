@@ -248,6 +248,107 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     }
   };
 
+  const renderRow = useCallback((item: CatalogItem, idx: number) => {
+    const category = categoryById.get(item.category_id ?? '');
+    const unit = unitById.get(item.unit_id ?? '');
+    return (
+      <TableRow key={item.id} aria-rowindex={idx + 1}>
+        {col('photo') && (
+          <TableCell>
+            {item.image_url ? (
+              <button onClick={() => setPreviewImage({ url: item.image_url!, name: item.name })} className="cursor-pointer">
+                <img src={item.image_url} alt={item.name} loading="lazy" decoding="async" className="h-7 w-7 rounded object-cover" />
+              </button>
+            ) : (
+              <div className="h-7 w-7 rounded bg-muted flex items-center justify-center">
+                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            )}
+          </TableCell>
+        )}
+        {col('item_code') && <TableCell className="font-mono text-xs">{item.item_code}</TableCell>}
+        <TableCell>
+          <div className="space-y-0.5">
+            <div className="font-medium">{item.name}</div>
+            {item.description && (
+              <div className="text-xs text-muted-foreground line-clamp-1">
+                {item.description}
+              </div>
+            )}
+          </div>
+        </TableCell>
+        {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
+        {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
+        {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
+        {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
+        {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
+        {col('status') && (
+          <TableCell>
+            <Badge variant="outline" className={getStatusColor(item.status || 'active')}>
+              {item.status || 'active'}
+            </Badge>
+          </TableCell>
+        )}
+        <TableCell>
+          <div className="flex items-center justify-end gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewingItem(item)}>
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View Details</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit Item</TooltipContent>
+              </Tooltip>
+              {canDelete && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingItem(item)} disabled={isDeleting || isMarkingInactive}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Item</TooltipContent>
+                </Tooltip>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToInventory?.(item.id)}>
+                    <Package className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View in Inventory</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToBins?.(item.id)}>
+                    <MapPin className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View Bin Allocations</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setStockMovementItem(item)}>
+                    <History className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Stock Movement History</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }, [categoryById, unitById, visibleColumns, canDelete, isDeleting, isMarkingInactive, onNavigateToInventory, onNavigateToBins]);
+
   const handleDownloadExcel = useCallback(async () => {
     setIsExporting(true);
     try {
