@@ -108,6 +108,26 @@ export function useToolReturns() {
         if (updateToolError) throw updateToolError;
       }
 
+      // Phase 2b: post return to unified inventory ledger
+      const warehouseItemId =
+        (tool as any)?.warehouse_item_id ??
+        (issue as any)?.warehouse_item_id ?? null;
+
+      if (warehouseItemId) {
+        const { error: ledgerError } = await supabase.rpc(
+          "tool_return_post_ledger",
+          {
+            p_warehouse_item_id: warehouseItemId,
+            p_quantity: returnData.quantity_returned,
+            p_condition: returnData.condition,
+            p_reference_id: returnRecord.id,
+            p_company_id: selectedCompany?.id || returnData.company_id,
+            p_notes: `Tool return ${returnNumber}`,
+          },
+        );
+        if (ledgerError) console.error("tool ledger (return) failed", ledgerError);
+      }
+
       return returnRecord;
     },
     onSuccess: () => {
