@@ -208,7 +208,7 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
       const value = Number(t.total_value) || Math.abs(q) * unitCost;
       return {
         date: t.created_at,
-        docNo: t.reference_no ?? '—',
+        docNo: t.reference_id ? String(t.reference_id).slice(0, 8) : '—',
         refType: TX_TYPE_LABEL[t.transaction_type] ?? t.transaction_type,
         description: t.reference_type ?? '',
         inQty: isIn ? q : 0,
