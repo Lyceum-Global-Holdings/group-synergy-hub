@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { WarehouseTool, ToolAdjustment } from "@/types/toolManagement";
+import { useInvalidateWarehouseStock } from "@/hooks/useInvalidateWarehouseStock";
 
 export interface CreateToolAdjustmentData {
   tool: WarehouseTool;
@@ -16,6 +17,7 @@ export function useToolAdjustments() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const invalidateWarehouseStock = useInvalidateWarehouseStock();
 
   const createAdjustmentMutation = useMutation({
     mutationFn: async (data: CreateToolAdjustmentData) => {
