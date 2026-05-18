@@ -373,7 +373,7 @@ export function BinAllocationsTab() {
         <DataTable
           columns={columns}
           data={filteredAllocations}
-          isLoading={isLoading}
+          isLoading={isLoading || toolsLoading}
         />
       </CardContent>
 
