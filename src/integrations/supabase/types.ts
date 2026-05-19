@@ -21682,6 +21682,26 @@ export type Database = {
         }[]
       }
       get_current_tenant_id: { Args: never; Returns: string }
+      get_dashboard_finance_pulse: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
+      get_dashboard_health_strip: {
+        Args: { p_company_id?: string; p_location_id?: string }
+        Returns: Json
+      }
+      get_dashboard_procurement_pulse: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
+      get_dashboard_sourcing_pulse: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
+      get_dashboard_warehouse_pulse: {
+        Args: { p_company_id?: string; p_location_id?: string }
+        Returns: Json
+      }
       get_effective_location_company_ids: {
         Args: { p_location_id: string }
         Returns: {
