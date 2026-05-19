@@ -1,52 +1,107 @@
-# Speed up Item Master on /warehouse/item-bin-master
 
-## Root cause
+# Modern Realtime Operations Dashboard
 
-The slow screen is `ItemMasterDefinitionTab.tsx`, not the previously-tuned `ItemMasterTab.tsx`. With 14k+ catalog rows it suffers from:
+## Problem with current `/dashboard`
 
-1. **No row virtualization** — every loaded row becomes a real `<tr>` in the DOM. After scrolling 2–3 pages the browser is laying out 200–300 rich rows (image + 8 cells + tooltip + actions) on every state change.
-2. **Page size 100** — first paint waits for 100 rows + their images.
-3. **O(N×M) lookups in render** — `categories.find(...)` and `units.find(...)` run for every visible row on every render.
-4. **Eager `<img>` thumbnails** — 100 network requests fire alongside the first data response.
-5. **Blocking count query** — `get_warehouse_catalog_count` runs on every keystroke / filter change, competing with the page fetch.
-6. **No server sort control** — RPC orders by `created_at` only; user expects ascending Name like the other tab.
+- KPIs (`Total Purchase Orders`, `Active Suppliers`, `Pending Approvals`, `Monthly Spend`), Department Module Status bars, and Recent Activities are **all hardcoded mock data** in `src/pages/Dashboard.tsx`.
+- No realtime subscriptions — the "Last updated" badge just shows the page-load time.
+- Layout is a flat stack of cards, no domain grouping, no drill-down, no trend context.
 
-## What we'll change (frontend + 1 small RPC tweak)
+## Goal
 
-### 1. `src/components/warehouse/ItemMasterDefinitionTab.tsx`
-- **Virtualize rows** with `@tanstack/react-virtual` (same pattern already used in `ItemMasterTab.tsx`): only render ~50 visible rows regardless of how many pages have loaded. Use a scroll container ref with `max-h-[calc(100vh-320px)] overflow-auto`, `estimateSize: 48`, `overscan: 8`.
-- **Drive infinite scroll from the virtualizer** (prefetch next page when last virtual row is within 10 of the end) and remove the IntersectionObserver sentinel.
-- **`pageSize = 50`** (matches the inventory tab and user request).
-- **O(1) lookup maps**: `categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])))`, same for `unitById`. Replace `.find()` in render with `Map.get()`.
-- **Lazy thumbnails**: add `loading="lazy"` and `decoding="async"` to the `<img>` tag.
-- **Sortable headers** for Item Code / Name / Status — default `sortBy='name'`, `sortDir='asc'`. Click toggles asc→desc; changing sort resets scroll and refetches from page 1.
-- **Defer count**: keep the count query but mark `enabled: items.length > 0` (or simply drop the badge from the critical path) and add `staleTime: 60_000` so it doesn't re-run while typing. The count is currently shown nowhere visible in the header — confirm and remove if unused; otherwise just lazy-enable it.
-- **Memoize row renderer** (`renderRow(item, virtualIndex)`) and keep `<TableRow>` props referentially stable so React skips re-rendering unchanged rows during scroll.
+Replace the mock dashboard with a **modular, realtime "Operations Pulse"** that streams live data from existing tables (`purchase_orders`, `goods_receipts`, `warehouse_items`, `stock_transactions`, `rfqs`, `suppliers`, `approvals`, etc.) and lays it out the way a COO actually reads an enterprise: **Pulse → Domain Pillars → Live Activity → Drill-down**.
 
-### 2. `src/hooks/useWarehouseItemsPaged.ts`
-- Default `pageSize` 100 → **50**.
-- Accept optional `sortBy` (`'name' | 'item_code' | 'created_at'`) and `sortDir` (`'asc' | 'desc'`); include in `queryKey` and pass to the RPC. Extend the `Cursor` type with `name`.
-- Keep `gcTime` long, add `staleTime: 30_000`.
+## Proposed layout
 
-### 3. DB migration — extend `get_warehouse_catalog_page`
-- Add allowlisted `p_sort_by` (`name | item_code | created_at`) and `p_sort_dir` (`asc | desc`) params, plus an extra `p_cursor_name` for name-sorted keyset.
-- Compose `ORDER BY <sort_key> <dir>, id <dir>` and matching keyset WHERE so pagination stays strictly monotonic (per the project's keyset-uniqueness rule).
-- Filter-before-paginate preserved. Defaults stay backward-compatible (`name asc`).
-- Ensure supporting index exists: `warehouse_item_catalog(name, id)` and `(item_code, id)` (trigram on `name` already exists per memory).
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│  Operations Pulse                  [● Live]  [Today ▾] [Location ▾] │
+├─────────────────────────────────────────────────────────────────────┤
+│  HEALTH STRIP (5 mini-KPIs with sparklines + delta vs yesterday)    │
+│  Orders Today | GRNs Pending | Stock Alerts | RFQs Open | Approvals │
+├──────────────────────────────────┬──────────────────────────────────┤
+│  WAREHOUSE pillar                │  PROCUREMENT pillar              │
+│  - On-hand value (live)          │  - PO pipeline funnel            │
+│  - Low-stock count + top 5 list  │  - Spend vs budget gauge         │
+│  - Bin moves (24h sparkline)     │  - Avg PO cycle time             │
+├──────────────────────────────────┼──────────────────────────────────┤
+│  SOURCING pillar                 │  FINANCE pillar                  │
+│  - Open RFQs + days-to-close     │  - AR aging donut                │
+│  - Supplier scorecard top/bottom │  - Cash position + 7d trend      │
+│  - 3-way match exceptions        │  - Pending payments              │
+├──────────────────────────────────┴──────────────────────────────────┤
+│  LIVE ACTIVITY FEED (realtime stream, grouped by module, filterable)│
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-## Out of scope
-- No changes to `ItemMasterTab.tsx`, Bin/Categories/Units tabs, RBAC, RLS, or any mutation paths.
-- No change to image storage or CDN; just `loading="lazy"`.
-- No new dependencies (`@tanstack/react-virtual` already installed).
+Each pillar card: title row with module icon, 1 hero metric, 1 secondary metric, 1 inline sparkline/mini-chart, and a "View module →" link that deep-links into the relevant page (e.g. `/warehouse/inventory?filter=low-stock`).
 
-## Expected impact
-- First paint goes from ~100 hydrated rows + 100 image fetches → ~15 rows + ~15 lazy images.
-- Scroll stays smooth past 1k+ rows because the DOM size is bounded.
-- Filter / search typing no longer blocked by a parallel `COUNT(*)`.
-- Sort is server-side and keyset-stable, so infinite scroll keeps working when sorted by Name.
+## Realtime mechanism
 
-## Files touched
-- `src/components/warehouse/ItemMasterDefinitionTab.tsx` (refactor render + sort UI + virtualization)
-- `src/hooks/useWarehouseItemsPaged.ts` (pageSize 50, sort params, cursor)
-- `supabase/migrations/<new>_catalog_page_sort.sql` (extend RPC with sort + name cursor)
-- `src/integrations/supabase/types.ts` (regenerated after migration)
+Use the existing `useRealtimeChannel` bus (already standard per memory: *Realtime Bus Pattern*). Each pillar subscribes to its own scoped channel and invalidates only its React Query keys — no full-page refetch.
+
+- Warehouse pillar → `stock_transactions`, `warehouse_items`, `bin_allocations`
+- Procurement pillar → `purchase_orders`, `purchase_order_items`, `goods_receipts`
+- Sourcing pillar → `rfqs`, `rfq_responses`, `suppliers`, `supplier_scorecards`
+- Finance pillar → `invoices`, `payments`, `journal_entries`
+- Activity feed → `audit_logs` (filtered to last 50, append on insert)
+
+A small **"● Live"** indicator pulses when a realtime event arrives in the last 5 seconds, then settles. Replaces the static "Last updated" badge.
+
+## Data hooks (new, server-aggregated)
+
+To keep the dashboard fast and avoid client-side aggregation across thousands of rows, create one RPC per pillar that returns a flat summary row. Pattern matches existing *List RPC Pattern* memory.
+
+- `get_dashboard_warehouse_pulse(p_company_id, p_location_id)` → on_hand_value, low_stock_count, moves_24h, sparkline_7d[]
+- `get_dashboard_procurement_pulse(p_company_id, p_location_id)` → po_open, po_approved_today, spend_mtd, budget_mtd, avg_cycle_days, funnel{}
+- `get_dashboard_sourcing_pulse(p_company_id)` → rfqs_open, rfqs_closing_7d, top_suppliers[], bottom_suppliers[], match_exceptions
+- `get_dashboard_finance_pulse(p_company_id)` → ar_aging{}, cash_position, payments_pending, trend_7d[]
+- `get_dashboard_health_strip(p_company_id, p_location_id)` → 5 KPIs + their yesterday deltas + 7d sparkline arrays
+
+All `SECURITY INVOKER`, company-scoped, respect `LocationFilterContext`.
+
+## Filters (header)
+
+- Location (already wired to `LocationFilterContext`)
+- Time window: Today / 7d / 30d / MTD (default Today)
+- Company (already wired to `CompanyContext`)
+
+State persists in URL query string so dashboards are shareable.
+
+## Visual treatment
+
+- Reuse existing semantic tokens; no new colors.
+- Sparklines via `recharts` `<LineChart>` mini variant (already in dep tree).
+- Donut + gauge via `recharts` `RadialBarChart` / `PieChart`.
+- Subtle pulse animation on the "● Live" dot using existing Tailwind `animate-pulse`.
+- Density: pillar cards are equal-height, 2-up on `lg`, 1-up on mobile. Health strip is 5-up on `xl`, scrollable horizontally on small.
+
+## Files to touch
+
+### New
+- `src/components/dashboard/HealthStrip.tsx`
+- `src/components/dashboard/PillarCard.tsx` (shared shell: title, hero, secondary, sparkline slot, CTA)
+- `src/components/dashboard/WarehousePillar.tsx`
+- `src/components/dashboard/ProcurementPillar.tsx`
+- `src/components/dashboard/SourcingPillar.tsx`
+- `src/components/dashboard/FinancePillar.tsx`
+- `src/components/dashboard/LiveActivityFeed.tsx`
+- `src/components/dashboard/LivePulseIndicator.tsx`
+- `src/hooks/useDashboardPulse.ts` (5 query hooks, one per RPC)
+- `supabase/migrations/<ts>_dashboard_pulse_rpcs.sql`
+
+### Edited
+- `src/pages/Dashboard.tsx` — replace mock body with the new layout; keep location/company header.
+
+### Untouched
+- Module pages, RBAC, RLS, existing realtime hooks.
+
+## Out of scope (can be follow-ups)
+
+- User-customizable widget drag-and-drop (the existing `dashboards/` widget framework already handles that for management dashboards — this is the fixed "home" dashboard).
+- Alert thresholds configuration UI.
+- Export-to-PDF of the dashboard snapshot.
+
+## Open question
+
+Before I build, one clarification: do you want the Finance pillar included on the home dashboard for all roles, or should it be **role-gated** (e.g. only Finance/Admin see it) given finance data sensitivity? I'd default to role-gated using the existing `has_role` check.
