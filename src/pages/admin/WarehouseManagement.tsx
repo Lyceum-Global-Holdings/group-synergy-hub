@@ -333,10 +333,10 @@ export default function WarehouseManagement() {
   // Get potential parent locations based on selected type
   const getParentOptions = () => {
     if (editForm.type === 'sublocation') {
-      return locations.filter(l => l.type === 'location');
+      return locations.filter(l => l.type === 'warehouse' || l.type === 'location');
     }
     if (editForm.type === 'department') {
-      return locations.filter(l => l.type === 'location' || l.type === 'sublocation');
+      return locations.filter(l => l.type === 'warehouse' || l.type === 'location' || l.type === 'sublocation');
     }
     return [];
   };
@@ -841,6 +841,7 @@ export default function WarehouseManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="warehouse">Warehouse</SelectItem>
                     <SelectItem value="location">Location</SelectItem>
                     <SelectItem value="sublocation">Sublocation</SelectItem>
                     <SelectItem value="department">Department</SelectItem>
