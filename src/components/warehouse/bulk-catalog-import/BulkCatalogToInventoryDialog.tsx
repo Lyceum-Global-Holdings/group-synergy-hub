@@ -66,13 +66,17 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
 
   const [pasteOpen, setPasteOpen] = useState(false);
 
+  // Show ALL active locations regardless of company ownership.
+  // Rationale: bin↔location parity is enforced server-side (see
+  // bin-allocation-location-parity), but bins are often physically attached to
+  // a "warehouse" location owned by a different company while serving multiple
+  // companies' inventory (shared / multi-owner bins). Filtering locations by
+  // the row's company hides those parent warehouse nodes and makes their bins
+  // unreachable from this dialog. Let users pick any active location; the
+  // server still validates writes.
   const locationsByCompany = useMemo(() => {
-    return (companyId: string | null) => {
-      const scoped = !companyId
-        ? locations
-        : locations.filter((l) => !l.company_id || l.company_id === companyId);
-      return buildLocationOptions(scoped, { activeOnly: true });
-    };
+    const opts = buildLocationOptions(locations, { activeOnly: true });
+    return (_companyId: string | null) => opts;
   }, [locations]);
 
 
