@@ -73,10 +73,24 @@ export function useCompanies() {
           query = query.eq('id', userProfile.company_id);
         }
       } 
-      // Regular users see only their company
-      else if (userProfile?.company_id) {
-        console.log('[useCompanies] Regular user - filtering to company:', userProfile.company_id);
-        query = query.eq('id', userProfile.company_id);
+      // Regular users see primary company + any assigned via user_company_access
+      else {
+        const { data: accessData } = await supabase
+          .from('user_company_access')
+          .select('company_id')
+          .eq('user_id', user.id);
+
+        const accessibleCompanyIds = new Set<string>();
+        if (userProfile?.company_id) accessibleCompanyIds.add(userProfile.company_id);
+        accessData?.forEach(a => accessibleCompanyIds.add(a.company_id));
+
+        console.log('[useCompanies] Regular user - accessible companies:', Array.from(accessibleCompanyIds));
+
+        if (accessibleCompanyIds.size > 0) {
+          query = query.in('id', Array.from(accessibleCompanyIds));
+        } else {
+          return [];
+        }
       }
 
       const { data: companiesData, error } = await query;
