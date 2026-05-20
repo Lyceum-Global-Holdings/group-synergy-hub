@@ -362,29 +362,153 @@ async function renderStockTransferDaily(sb: SupabaseClient, job: Job): Promise<R
 }
 
 async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<RenderedReport> {
-  const { from, to, label } = previousLocalDay(job.timezone);
+  const { from, to, label } = currentLocalDay(job.timezone);
+  const todayYMD = label;
+
+  // ---- 1. Site reports submitted today ----
   const { data: reports } = await sb
     .from('daily_site_reports')
     .select('id, report_date, project_id, weather, total_manpower, work_progress_summary, projects:project_id(name)')
     .eq('company_id', job.company_id)
-    .gte('report_date', from.slice(0, 10))
-    .lt('report_date', to.slice(0, 10))
-    .order('report_date', { ascending: false });
+    .eq('report_date', todayYMD)
+    .order('created_at', { ascending: false });
 
-  let html = `<b>🏗️ Daily Site Report</b>\n<i>Date: ${esc(label)}</i>\n\n`;
+  let html = `<b>🏗️ Daily Site Report</b>\n<i>Date: ${esc(label)} (today)</i>\n\n`;
   if (!reports || reports.length === 0) {
-    html += '<i>No site reports submitted.</i>';
-    return { title: 'Daily Site Report', html };
+    html += '<i>No site reports submitted today.</i>\n\n';
+  } else {
+    for (const r of reports as any[]) {
+      html += `<b>${esc(r.projects?.name ?? 'Project')}</b>\n`;
+      html += `  Weather: ${esc(r.weather ?? 'n/a')}\n`;
+      html += `  Manpower: ${fmtNum(r.total_manpower)}\n`;
+      if (r.work_progress_summary) {
+        html += `  Progress: ${esc(String(r.work_progress_summary).slice(0, 200))}\n`;
+      }
+      html += `\n`;
+    }
   }
-  for (const r of reports as any[]) {
-    html += `<b>${esc(r.projects?.name ?? 'Project')}</b>\n`;
-    html += `  Weather: ${esc(r.weather ?? 'n/a')}\n`;
-    html += `  Manpower: ${fmtNum(r.total_manpower)}\n`;
-    if (r.work_progress_summary) {
-      html += `  Progress: ${esc(String(r.work_progress_summary).slice(0, 200))}\n`;
+
+  // ---- 2. Material Issues (today) ----
+  html += `<b>📦 Material Issues (today)</b>\n`;
+  const { data: issuesData } = await sb
+    .from('material_issue_notes')
+    .select(`
+      min_number, issued_to, department,
+      material_issue_items (
+        quantity_issued,
+        warehouse_items ( item_code, name )
+      )
+    `)
+    .eq('company_id', job.company_id)
+    .eq('issue_date', todayYMD);
+
+  const issueRows: Array<{ min: string; to: string; code: string; name: string; qty: number }> = [];
+  for (const note of (issuesData ?? []) as any[]) {
+    for (const it of (note.material_issue_items ?? []) as any[]) {
+      issueRows.push({
+        min: note.min_number ?? '',
+        to: note.issued_to ?? note.department ?? '',
+        code: it.warehouse_items?.item_code ?? '',
+        name: it.warehouse_items?.name ?? 'Unknown',
+        qty: Number(it.quantity_issued ?? 0),
+      });
+    }
+  }
+  if (issueRows.length === 0) {
+    html += '<i>No material issues recorded today.</i>\n\n';
+  } else {
+    for (const r of issueRows) {
+      html += `  • <b>${esc(r.min)}</b> → ${esc(r.to)}: ${esc(r.code)} ${esc(r.name)} — ${fmtNum(r.qty)}\n`;
     }
     html += `\n`;
   }
+
+  // ---- 3. Stock Movements (today) ----
+  html += `<b>🔄 Stock Movements (today)</b>\n`;
+  const { data: txData } = await sb
+    .from('stock_transactions')
+    .select(`
+      transaction_type, quantity_change, quantity_before, quantity_after,
+      created_by, issued_to_location_id,
+      issued_to_location:issued_to_location_id ( name ),
+      warehouse_items_full!inner ( item_code, name, company_id )
+    `)
+    .eq('warehouse_items_full.company_id', job.company_id)
+    .or('transaction_type.not.in.("material_issue","material_return"),and(transaction_type.eq.material_issue,issued_to_location_id.not.is.null)')
+    .gte('created_at', from)
+    .lt('created_at', to)
+    .order('created_at', { ascending: false });
+
+  const txRows = (txData ?? []) as any[];
+  if (txRows.length === 0) {
+    html += '<i>No stock movements recorded today.</i>\n\n';
+  } else {
+    // Resolve adjuster names
+    const userIds = [...new Set(txRows.map(t => t.created_by).filter(Boolean))] as string[];
+    const namesMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profs } = await sb.from('profiles').select('user_id, full_name, email').in('user_id', userIds);
+      for (const p of (profs ?? []) as any[]) namesMap[p.user_id] = p.full_name || p.email || 'Unknown';
+    }
+    for (const t of txRows) {
+      const typeLabel = TX_TYPE_LABEL[t.transaction_type] ?? String(t.transaction_type ?? '').toUpperCase();
+      const item = `${t.warehouse_items_full?.item_code ?? ''} ${t.warehouse_items_full?.name ?? ''}`.trim();
+      const by = t.created_by ? (namesMap[t.created_by] ?? '') : '';
+      const loc = t.issued_to_location?.name ?? '';
+      html += `  • [${esc(typeLabel)}] ${esc(item)} — ${fmtNum(t.quantity_before)} → ${fmtNum(t.quantity_after)} (Δ ${fmtNum(t.quantity_change)})`;
+      if (loc) html += ` · ${esc(loc)}`;
+      if (by) html += ` · ${esc(by)}`;
+      html += `\n`;
+    }
+    html += `\n`;
+  }
+
+  // ---- 4. Current Stock Balances (live snapshot) ----
+  html += `<b>📊 Current Stock (as of now)</b>\n`;
+  const { data: allocData } = await sb
+    .from('warehouse_bin_allocations')
+    .select(`
+      allocated_quantity,
+      warehouse_items:warehouse_item_id ( item_code, name ),
+      warehouse_bins:bin_id (
+        warehouse_locations:location_id ( id, name )
+      )
+    `)
+    .eq('company_id', job.company_id)
+    .gt('allocated_quantity', 0);
+
+  type Row = { code: string; name: string; qty: number };
+  const byWh = new Map<string, { wh: string; items: Map<string, Row> }>();
+  let grandTotal = 0;
+  for (const a of (allocData ?? []) as any[]) {
+    const wh = a.warehouse_bins?.warehouse_locations?.name ?? 'Unassigned';
+    const whId = a.warehouse_bins?.warehouse_locations?.id ?? 'none';
+    const code = a.warehouse_items?.item_code ?? '';
+    const name = a.warehouse_items?.name ?? 'Unknown';
+    const qty = Number(a.allocated_quantity ?? 0);
+    grandTotal += qty;
+    if (!byWh.has(whId)) byWh.set(whId, { wh, items: new Map() });
+    const bucket = byWh.get(whId)!;
+    const key = `${code}::${name}`;
+    const existing = bucket.items.get(key);
+    if (existing) existing.qty += qty;
+    else bucket.items.set(key, { code, name, qty });
+  }
+
+  if (byWh.size === 0) {
+    html += '<i>No stock on hand.</i>\n';
+  } else {
+    for (const { wh, items } of byWh.values()) {
+      const subtotal = Array.from(items.values()).reduce((s, r) => s + r.qty, 0);
+      html += `<b>${esc(wh)}</b> — Subtotal: ${fmtNum(subtotal)}\n`;
+      const sorted = Array.from(items.values()).sort((a, b) => a.name.localeCompare(b.name));
+      for (const r of sorted) {
+        html += `  • ${esc(r.code)} ${esc(r.name)}: ${fmtNum(r.qty)}\n`;
+      }
+    }
+    html += `\n<b>Grand Total:</b> ${fmtNum(grandTotal)}\n`;
+  }
+
   return { title: 'Daily Site Report', html };
 }
 
