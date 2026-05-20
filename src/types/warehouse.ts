@@ -62,7 +62,7 @@ export interface WarehouseAsset {
 
 export interface CreateWarehouseLocationData {
   name: string;
-  type: 'location' | 'sublocation' | 'department';
+  type: 'warehouse' | 'location' | 'sublocation' | 'department';
   parent_id?: string;
   description?: string;
   company_id?: string;
