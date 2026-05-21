@@ -626,11 +626,7 @@ async function fetchMaterialsData(
       .select(`
         allocated_quantity,
         company_id,
-        warehouse_items:warehouse_item_id (
-          id,
-          item_code,
-          name
-        ),
+        warehouse_item_id,
         warehouse_bins:bin_id (
           location_id,
           warehouse_locations:location_id (
@@ -645,11 +641,29 @@ async function fetchMaterialsData(
     if (stockError) {
       console.error("Error fetching stock balances:", stockError);
     } else if (stockData) {
+      const stockItemIds = [...new Set(stockData.map((allocation: any) => allocation.warehouse_item_id).filter(Boolean))] as string[];
+      let stockItemMap: Record<string, { code: string | null; name: string }> = {};
+
+      if (stockItemIds.length > 0) {
+        const { data: itemsData } = await supabase
+          .from('warehouse_items_full')
+          .select('id, item_code, name')
+          .in('id', stockItemIds);
+
+        if (itemsData) {
+          stockItemMap = itemsData.reduce((acc: Record<string, { code: string | null; name: string }>, item: any) => {
+            acc[item.id] = { code: item.item_code || null, name: item.name || 'Unknown Item' };
+            return acc;
+          }, {});
+        }
+      }
+
       // Group by item_code + warehouse to aggregate stock
       const stockMap = new Map<string, CurrentStockBalance>();
       
       stockData.forEach((allocation: any) => {
-        const itemCode = allocation.warehouse_items?.item_code || "";
+        const itemInfo = stockItemMap[allocation.warehouse_item_id] ?? { code: null, name: "Unknown Item" };
+        const itemCode = itemInfo.code || "";
         const warehouseId = allocation.warehouse_bins?.warehouse_locations?.id || "";
         const key = `${itemCode}-${warehouseId}`;
         
@@ -658,8 +672,8 @@ async function fetchMaterialsData(
           existing.current_stock += allocation.allocated_quantity || 0;
         } else {
           stockMap.set(key, {
-            item_code: allocation.warehouse_items?.item_code || null,
-            item_name: allocation.warehouse_items?.name || "Unknown Item",
+            item_code: itemInfo.code,
+            item_name: itemInfo.name,
             current_stock: allocation.allocated_quantity || 0,
             warehouse_id: allocation.warehouse_bins?.warehouse_locations?.id || null,
             warehouse_name: allocation.warehouse_bins?.warehouse_locations?.name || null,
