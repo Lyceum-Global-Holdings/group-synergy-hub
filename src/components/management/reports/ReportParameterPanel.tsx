@@ -20,6 +20,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { LocationTreePicker } from "@/components/management/reports/LocationTreePicker";
+import { useBinsAtLocation } from "@/hooks/warehouse/useBinsAtLocation";
 
 interface Props {
   definition: ReportDefinition;
