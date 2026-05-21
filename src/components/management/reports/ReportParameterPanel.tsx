@@ -105,6 +105,22 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
 
   const set = (key: string, v: unknown) => onChange({ ...values, [key]: v });
 
+  // Clear any "bin" param whose scoping sibling (locationId) has changed/cleared.
+  useEffect(() => {
+    const next: Record<string, unknown> = { ...values };
+    let changed = false;
+    definition.parameters.forEach((p) => {
+      if (p.type !== "bin") return;
+      const scope = next[p.dependsOn];
+      if (!scope && next[p.key]) {
+        next[p.key] = null;
+        changed = true;
+      }
+    });
+    if (changed) onChange(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definition.code, JSON.stringify(definition.parameters.map((p) => (p.type === "bin" ? values[p.dependsOn] : null)))]);
+
   return (
     <div className="grid gap-4">
       {definition.parameters.map((p) => (
@@ -118,6 +134,7 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
             locationsLoading={locationsLoading}
             companySelected={!!selectedCompany?.id}
             categories={categories}
+            siblingValues={values}
           />
         </div>
       ))}
