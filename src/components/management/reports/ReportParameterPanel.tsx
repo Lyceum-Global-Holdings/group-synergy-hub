@@ -20,6 +20,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { LocationTreePicker } from "@/components/management/reports/LocationTreePicker";
+import { useBinsAtLocation } from "@/hooks/warehouse/useBinsAtLocation";
 
 interface Props {
   definition: ReportDefinition;
@@ -105,6 +106,22 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
 
   const set = (key: string, v: unknown) => onChange({ ...values, [key]: v });
 
+  // Clear any "bin" param whose scoping sibling (locationId) has changed/cleared.
+  useEffect(() => {
+    const next: Record<string, unknown> = { ...values };
+    let changed = false;
+    definition.parameters.forEach((p) => {
+      if (p.type !== "bin") return;
+      const scope = next[p.dependsOn];
+      if (!scope && next[p.key]) {
+        next[p.key] = null;
+        changed = true;
+      }
+    });
+    if (changed) onChange(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definition.code, JSON.stringify(definition.parameters.map((p) => (p.type === "bin" ? values[p.dependsOn] : null)))]);
+
   return (
     <div className="grid gap-4">
       {definition.parameters.map((p) => (
@@ -118,6 +135,7 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
             locationsLoading={locationsLoading}
             companySelected={!!selectedCompany?.id}
             categories={categories}
+            siblingValues={values}
           />
         </div>
       ))}
@@ -136,6 +154,7 @@ function ParameterInput({
   locationsLoading,
   companySelected,
   categories,
+  siblingValues,
 }: {
   param: ReportParameter;
   value: unknown;
@@ -144,6 +163,7 @@ function ParameterInput({
   locationsLoading: boolean;
   companySelected: boolean;
   categories: { id: string; name: string }[];
+  siblingValues: Record<string, unknown>;
 }) {
   switch (param.type) {
     case "date":
@@ -234,6 +254,10 @@ function ParameterInput({
         </>
       );
     }
+    case "bin": {
+      const scopeId = siblingValues[param.dependsOn] as string | null | undefined;
+      return <BinParamInput paramKey={param.key} locationId={scopeId ?? null} value={(value as string) ?? null} onChange={onChange} />;
+    }
     case "category":
       return (
         <Select value={(value as string) ?? "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
@@ -299,3 +323,48 @@ type NotesOp =
   | "startsWith"
   | "endsWith"
   | "notContains";
+
+function BinParamInput({
+  paramKey,
+  locationId,
+  value,
+  onChange,
+}: {
+  paramKey: string;
+  locationId: string | null;
+  value: string | null;
+  onChange: (v: unknown) => void;
+}) {
+  const { data: bins = [], isLoading } = useBinsAtLocation(locationId);
+  const disabled = !locationId || isLoading;
+  return (
+    <Select
+      value={value ?? "all"}
+      onValueChange={(v) => onChange(v === "all" ? null : v)}
+      disabled={disabled}
+    >
+      <SelectTrigger id={paramKey}>
+        <SelectValue
+          placeholder={
+            !locationId
+              ? "Pick a location first"
+              : isLoading
+                ? "Loading bins…"
+                : bins.length === 0
+                  ? "No bins at this location"
+                  : "All bins"
+          }
+        />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All bins</SelectItem>
+        {bins.map((b) => (
+          <SelectItem key={b.id} value={b.id}>
+            {b.bin_code}
+            {b.name ? ` — ${b.name}` : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}

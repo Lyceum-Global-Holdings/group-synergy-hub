@@ -22998,32 +22998,64 @@ export type Database = {
           user_email: string
         }[]
       }
-      report_stock_on_hand: {
-        Args: {
-          p_category_id?: string
-          p_company_id: string
-          p_include_zero?: boolean
-          p_location_id?: string
-        }
-        Returns: {
-          available_quantity: number
-          category_id: string
-          category_name: string
-          current_stock: number
-          item_code: string
-          item_id: string
-          item_name: string
-          location_id: string
-          location_name: string
-          min_stock_level: number
-          reorder_level: number
-          reserved_quantity: number
-          status: string
-          stock_value: number
-          unit_cost: number
-          unit_name: string
-        }[]
-      }
+      report_stock_on_hand:
+        | {
+            Args: {
+              p_category_id?: string
+              p_company_id: string
+              p_include_zero?: boolean
+              p_location_id?: string
+            }
+            Returns: {
+              available_quantity: number
+              category_id: string
+              category_name: string
+              current_stock: number
+              item_code: string
+              item_id: string
+              item_name: string
+              location_id: string
+              location_name: string
+              min_stock_level: number
+              reorder_level: number
+              reserved_quantity: number
+              status: string
+              stock_value: number
+              unit_cost: number
+              unit_name: string
+            }[]
+          }
+        | {
+            Args: {
+              p_bin_id?: string
+              p_bin_wise?: boolean
+              p_category_id?: string
+              p_company_id: string
+              p_include_zero?: boolean
+              p_location_id?: string
+            }
+            Returns: {
+              available_quantity: number
+              bin_code: string
+              bin_id: string
+              bin_name: string
+              category_id: string
+              category_name: string
+              current_stock: number
+              item_code: string
+              item_id: string
+              item_name: string
+              location_id: string
+              location_name: string
+              min_stock_level: number
+              reorder_level: number
+              reserved_quantity: number
+              status: string
+              stock_value: number
+              unit_cost: number
+              unit_name: string
+            }[]
+          }
       report_supplier_scorecard: {
         Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
         Returns: {
