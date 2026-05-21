@@ -45,6 +45,15 @@ export type ReportParameter =
   | {
       key: string;
       label: string;
+      /** Bin picker — scoped to the value of another parameter (typically locationId). */
+      type: "bin";
+      /** Sibling param key whose value scopes the bin list (e.g. "locationId"). */
+      dependsOn: string;
+      required?: boolean;
+    }
+  | {
+      key: string;
+      label: string;
       type: "text";
       placeholder?: string;
       required?: boolean;
