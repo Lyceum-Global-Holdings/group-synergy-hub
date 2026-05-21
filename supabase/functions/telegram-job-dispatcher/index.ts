@@ -434,7 +434,6 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
       warehouse_items_full!inner ( item_code, name, company_id )
     `)
     .eq('warehouse_items_full.company_id', job.company_id)
-    .or('transaction_type.not.in.("material_issue","material_return"),and(transaction_type.eq.material_issue,issued_to_location_id.not.is.null)')
     .gte('created_at', from)
     .lt('created_at', to)
     .order('created_at', { ascending: false });
