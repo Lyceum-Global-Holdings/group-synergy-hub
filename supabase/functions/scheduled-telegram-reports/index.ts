@@ -515,7 +515,7 @@ async function fetchMaterialsData(
         material_issue_items (
           quantity_issued,
           notes,
-          warehouse_items (
+          warehouse_items_full (
             item_code,
             name
           )
@@ -535,8 +535,8 @@ async function fetchMaterialsData(
             min_number: issue.min_number,
             issued_to: issue.issued_to,
             department: issue.department,
-            item_code: item.warehouse_items?.item_code || null,
-            item_name: item.warehouse_items?.name || "Unknown Item",
+            item_code: item.warehouse_items_full?.item_code || null,
+            item_name: item.warehouse_items_full?.name || "Unknown Item",
             quantity_issued: item.quantity_issued,
           });
         });
@@ -554,24 +554,36 @@ async function fetchMaterialsData(
         notes,
         created_by,
         issued_to_location_id,
+        item_id,
         issued_to_location:issued_to_location_id (
           name
-        ),
-        warehouse_items!inner (
-          item_code,
-          name,
-          company_id
         )
       `)
-      .eq("warehouse_items.company_id", companyId)
-      .or("transaction_type.not.in.(\"material_issue\",\"material_return\"),and(transaction_type.eq.material_issue,issued_to_location_id.not.is.null)")
+      .eq("company_id", companyId)
       .gte("created_at", `${startDate}T00:00:00`)
       .lt("created_at", `${endDate}T23:59:59.999`);
 
     if (adjustmentsError) {
       console.error("Error fetching stock adjustments:", adjustmentsError);
     } else if (adjustmentsData) {
-      // Fetch profiles for adjusted_by names
+      // Fetch item and profile names from source-of-truth views
+      const itemIds = [...new Set(adjustmentsData.map((t: any) => t.item_id).filter(Boolean))] as string[];
+      let itemMap: Record<string, { code: string | null; name: string }> = {};
+
+      if (itemIds.length > 0) {
+        const { data: itemsData } = await supabase
+          .from('warehouse_items_full')
+          .select('id, item_code, name')
+          .in('id', itemIds);
+
+        if (itemsData) {
+          itemMap = itemsData.reduce((acc: Record<string, { code: string | null; name: string }>, item: any) => {
+            acc[item.id] = { code: item.item_code || null, name: item.name || 'Unknown Item' };
+            return acc;
+          }, {});
+        }
+      }
+
       const userIds = [...new Set(adjustmentsData.map((t: any) => t.created_by).filter(Boolean))] as string[];
       let profilesMap: Record<string, string> = {};
       
@@ -596,8 +608,8 @@ async function fetchMaterialsData(
         
         return {
           transaction_type: displayType,
-          item_code: adj.warehouse_items?.item_code || null,
-          item_name: adj.warehouse_items?.name || "Unknown Item",
+          item_code: itemMap[adj.item_id]?.code || null,
+          item_name: itemMap[adj.item_id]?.name || "Unknown Item",
           quantity_change: adj.quantity_change,
           quantity_before: adj.quantity_before,
           quantity_after: adj.quantity_after,
@@ -614,11 +626,7 @@ async function fetchMaterialsData(
       .select(`
         allocated_quantity,
         company_id,
-        warehouse_items:warehouse_item_id (
-          id,
-          item_code,
-          name
-        ),
+        warehouse_item_id,
         warehouse_bins:bin_id (
           location_id,
           warehouse_locations:location_id (
@@ -633,11 +641,29 @@ async function fetchMaterialsData(
     if (stockError) {
       console.error("Error fetching stock balances:", stockError);
     } else if (stockData) {
+      const stockItemIds = [...new Set(stockData.map((allocation: any) => allocation.warehouse_item_id).filter(Boolean))] as string[];
+      let stockItemMap: Record<string, { code: string | null; name: string }> = {};
+
+      if (stockItemIds.length > 0) {
+        const { data: itemsData } = await supabase
+          .from('warehouse_items_full')
+          .select('id, item_code, name')
+          .in('id', stockItemIds);
+
+        if (itemsData) {
+          stockItemMap = itemsData.reduce((acc: Record<string, { code: string | null; name: string }>, item: any) => {
+            acc[item.id] = { code: item.item_code || null, name: item.name || 'Unknown Item' };
+            return acc;
+          }, {});
+        }
+      }
+
       // Group by item_code + warehouse to aggregate stock
       const stockMap = new Map<string, CurrentStockBalance>();
       
       stockData.forEach((allocation: any) => {
-        const itemCode = allocation.warehouse_items?.item_code || "";
+        const itemInfo = stockItemMap[allocation.warehouse_item_id] ?? { code: null, name: "Unknown Item" };
+        const itemCode = itemInfo.code || "";
         const warehouseId = allocation.warehouse_bins?.warehouse_locations?.id || "";
         const key = `${itemCode}-${warehouseId}`;
         
@@ -646,8 +672,8 @@ async function fetchMaterialsData(
           existing.current_stock += allocation.allocated_quantity || 0;
         } else {
           stockMap.set(key, {
-            item_code: allocation.warehouse_items?.item_code || null,
-            item_name: allocation.warehouse_items?.name || "Unknown Item",
+            item_code: itemInfo.code,
+            item_name: itemInfo.name,
             current_stock: allocation.allocated_quantity || 0,
             warehouse_id: allocation.warehouse_bins?.warehouse_locations?.id || null,
             warehouse_name: allocation.warehouse_bins?.warehouse_locations?.name || null,

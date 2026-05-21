@@ -396,7 +396,7 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
       min_number, issued_to, department,
       material_issue_items (
         quantity_issued,
-        warehouse_items ( item_code, name )
+        warehouse_items_full ( item_code, name )
       )
     `)
     .eq('company_id', job.company_id)
@@ -408,8 +408,8 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
       issueRows.push({
         min: note.min_number ?? '',
         to: note.issued_to ?? note.department ?? '',
-        code: it.warehouse_items?.item_code ?? '',
-        name: it.warehouse_items?.name ?? 'Unknown',
+        code: it.warehouse_items_full?.item_code ?? '',
+        name: it.warehouse_items_full?.name ?? 'Unknown',
         qty: Number(it.quantity_issued ?? 0),
       });
     }
@@ -428,13 +428,11 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
   const { data: txData } = await sb
     .from('stock_transactions')
     .select(`
-      transaction_type, quantity_change, quantity_before, quantity_after,
+      item_id, transaction_type, quantity_change, quantity_before, quantity_after,
       created_by, issued_to_location_id,
-      issued_to_location:issued_to_location_id ( name ),
-      warehouse_items_full!inner ( item_code, name, company_id )
+      issued_to_location:issued_to_location_id ( name )
     `)
-    .eq('warehouse_items_full.company_id', job.company_id)
-    .or('transaction_type.not.in.("material_issue","material_return"),and(transaction_type.eq.material_issue,issued_to_location_id.not.is.null)')
+    .eq('company_id', job.company_id)
     .gte('created_at', from)
     .lt('created_at', to)
     .order('created_at', { ascending: false });
@@ -443,7 +441,16 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
   if (txRows.length === 0) {
     html += '<i>No stock movements recorded today.</i>\n\n';
   } else {
-    // Resolve adjuster names
+    // Resolve item and adjuster names
+    const itemIds = [...new Set(txRows.map(t => t.item_id).filter(Boolean))] as string[];
+    const itemMap: Record<string, { code: string; name: string }> = {};
+    if (itemIds.length > 0) {
+      const { data: items } = await sb
+        .from('warehouse_items_full')
+        .select('id, item_code, name')
+        .in('id', itemIds);
+      for (const i of (items ?? []) as any[]) itemMap[i.id] = { code: i.item_code ?? '', name: i.name ?? 'Unknown' };
+    }
     const userIds = [...new Set(txRows.map(t => t.created_by).filter(Boolean))] as string[];
     const namesMap: Record<string, string> = {};
     if (userIds.length > 0) {
@@ -452,7 +459,8 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
     }
     for (const t of txRows) {
       const typeLabel = TX_TYPE_LABEL[t.transaction_type] ?? String(t.transaction_type ?? '').toUpperCase();
-      const item = `${t.warehouse_items_full?.item_code ?? ''} ${t.warehouse_items_full?.name ?? ''}`.trim();
+      const itemInfo = itemMap[t.item_id] ?? { code: '', name: 'Unknown item' };
+      const item = `${itemInfo.code} ${itemInfo.name}`.trim();
       const by = t.created_by ? (namesMap[t.created_by] ?? '') : '';
       const loc = t.issued_to_location?.name ?? '';
       html += `  • [${esc(typeLabel)}] ${esc(item)} — ${fmtNum(t.quantity_before)} → ${fmtNum(t.quantity_after)} (Δ ${fmtNum(t.quantity_change)})`;
@@ -469,7 +477,7 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
     .from('warehouse_bin_allocations')
     .select(`
       allocated_quantity,
-      warehouse_items:warehouse_item_id ( item_code, name ),
+      warehouse_item_id,
       warehouse_bins:bin_id (
         warehouse_locations:location_id ( id, name )
       )
@@ -478,13 +486,23 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
     .gt('allocated_quantity', 0);
 
   type Row = { code: string; name: string; qty: number };
+  const allocItemIds = [...new Set(((allocData ?? []) as any[]).map(a => a.warehouse_item_id).filter(Boolean))] as string[];
+  const allocItemMap: Record<string, { code: string; name: string }> = {};
+  if (allocItemIds.length > 0) {
+    const { data: items } = await sb
+      .from('warehouse_items_full')
+      .select('id, item_code, name')
+      .in('id', allocItemIds);
+    for (const i of (items ?? []) as any[]) allocItemMap[i.id] = { code: i.item_code ?? '', name: i.name ?? 'Unknown' };
+  }
   const byWh = new Map<string, { wh: string; items: Map<string, Row> }>();
   let grandTotal = 0;
   for (const a of (allocData ?? []) as any[]) {
     const wh = a.warehouse_bins?.warehouse_locations?.name ?? 'Unassigned';
     const whId = a.warehouse_bins?.warehouse_locations?.id ?? 'none';
-    const code = a.warehouse_items?.item_code ?? '';
-    const name = a.warehouse_items?.name ?? 'Unknown';
+    const itemInfo = allocItemMap[a.warehouse_item_id] ?? { code: '', name: 'Unknown' };
+    const code = itemInfo.code;
+    const name = itemInfo.name;
     const qty = Number(a.allocated_quantity ?? 0);
     grandTotal += qty;
     if (!byWh.has(whId)) byWh.set(whId, { wh, items: new Map() });
