@@ -317,15 +317,6 @@ export function ViewSiteReportDialog({
     return warehouseA.localeCompare(warehouseB);
   });
 
-  // Calculate total stock per item (across all warehouses)
-  const itemTotals = stockBalances.reduce((acc, item) => {
-    const itemCode = item.item_code || "unknown";
-    if (!acc[itemCode]) {
-      acc[itemCode] = 0;
-    }
-    acc[itemCode] += item.current_stock;
-    return acc;
-  }, {} as Record<string, number>);
 
   // Group sorted stock balances by warehouse
   const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
@@ -923,40 +914,9 @@ export function ViewSiteReportDialog({
                     </CardContent>
                   </Card>
 
-                  {/* Detailed Stock Balances */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Detailed Stock Balances ({sortedStockBalances.length} items)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {sortedStockBalances.length === 0 ? <p className="text-sm text-muted-foreground py-4 text-center">
-                          No stock data available
-                        </p> : <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Code</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Current Stock</TableHead>
-                              <TableHead>Warehouse</TableHead>
-                              <TableHead>Total Stock</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sortedStockBalances.map((item, idx) => <TableRow key={`${item.item_code}-${item.warehouse_id}-${idx}`}>
-                                <TableCell>{item.item_code || "-"}</TableCell>
-                                <TableCell>{item.item_name}</TableCell>
-                                <TableCell>{item.current_stock}</TableCell>
-                                <TableCell>{item.warehouse_name || "Unassigned"}</TableCell>
-                                <TableCell className="font-medium">{itemTotals[item.item_code || "unknown"] || 0}</TableCell>
-                              </TableRow>)}
-                          </TableBody>
-                        </Table>}
-                    </CardContent>
-                  </Card>
                 </div>}
             </div>
+
           </div>
         </ScrollArea>
 

@@ -424,16 +424,6 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
       return warehouseA.localeCompare(warehouseB);
     });
 
-    // Calculate total stock per item (across all warehouses)
-    const itemTotals = materials.stockBalances.reduce((acc, item) => {
-      const itemCode = item.item_code || "unknown";
-      if (!acc[itemCode]) {
-        acc[itemCode] = 0;
-      }
-      acc[itemCode] += item.current_stock;
-      return acc;
-    }, {} as Record<string, number>);
-
     // Group sorted stock balances by warehouse
     const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
       const warehouseName = item.warehouse_name || "Unassigned";
@@ -466,33 +456,8 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
       margin: { left: 14, right: 14 },
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
-
-    // Detailed Stock Balances
-    if (yPos > 230) {
-      doc.addPage();
-      yPos = 20;
-    }
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Detailed Stock Balances", 14, yPos);
-    yPos += 2;
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [["Code", "Item", "Current Stock", "Warehouse", "Total Stock"]],
-      body: sortedStockBalances.map((item) => [
-        item.item_code || "-",
-        item.item_name,
-        String(item.current_stock),
-        item.warehouse_name || "Unassigned",
-        String(itemTotals[item.item_code || "unknown"] || 0),
-      ]),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [91, 192, 222] },
-      margin: { left: 14, right: 14 },
-    });
   }
+
 
   // Labour Attendance Section
   if (materials.attendanceRecords && materials.attendanceRecords.length > 0) {
