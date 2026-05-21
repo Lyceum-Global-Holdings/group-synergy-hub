@@ -54,10 +54,10 @@ const formSchema = z.object({
   weather_conditions: z.string().optional(),
   temperature_high: z.coerce.number().optional(),
   temperature_low: z.coerce.number().optional(),
-  skilled_labor_count: z.coerce.number().optional(),
-  unskilled_labor_count: z.coerce.number().optional(),
-  subcontractor_count: z.coerce.number().optional(),
-  visitor_count: z.coerce.number().optional(),
+  skilled_labor_count: z.coerce.number().min(0, "Cannot be negative").optional(),
+  unskilled_labor_count: z.coerce.number().min(0, "Cannot be negative").optional(),
+  subcontractor_count: z.coerce.number().min(0, "Cannot be negative").optional(),
+  visitor_count: z.coerce.number().min(0, "Cannot be negative").optional(),
   work_summary: z.string().optional(),
   delays_issues: z.string().optional(),
   materials_received: z.string().optional(),
@@ -173,10 +173,10 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
         weather_conditions: data.weather_conditions || null,
         temperature_high: data.temperature_high || null,
         temperature_low: data.temperature_low || null,
-        skilled_labor_count: data.skilled_labor_count || null,
-        unskilled_labor_count: data.unskilled_labor_count || null,
-        subcontractor_count: data.subcontractor_count || null,
-        visitor_count: data.visitor_count || null,
+        skilled_labor_count: Math.max(0, data.skilled_labor_count || 0) || null,
+        unskilled_labor_count: Math.max(0, data.unskilled_labor_count || 0) || null,
+        subcontractor_count: Math.max(0, data.subcontractor_count || 0) || null,
+        visitor_count: Math.max(0, data.visitor_count || 0) || null,
         work_summary: data.work_summary || null,
         delays_issues: data.delays_issues || null,
         materials_received: data.materials_received || null,
@@ -347,7 +347,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                   <FormItem>
                     <FormLabel>Skilled Labor</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0" {...field} />
+                      <Input type="number" min={0} placeholder="0" {...field} />
+
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -361,7 +362,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                   <FormItem>
                     <FormLabel>Non-Skilled Labor</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0" {...field} />
+                      <Input type="number" min={0} placeholder="0" {...field} />
+
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -375,7 +377,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                   <FormItem>
                     <FormLabel>Subcontractors</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0" {...field} />
+                      <Input type="number" min={0} placeholder="0" {...field} />
+
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -389,7 +392,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                   <FormItem>
                     <FormLabel>Visitors</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0" {...field} />
+                      <Input type="number" min={0} placeholder="0" {...field} />
+
                     </FormControl>
                     <FormMessage />
                   </FormItem>
