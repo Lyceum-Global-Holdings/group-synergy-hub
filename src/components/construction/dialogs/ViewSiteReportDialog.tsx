@@ -317,15 +317,6 @@ export function ViewSiteReportDialog({
     return warehouseA.localeCompare(warehouseB);
   });
 
-  // Calculate total stock per item (across all warehouses)
-  const itemTotals = stockBalances.reduce((acc, item) => {
-    const itemCode = item.item_code || "unknown";
-    if (!acc[itemCode]) {
-      acc[itemCode] = 0;
-    }
-    acc[itemCode] += item.current_stock;
-    return acc;
-  }, {} as Record<string, number>);
 
   // Group sorted stock balances by warehouse
   const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
