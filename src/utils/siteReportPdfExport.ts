@@ -291,6 +291,8 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
       project_issue: "Project Issue",
       project_return: "Project Return",
       sublocation_issue: "Sub-Location Issue",
+      material_issue: "Material Issue",
+      material_return: "Material Return",
     };
     return labels[type] || type.replace(/_/g, ' ');
   };
