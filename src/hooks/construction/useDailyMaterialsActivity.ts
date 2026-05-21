@@ -54,12 +54,66 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
   const { selectedCompany } = useCompany();
   const effectiveEndDate = endDate || startDate;
 
+  // Helper: resolve item master fields (item_code, name, notes, supplier) for a set of warehouse_item IDs.
+  // Reads from warehouse_items_full (catalog source of truth) plus suppliers for supplier metadata.
+  const resolveItemMaster = async (
+    itemIds: string[]
+  ): Promise<Record<string, {
+    item_code: string | null;
+    name: string;
+    notes: string | null;
+    supplier_name: string | null;
+    supplier_type: string | null;
+  }>> => {
+    const map: Record<string, {
+      item_code: string | null;
+      name: string;
+      notes: string | null;
+      supplier_name: string | null;
+      supplier_type: string | null;
+    }> = {};
+    if (itemIds.length === 0) return map;
+
+    const { data: fullRows } = await supabase
+      .from("warehouse_items_full")
+      .select("id, item_code, name, notes, supplier_id")
+      .in("id", itemIds);
+
+    const supplierIds = [
+      ...new Set((fullRows || []).map((r: any) => r.supplier_id).filter(Boolean)),
+    ] as string[];
+
+    let supplierMap: Record<string, { name: string | null; supplier_type: string | null }> = {};
+    if (supplierIds.length > 0) {
+      const { data: suppliers } = await supabase
+        .from("suppliers")
+        .select("id, name, supplier_type")
+        .in("id", supplierIds);
+      supplierMap = (suppliers || []).reduce((acc: any, s: any) => {
+        acc[s.id] = { name: s.name ?? null, supplier_type: s.supplier_type ?? null };
+        return acc;
+      }, {});
+    }
+
+    for (const row of (fullRows || []) as any[]) {
+      const sup = row.supplier_id ? supplierMap[row.supplier_id] : null;
+      map[row.id] = {
+        item_code: row.item_code ?? null,
+        name: row.name ?? "Unknown Item",
+        notes: row.notes ?? null,
+        supplier_name: sup?.name ?? null,
+        supplier_type: sup?.supplier_type ?? null,
+      };
+    }
+    return map;
+  };
+
   const issuesQuery = useQuery({
     queryKey: ["daily-material-issues", selectedCompany?.id, startDate, effectiveEndDate],
     queryFn: async (): Promise<DailyMaterialIssue[]> => {
       if (!selectedCompany?.id || !startDate) return [];
 
-      let query = supabase
+      const { data, error } = await supabase
         .from("material_issue_notes")
         .select(`
           min_number,
@@ -68,41 +122,41 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           material_issue_items (
             quantity_issued,
             notes,
-            item_id,
-            warehouse_items!material_issue_items_item_id_fkey(
-            id,
-            notes,
-            suppliers!warehouse_items_supplier_id_fkey (
-                name,
-            supplier_type,
-            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, supplier_id)
-          )
-            )
+            item_id
           )
         `)
         .eq("company_id", selectedCompany.id)
         .gte("issue_date", startDate)
         .lte("issue_date", effectiveEndDate!);
 
-      const { data, error } = await query;
-
       if (error) throw error;
 
-      // Flatten the data structure
+      const allItemIds: string[] = [];
+      data?.forEach((issue: any) => {
+        (issue.material_issue_items ?? []).forEach((it: any) => {
+          if (it.item_id) allItemIds.push(it.item_id);
+        });
+      });
+      const itemMap = await resolveItemMaster([...new Set(allItemIds)]);
+
       const issues: DailyMaterialIssue[] = [];
-      data?.forEach((issue) => {
-        issue.material_issue_items?.forEach((item: any) => {
+      data?.forEach((issue: any) => {
+        (issue.material_issue_items ?? []).forEach((item: any) => {
+          const info = itemMap[item.item_id] || {
+            item_code: null, name: "Unknown Item", notes: null,
+            supplier_name: null, supplier_type: null,
+          };
           issues.push({
             min_number: issue.min_number,
             issued_to: issue.issued_to,
             department: issue.department,
-            item_code: item.warehouse_items?.item_code || null,
-            item_name: item.warehouse_items?.name || "Unknown Item",
+            item_code: info.item_code,
+            item_name: info.name,
             quantity_issued: item.quantity_issued,
             item_notes: item.notes,
-            item_master_notes: item.warehouse_items?.notes || null,
-            supplier_name: item.warehouse_items?.suppliers?.name || null,
-            supplier_type: item.warehouse_items?.suppliers?.supplier_type || null,
+            item_master_notes: info.notes,
+            supplier_name: info.supplier_name,
+            supplier_type: info.supplier_type,
           });
         });
       });
@@ -110,6 +164,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
       return issues;
     },
     enabled: !!selectedCompany?.id && !!startDate,
+    staleTime: 0,
   });
 
   const returnsQuery = useQuery({
@@ -117,7 +172,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
     queryFn: async (): Promise<DailyMaterialReturn[]> => {
       if (!selectedCompany?.id || !startDate) return [];
 
-      let query = supabase
+      const { data, error } = await supabase
         .from("material_return_notes")
         .select(`
           mrn_number,
@@ -126,34 +181,36 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
             quantity_returned,
             condition,
             notes,
-            warehouse_items(
-            id,
-            notes,
-            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
-          )
+            item_id
           )
         `)
         .eq("company_id", selectedCompany.id)
         .gte("return_date", startDate)
         .lte("return_date", effectiveEndDate!);
 
-      const { data, error } = await query;
-
       if (error) throw error;
 
-      // Flatten the data structure
+      const allItemIds: string[] = [];
+      data?.forEach((ret: any) => {
+        (ret.material_return_items ?? []).forEach((it: any) => {
+          if (it.item_id) allItemIds.push(it.item_id);
+        });
+      });
+      const itemMap = await resolveItemMaster([...new Set(allItemIds)]);
+
       const returns: DailyMaterialReturn[] = [];
-      data?.forEach((ret) => {
-        ret.material_return_items?.forEach((item: any) => {
+      data?.forEach((ret: any) => {
+        (ret.material_return_items ?? []).forEach((item: any) => {
+          const info = itemMap[item.item_id] || { item_code: null, name: "Unknown Item", notes: null, supplier_name: null, supplier_type: null };
           returns.push({
             mrn_number: ret.mrn_number,
             returned_by: ret.returned_by,
-            item_code: item.warehouse_items?.item_code || null,
-            item_name: item.warehouse_items?.name || "Unknown Item",
+            item_code: info.item_code,
+            item_name: info.name,
             quantity_returned: item.quantity_returned,
             condition: item.condition,
             item_notes: item.notes,
-            item_master_notes: item.warehouse_items?.notes || null,
+            item_master_notes: info.notes,
           });
         });
       });
@@ -161,6 +218,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
       return returns;
     },
     enabled: !!selectedCompany?.id && !!startDate,
+    staleTime: 0,
   });
 
   const adjustmentsQuery = useQuery({
@@ -168,8 +226,9 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
     queryFn: async (): Promise<DailyStockAdjustment[]> => {
       if (!selectedCompany?.id || !startDate) return [];
 
-      // Query for non-material_issue/material_return transactions
-      // Plus material_issue transactions with issued_to_location_id (sub-location issues)
+      // Pull ALL stock_transactions for the period (company-scoped). The Daily Site Report
+      // needs to surface every stock movement that touched the company on that day —
+      // goods receipts, material issues/returns, adjustments, transfers, project moves.
       const { data, error } = await supabase
         .from("stock_transactions")
         .select(`
@@ -180,95 +239,78 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           notes,
           created_by,
           issued_to_location_id,
-          issued_to_location:issued_to_location_id (
-            name
-          ),
-          warehouse_items!inner(
-            id,
-            notes,
-            company_id,
-            suppliers!warehouse_items_supplier_id_fkey (
-              name,
-            supplier_type,
-            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, supplier_id)
-          )
-          )
+          item_id,
+          issued_to_location:issued_to_location_id ( name )
         `)
-        .eq("warehouse_items.company_id", selectedCompany.id)
-        .or("transaction_type.not.in.(\"material_issue\",\"material_return\"),and(transaction_type.eq.material_issue,issued_to_location_id.not.is.null)")
+        .eq("company_id", selectedCompany.id)
         .gte("created_at", `${startDate}T00:00:00`)
-        .lt("created_at", `${effectiveEndDate}T23:59:59.999`);
+        .lt("created_at", `${effectiveEndDate}T23:59:59.999`)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      // Fetch profiles for all unique created_by user IDs
-      const userIds = [...new Set((data || []).map((t: any) => t.created_by).filter(Boolean))] as string[];
-      
+      const rows = (data ?? []) as any[];
+
+      // Resolve item master via warehouse_items_full
+      const itemIds = [...new Set(rows.map((r) => r.item_id).filter(Boolean))] as string[];
+      const itemMap = await resolveItemMaster(itemIds);
+
+      // Resolve adjuster names
+      const userIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[];
       let profilesMap: Record<string, string> = {};
-      
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
-          .from('profiles_directory')
-          .select('user_id, full_name, email')
-          .in('user_id', userIds);
-        
+          .from("profiles_directory")
+          .select("user_id, full_name, email")
+          .in("user_id", userIds);
         if (profilesData) {
-          profilesMap = profilesData.reduce((acc, profile) => {
-            acc[profile.user_id] = profile.full_name || profile.email || 'Unknown';
+          profilesMap = profilesData.reduce((acc: Record<string, string>, p: any) => {
+            acc[p.user_id] = p.full_name || p.email || "Unknown";
             return acc;
-          }, {} as unknown as Record<string, string>);
+          }, {});
         }
       }
 
-      return (data || []).map((adj: any) => {
-        // Determine display transaction type - use "sublocation_issue" for material_issue with location
-        const displayType = adj.transaction_type === "material_issue" && adj.issued_to_location_id 
-          ? "sublocation_issue" 
+      return rows.map((adj: any) => {
+        const info = itemMap[adj.item_id] || { item_code: null, name: "Unknown Item", notes: null, supplier_name: null, supplier_type: null };
+        const displayType = adj.transaction_type === "material_issue" && adj.issued_to_location_id
+          ? "sublocation_issue"
           : adj.transaction_type || "adjustment";
-        
         return {
           transaction_type: displayType,
-          item_code: adj.warehouse_items?.item_code || null,
-          item_name: adj.warehouse_items?.name || "Unknown Item",
-          quantity_change: adj.quantity_change,
-          quantity_before: adj.quantity_before,
-          quantity_after: adj.quantity_after,
+          item_code: info.item_code,
+          item_name: info.name,
+          quantity_change: Number(adj.quantity_change) || 0,
+          quantity_before: Number(adj.quantity_before) || 0,
+          quantity_after: Number(adj.quantity_after) || 0,
           adjustment_notes: adj.notes,
-          item_master_notes: adj.warehouse_items?.notes || null,
+          item_master_notes: info.notes,
           adjusted_by: adj.created_by ? profilesMap[adj.created_by] || null : null,
           issued_to_location_name: adj.issued_to_location?.name || null,
-          supplier_name: adj.warehouse_items?.suppliers?.name || null,
-          supplier_type: adj.warehouse_items?.suppliers?.supplier_type || null,
+          supplier_name: info.supplier_name,
+          supplier_type: info.supplier_type,
         };
       });
     },
     enabled: !!selectedCompany?.id && !!startDate,
+    staleTime: 0,
   });
 
-  // Query for current stock balances from bin allocations (tracks stock per warehouse correctly)
+  // Current stock balances from bin allocations (per company + warehouse location).
+  // Item master fields are resolved via warehouse_items_full.
   const stockBalanceQuery = useQuery({
     queryKey: ["current-stock-balance", selectedCompany?.id],
     queryFn: async (): Promise<CurrentStockBalance[]> => {
       if (!selectedCompany?.id) return [];
 
-      // Fetch stock from bin allocations - this correctly tracks stock per warehouse
-      // Use explicit foreign key hints and filter directly on company_id
       const { data, error } = await supabase
         .from("warehouse_bin_allocations")
         .select(`
           allocated_quantity,
-          company_id,
-          warehouse_items:warehouse_item_id (
-            id,
-            item_code,
-            name
-          ),
+          warehouse_item_id,
           warehouse_bins:bin_id (
             location_id,
-            warehouse_locations:location_id (
-              id,
-              name
-            )
+            warehouse_locations:location_id ( id, name )
           )
         `)
         .eq("company_id", selectedCompany.id)
@@ -276,31 +318,33 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
 
       if (error) throw error;
 
-      // Group by item_code + warehouse to aggregate stock
+      const rows = (data ?? []) as any[];
+      const itemIds = [...new Set(rows.map((r) => r.warehouse_item_id).filter(Boolean))] as string[];
+      const itemMap = await resolveItemMaster(itemIds);
+
       const stockMap = new Map<string, CurrentStockBalance>();
-      
-      (data || []).forEach((allocation: any) => {
-        const itemCode = allocation.warehouse_items?.item_code || "";
+      rows.forEach((allocation: any) => {
+        const info = itemMap[allocation.warehouse_item_id] || { item_code: null, name: "Unknown Item", notes: null, supplier_name: null, supplier_type: null };
         const warehouseId = allocation.warehouse_bins?.warehouse_locations?.id || "";
-        const key = `${itemCode}-${warehouseId}`;
-        
+        const key = `${info.item_code || allocation.warehouse_item_id}-${warehouseId}`;
+        const qty = Number(allocation.allocated_quantity) || 0;
         if (stockMap.has(key)) {
-          const existing = stockMap.get(key)!;
-          existing.current_stock += allocation.allocated_quantity || 0;
+          stockMap.get(key)!.current_stock += qty;
         } else {
           stockMap.set(key, {
-            item_code: allocation.warehouse_items?.item_code || null,
-            item_name: allocation.warehouse_items?.name || "Unknown Item",
-            current_stock: allocation.allocated_quantity || 0,
+            item_code: info.item_code,
+            item_name: info.name,
+            current_stock: qty,
             warehouse_id: allocation.warehouse_bins?.warehouse_locations?.id || null,
             warehouse_name: allocation.warehouse_bins?.warehouse_locations?.name || null,
           });
         }
       });
-      
+
       return Array.from(stockMap.values());
     },
     enabled: !!selectedCompany?.id,
+    staleTime: 0,
   });
 
   return {

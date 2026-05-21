@@ -49,6 +49,8 @@ const getTransactionTypeLabel = (type: string): string => {
     project_issue: "Project Issue",
     project_return: "Project Return",
     sublocation_issue: "Sub-Location Issue",
+    material_issue: "Material Issue",
+    material_return: "Material Return",
   };
   return labels[type] || type.replace(/_/g, ' ');
 };
@@ -63,6 +65,8 @@ const getTransactionTypeBadgeColor = (type: string): string => {
     project_issue: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
     project_return: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300",
     sublocation_issue: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
+    material_issue: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    material_return: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
   };
   return colors[type] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
 };
