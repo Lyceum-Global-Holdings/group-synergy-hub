@@ -430,11 +430,11 @@ export function ViewSiteReportDialog({
                 <CardContent className="text-sm space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subcontractors:</span>
-                    <span>{(displayReport as any).subcontractor_count || 0}</span>
+                    <span>{Math.max(0, (displayReport as any).subcontractor_count || 0)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Visitors:</span>
-                    <span>{(displayReport as any).visitor_count || 0}</span>
+                    <span>{Math.max(0, (displayReport as any).visitor_count || 0)}</span>
                   </div>
                 </CardContent>
               </Card>
