@@ -268,6 +268,61 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "notes", label: "Notes", type: "string", width: 36 },
     ],
   },
+  {
+    code: "WH-PP-MOV-001",
+    title: "Partial Pieces Movement Ledger",
+    description: "Chronological lifecycle ledger for partial-piece handling units: CREATE / SPLIT_IN / CONSUME / SCRAP.",
+    moduleKey: "warehouse",
+    group: "Movement",
+    standard: "ISO 8601 / SAP EWM HU events",
+    hookId: "warehouse.partialPiecesMovement",
+    parameters: [
+      { key: "period", label: "Period", type: "dateRange", defaultDays: 30 },
+      { key: "locationId", label: "Location", type: "location" },
+      { key: "binId", label: "Bin", type: "bin", dependsOn: "locationId" },
+      {
+        key: "eventType",
+        label: "Event type",
+        type: "select",
+        options: [
+          { value: "all", label: "All events" },
+          { value: "CREATE", label: "Create" },
+          { value: "SPLIT_IN", label: "Split (residual)" },
+          { value: "CONSUME", label: "Consume" },
+          { value: "SCRAP", label: "Scrap" },
+        ],
+        defaultValue: "all",
+      },
+      {
+        key: "notesFilter",
+        label: "Notes filter",
+        type: "textOperator",
+        placeholder: "e.g. reason:scrap",
+        highlightColumn: "notes",
+      },
+    ],
+    columns: [
+      { key: "event_at", label: "Date", type: "datetime", width: 22 },
+      { key: "event_type", label: "Event", type: "string", width: 12 },
+      { key: "piece_code", label: "Piece Code", type: "string", width: 18 },
+      { key: "parent_piece_code", label: "Parent Piece", type: "string", width: 18 },
+      { key: "item_code", label: "Item Code", type: "string", width: 18 },
+      { key: "item_name", label: "Item Name", type: "string", width: 28 },
+      { key: "location_name", label: "Location", type: "string", width: 20 },
+      { key: "bin_code", label: "Bin", type: "string", width: 14 },
+      { key: "size_value", label: "Size", type: "number", width: 10, align: "right" },
+      { key: "size_uom", label: "UoM", type: "string", width: 8 },
+      { key: "event_pieces", label: "Pieces Δ", type: "integer", width: 10, align: "right" },
+      { key: "event_qty", label: "Qty Δ", type: "number", width: 12, align: "right" },
+      { key: "unit_cost", label: "Unit Cost", type: "currency", width: 14, align: "right" },
+      { key: "event_value", label: "Value", type: "currency", width: 14, align: "right" },
+      { key: "reason", label: "Reason", type: "string", width: 18 },
+      { key: "user_email", label: "User", type: "string", width: 24 },
+      { key: "notes", label: "Notes", type: "string", width: 30 },
+    ],
+  },
+
+
 
   // ============ WAREHOUSE — COMPLIANCE ============
   {
