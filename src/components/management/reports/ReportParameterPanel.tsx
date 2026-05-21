@@ -323,3 +323,48 @@ type NotesOp =
   | "startsWith"
   | "endsWith"
   | "notContains";
+
+function BinParamInput({
+  paramKey,
+  locationId,
+  value,
+  onChange,
+}: {
+  paramKey: string;
+  locationId: string | null;
+  value: string | null;
+  onChange: (v: unknown) => void;
+}) {
+  const { data: bins = [], isLoading } = useBinsAtLocation(locationId);
+  const disabled = !locationId || isLoading;
+  return (
+    <Select
+      value={value ?? "all"}
+      onValueChange={(v) => onChange(v === "all" ? null : v)}
+      disabled={disabled}
+    >
+      <SelectTrigger id={paramKey}>
+        <SelectValue
+          placeholder={
+            !locationId
+              ? "Pick a location first"
+              : isLoading
+                ? "Loading bins…"
+                : bins.length === 0
+                  ? "No bins at this location"
+                  : "All bins"
+          }
+        />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All bins</SelectItem>
+        {bins.map((b) => (
+          <SelectItem key={b.id} value={b.id}>
+            {b.bin_code}
+            {b.name ? ` — ${b.name}` : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
