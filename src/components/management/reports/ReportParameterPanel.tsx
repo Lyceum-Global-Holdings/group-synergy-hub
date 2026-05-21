@@ -153,6 +153,7 @@ function ParameterInput({
   locationsLoading,
   companySelected,
   categories,
+  siblingValues,
 }: {
   param: ReportParameter;
   value: unknown;
@@ -161,6 +162,7 @@ function ParameterInput({
   locationsLoading: boolean;
   companySelected: boolean;
   categories: { id: string; name: string }[];
+  siblingValues: Record<string, unknown>;
 }) {
   switch (param.type) {
     case "date":
