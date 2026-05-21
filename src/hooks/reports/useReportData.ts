@@ -540,6 +540,10 @@ export async function buildReportEnvelope(
       return fetchAbcClassification(def, ctx, params as never);
     case "warehouse.stockMovement":
       return fetchStockMovement(def, ctx, params as never);
+    case "warehouse.partialPiecesOnHand":
+      return fetchPartialPiecesOnHand(def, ctx, params as never);
+    case "warehouse.partialPiecesMovement":
+      return fetchPartialPiecesMovement(def, ctx, params as never);
     case "warehouse.cycleCountVariance":
       return fetchCycleCountVariance(def, ctx, params as never);
     case "warehouse.binUtilisation":
