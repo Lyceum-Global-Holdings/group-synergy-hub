@@ -396,7 +396,7 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
       min_number, issued_to, department,
       material_issue_items (
         quantity_issued,
-        warehouse_items ( item_code, name )
+        warehouse_items_full ( item_code, name )
       )
     `)
     .eq('company_id', job.company_id)
@@ -408,8 +408,8 @@ async function renderSiteReportDaily(sb: SupabaseClient, job: Job): Promise<Rend
       issueRows.push({
         min: note.min_number ?? '',
         to: note.issued_to ?? note.department ?? '',
-        code: it.warehouse_items?.item_code ?? '',
-        name: it.warehouse_items?.name ?? 'Unknown',
+        code: it.warehouse_items_full?.item_code ?? '',
+        name: it.warehouse_items_full?.name ?? 'Unknown',
         qty: Number(it.quantity_issued ?? 0),
       });
     }
