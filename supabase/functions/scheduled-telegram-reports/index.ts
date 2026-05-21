@@ -1032,13 +1032,6 @@ async function generateReportPdf(
       return warehouseA.localeCompare(warehouseB);
     });
     
-    // Calculate total stock per item
-    const itemTotals = materials.stockBalances.reduce((acc, item) => {
-      const itemCode = item.item_code || "unknown";
-      acc[itemCode] = (acc[itemCode] || 0) + item.current_stock;
-      return acc;
-    }, {} as Record<string, number>);
-    
     // Group by warehouse for summary
     const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
       const warehouseName = item.warehouse_name || "Unassigned";
@@ -1062,23 +1055,8 @@ async function generateReportPdf(
     ]);
     
     drawTable(warehouseHeaders, warehouseRows, { r: 92, g: 184, b: 92 }); // Green header
-    
-    // Detailed Stock Balances table
-    checkPageBreak(80);
-    drawText('Detailed Stock Balances', margin, { bold: true, size: 10 });
-    y -= 6;
-    
-    const detailHeaders = ['Code', 'Item', 'Current Stock', 'Warehouse', 'Total Stock'];
-    const detailRows = sortedStockBalances.map(item => [
-      item.item_code || '-',
-      item.item_name,
-      String(item.current_stock),
-      item.warehouse_name || 'Unassigned',
-      String(itemTotals[item.item_code || "unknown"] || 0),
-    ]);
-    
-    drawTable(detailHeaders, detailRows, { r: 91, g: 192, b: 222 }); // Cyan header
   }
+
   
   // ===== FOOTER =====
   const pageCount = pdfDoc.getPageCount();
