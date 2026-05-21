@@ -186,6 +186,51 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "abc_class", label: "Class", type: "string", width: 8, align: "center" },
     ],
   },
+  {
+    code: "WH-PP-OH-001",
+    title: "Partial Pieces on Hand",
+    description: "Live snapshot of partial-piece handling units (SAP EWM HU / IAS 2) with size × pieces, valuation and ageing.",
+    moduleKey: "warehouse",
+    group: "Inventory",
+    standard: "IAS 2 / SAP EWM HU",
+    hookId: "warehouse.partialPiecesOnHand",
+    parameters: [
+      { key: "locationId", label: "Location", type: "location" },
+      { key: "binId", label: "Bin", type: "bin", dependsOn: "locationId" },
+      { key: "categoryId", label: "Category", type: "category" },
+      {
+        key: "status",
+        label: "Status",
+        type: "select",
+        options: [
+          { value: "available", label: "Available" },
+          { value: "reserved", label: "Reserved" },
+          { value: "all", label: "All statuses" },
+        ],
+        defaultValue: "available",
+      },
+      { key: "includeZero", label: "Include depleted (piece_count = 0)", type: "boolean", defaultValue: false },
+    ],
+    columns: [
+      { key: "piece_code", label: "Piece Code", type: "string", width: 18 },
+      { key: "item_code", label: "Item Code", type: "string", width: 18 },
+      { key: "item_name", label: "Item Name", type: "string", width: 30 },
+      { key: "category_name", label: "Category", type: "string", width: 20 },
+      { key: "location_name", label: "Location", type: "string", width: 20 },
+      { key: "bin_code", label: "Bin", type: "string", width: 14 },
+      { key: "size_value", label: "Size", type: "number", width: 10, align: "right" },
+      { key: "size_uom", label: "UoM", type: "string", width: 8 },
+      { key: "piece_count", label: "Pieces", type: "integer", width: 10, align: "right" },
+      { key: "total_size", label: "Total", type: "number", width: 12, align: "right" },
+      { key: "unit_cost", label: "Unit Cost", type: "currency", width: 14, align: "right" },
+      { key: "stock_value", label: "Stock Value", type: "currency", width: 16, align: "right" },
+      { key: "batch_number", label: "Batch", type: "string", width: 16 },
+      { key: "status", label: "Status", type: "string", width: 12 },
+      { key: "age_days", label: "Age (d)", type: "integer", width: 10, align: "right" },
+    ],
+  },
+
+
 
   // ============ WAREHOUSE — MOVEMENT ============
   {
