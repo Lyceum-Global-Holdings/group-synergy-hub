@@ -564,7 +564,6 @@ async function fetchMaterialsData(
         )
       `)
       .eq("warehouse_items.company_id", companyId)
-      .or("transaction_type.not.in.(\"material_issue\",\"material_return\"),and(transaction_type.eq.material_issue,issued_to_location_id.not.is.null)")
       .gte("created_at", `${startDate}T00:00:00`)
       .lt("created_at", `${endDate}T23:59:59.999`);
 
