@@ -22790,6 +22790,80 @@ export type Database = {
           total_qty_received: number
         }[]
       }
+      report_partial_pieces_movement: {
+        Args: {
+          p_bin_id?: string
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_event_type?: string
+          p_item_id?: string
+          p_location_id?: string
+        }
+        Returns: {
+          bin_code: string
+          bin_id: string
+          event_at: string
+          event_pieces: number
+          event_qty: number
+          event_type: string
+          event_value: number
+          item_code: string
+          item_id: string
+          item_name: string
+          location_id: string
+          location_name: string
+          notes: string
+          parent_piece_code: string
+          piece_code: string
+          piece_id: string
+          reason: string
+          size_uom: string
+          size_value: number
+          unit_cost: number
+          user_email: string
+        }[]
+      }
+      report_partial_pieces_on_hand: {
+        Args: {
+          p_bin_id?: string
+          p_category_id?: string
+          p_company_id: string
+          p_include_zero?: boolean
+          p_item_id?: string
+          p_location_id?: string
+          p_status?: string
+        }
+        Returns: {
+          age_days: number
+          base_uom: string
+          batch_number: string
+          bin_code: string
+          bin_id: string
+          bin_name: string
+          category_id: string
+          category_name: string
+          created_at: string
+          item_code: string
+          item_id: string
+          item_name: string
+          label: string
+          location_id: string
+          location_name: string
+          original_piece_count: number
+          piece_code: string
+          piece_count: number
+          piece_id: string
+          secondary_uom: string
+          size_uom: string
+          size_value: number
+          source_ref: string
+          status: string
+          stock_value: number
+          total_size: number
+          unit_cost: number
+        }[]
+      }
       report_pending_approvals: {
         Args: { p_company_id: string }
         Returns: {

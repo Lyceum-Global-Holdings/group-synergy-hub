@@ -261,7 +261,78 @@ export async function fetchStockMovement(
   );
 }
 
-/* ---------------- Compliance ---------------- */
+/* ---------------- Partial Pieces ---------------- */
+
+export async function fetchPartialPiecesOnHand(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: {
+    locationId?: string | null;
+    binId?: string | null;
+    categoryId?: string | null;
+    status?: string | null;
+    includeZero?: boolean;
+  },
+): Promise<ReportEnvelope> {
+  const { data, error } = await (supabase.rpc as any)("report_partial_pieces_on_hand", {
+    p_company_id: ctx.companyId,
+    p_location_id: params.locationId || null,
+    p_bin_id: params.binId || null,
+    p_category_id: params.categoryId || null,
+    p_item_id: null,
+    p_status: params.status || "available",
+    p_include_zero: params.includeZero ?? false,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, {
+    piece_count: sumCol(rows, "piece_count"),
+    total_size: sumCol(rows, "total_size"),
+    stock_value: sumCol(rows, "stock_value"),
+  });
+}
+
+export async function fetchPartialPiecesMovement(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: {
+    period?: { from?: string; to?: string };
+    locationId?: string | null;
+    binId?: string | null;
+    eventType?: string | null;
+    notesFilter?: unknown;
+  },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from ? new Date(params.period.from).toISOString() : null;
+  const to = params.period?.to ? new Date(params.period.to).toISOString() : null;
+  const parsed = parseNotesFilter(params.notesFilter);
+  const { data, error } = await (supabase.rpc as any)("report_partial_pieces_movement", {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+    p_location_id: params.locationId || null,
+    p_bin_id: params.binId || null,
+    p_item_id: null,
+    p_event_type: params.eventType && params.eventType !== "all" ? params.eventType : null,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const hl = buildHighlight("notes", parsed);
+  return envelopeBase(
+    def,
+    ctx,
+    rows,
+    {
+      event_pieces: sumCol(rows, "event_pieces"),
+      event_qty: sumCol(rows, "event_qty"),
+      event_value: sumCol(rows, "event_value"),
+    },
+    { start: from?.slice(0, 10), end: to?.slice(0, 10) },
+    hl.terms,
+    hl.wholeCell,
+  );
+}
+
 
 export async function fetchCycleCountVariance(
   def: ReportDefinition,
@@ -469,6 +540,10 @@ export async function buildReportEnvelope(
       return fetchAbcClassification(def, ctx, params as never);
     case "warehouse.stockMovement":
       return fetchStockMovement(def, ctx, params as never);
+    case "warehouse.partialPiecesOnHand":
+      return fetchPartialPiecesOnHand(def, ctx, params as never);
+    case "warehouse.partialPiecesMovement":
+      return fetchPartialPiecesMovement(def, ctx, params as never);
     case "warehouse.cycleCountVariance":
       return fetchCycleCountVariance(def, ctx, params as never);
     case "warehouse.binUtilisation":
