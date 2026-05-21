@@ -140,14 +140,22 @@ function buildHighlight(
 export async function fetchStockOnHand(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
-  params: { locationId?: string | null; categoryId?: string | null; includeZero?: boolean },
+  params: {
+    locationId?: string | null;
+    categoryId?: string | null;
+    includeZero?: boolean;
+    binId?: string | null;
+    binWise?: boolean;
+  },
 ): Promise<ReportEnvelope> {
   const { data, error } = await supabase.rpc("report_stock_on_hand", {
     p_company_id: ctx.companyId,
     p_location_id: params.locationId || null,
     p_category_id: params.categoryId || null,
     p_include_zero: params.includeZero ?? false,
-  });
+    p_bin_id: params.binId || null,
+    p_bin_wise: params.binWise ?? false,
+  } as never);
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
   return envelopeBase(def, ctx, rows, {
