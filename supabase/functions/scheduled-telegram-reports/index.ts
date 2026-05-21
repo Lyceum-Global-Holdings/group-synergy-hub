@@ -515,7 +515,7 @@ async function fetchMaterialsData(
         material_issue_items (
           quantity_issued,
           notes,
-          warehouse_items (
+          warehouse_items_full (
             item_code,
             name
           )
@@ -535,8 +535,8 @@ async function fetchMaterialsData(
             min_number: issue.min_number,
             issued_to: issue.issued_to,
             department: issue.department,
-            item_code: item.warehouse_items?.item_code || null,
-            item_name: item.warehouse_items?.name || "Unknown Item",
+            item_code: item.warehouse_items_full?.item_code || null,
+            item_name: item.warehouse_items_full?.name || "Unknown Item",
             quantity_issued: item.quantity_issued,
           });
         });
@@ -554,23 +554,36 @@ async function fetchMaterialsData(
         notes,
         created_by,
         issued_to_location_id,
+        item_id,
         issued_to_location:issued_to_location_id (
           name
-        ),
-        warehouse_items!inner (
-          item_code,
-          name,
-          company_id
         )
       `)
-      .eq("warehouse_items.company_id", companyId)
+      .eq("company_id", companyId)
       .gte("created_at", `${startDate}T00:00:00`)
       .lt("created_at", `${endDate}T23:59:59.999`);
 
     if (adjustmentsError) {
       console.error("Error fetching stock adjustments:", adjustmentsError);
     } else if (adjustmentsData) {
-      // Fetch profiles for adjusted_by names
+      // Fetch item and profile names from source-of-truth views
+      const itemIds = [...new Set(adjustmentsData.map((t: any) => t.item_id).filter(Boolean))] as string[];
+      let itemMap: Record<string, { code: string | null; name: string }> = {};
+
+      if (itemIds.length > 0) {
+        const { data: itemsData } = await supabase
+          .from('warehouse_items_full')
+          .select('id, item_code, name')
+          .in('id', itemIds);
+
+        if (itemsData) {
+          itemMap = itemsData.reduce((acc: Record<string, { code: string | null; name: string }>, item: any) => {
+            acc[item.id] = { code: item.item_code || null, name: item.name || 'Unknown Item' };
+            return acc;
+          }, {});
+        }
+      }
+
       const userIds = [...new Set(adjustmentsData.map((t: any) => t.created_by).filter(Boolean))] as string[];
       let profilesMap: Record<string, string> = {};
       
@@ -595,8 +608,8 @@ async function fetchMaterialsData(
         
         return {
           transaction_type: displayType,
-          item_code: adj.warehouse_items?.item_code || null,
-          item_name: adj.warehouse_items?.name || "Unknown Item",
+          item_code: itemMap[adj.item_id]?.code || null,
+          item_name: itemMap[adj.item_id]?.name || "Unknown Item",
           quantity_change: adj.quantity_change,
           quantity_before: adj.quantity_before,
           quantity_after: adj.quantity_after,
