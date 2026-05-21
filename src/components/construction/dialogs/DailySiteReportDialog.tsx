@@ -377,7 +377,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                   <FormItem>
                     <FormLabel>Subcontractors</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0" {...field} />
+                      <Input type="number" min={0} placeholder="0" {...field} />
+
                     </FormControl>
                     <FormMessage />
                   </FormItem>
