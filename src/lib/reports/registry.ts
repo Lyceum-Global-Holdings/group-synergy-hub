@@ -97,7 +97,9 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     hookId: "warehouse.stockOnHand",
     parameters: [
       { key: "locationId", label: "Location", type: "location" },
+      { key: "binId", label: "Bin", type: "bin", dependsOn: "locationId" },
       { key: "categoryId", label: "Category", type: "category" },
+      { key: "binWise", label: "Show bin-wise breakdown", type: "boolean", defaultValue: false },
       { key: "includeZero", label: "Include zero-stock items", type: "boolean", defaultValue: false },
     ],
     columns: [
@@ -105,6 +107,8 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "item_name", label: "Item Name", type: "string", width: 36 },
       { key: "category_name", label: "Category", type: "string", width: 22 },
       { key: "location_name", label: "Location", type: "string", width: 22 },
+      { key: "bin_code", label: "Bin Code", type: "string", width: 14 },
+      { key: "bin_name", label: "Bin Name", type: "string", width: 22 },
       { key: "unit_name", label: "UoM", type: "string", width: 10 },
       { key: "current_stock", label: "On Hand", type: "number", width: 12, align: "right" },
       { key: "reserved_quantity", label: "Reserved", type: "number", width: 12, align: "right" },
