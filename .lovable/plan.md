@@ -1,65 +1,70 @@
-# Scanner PWA → path-based at `/scanner`
+# Fix "Bulk add from catalog" name-phrase search
 
-Lovable hosting 301-redirects every non-primary custom domain to the Primary, so `scan.lgh.lk` can never serve a different bundle than `stores.lgh.lk`. Switch the scanner shell to a path prefix on the same origin. Same-origin also means the Supabase session is automatically shared (no cookie-domain work needed).
+## Root cause
 
-## Detection
+`CatalogItemCell` in the Bulk add from catalog dialog calls the `list_warehouse_catalog` RPC, which currently does a single-substring `ILIKE '%search%'` on `item_code`, `name`, `sku`, `barcode`.
 
-`src/lib/scannerShell.ts`
-- Replace hostname check with: `location.pathname === '/scanner' || location.pathname.startsWith('/scanner/')`.
-- Keep `?app=scanner` + `sessionStorage` fallback (useful for local dev / preview iframe).
-- Drop the `scan.` hostname branch.
+That means a query like `steel rod 12mm` only matches if those exact characters appear contiguously in one column. Real catalog names use different word orders or have extra words in between (`12mm steel reinforcement rod`), so the search returns nothing even though items exist.
 
-## Routing
+There is also no debounce — every keystroke fires a new RPC, which hides the lag and makes the empty state look like "no results" while a later request is still in flight.
 
-`src/scanner/ScannerApp.tsx`
-- Add `basename="/scanner"` to `<BrowserRouter>`. All internal routes (`/`, `/auth`, `/auth/mfa`, `/scan`, `/b/:id`, `/a/:assetId`, `/account/mfa`) stay as-is but resolve under `/scanner/*`.
-- Catch-all still `Navigate to="/"` (resolves to `/scanner/`).
+## Solution
 
-`src/App.tsx`
-- No change to the `isScannerShell()` gate — it already short-circuits to `<ScannerApp />`.
+Switch the catalog search to a token-based match: split the query on whitespace, and require every token to match `item_code`, `name`, `sku`, `barcode`, `brand`, or `manufacturer` (any column). This is what users intuitively expect from a free-text picker.
 
-`src/pages/ScanQR.tsx`
-- Confirm the "Back" button uses `navigate('/')` (relative within the scanner BrowserRouter — resolves to `/scanner/`). No edit expected unless it hardcodes a path.
+Add a small debounce on the client so we stop firing one RPC per keystroke.
 
-## PWA manifest & install identity
+## Changes
 
-`public/manifest-scanner.webmanifest`
-- `start_url: "/scanner/"`
-- `scope: "/scanner/"`
-- `id: "/scanner/"`
-- Keep distinct `name`, `short_name`, icons, theme color so it installs as its own home-screen app independent of the ERP PWA.
+### 1. DB migration — upgrade `list_warehouse_catalog` search
 
-`index.html`
-- Inline manifest-swap script: swap to scanner manifest when `location.pathname.startsWith('/scanner')` (instead of `host.startsWith('scan.')`). Also swap `<title>` + `theme-color` the same way.
+Replace the single `ILIKE` block with token-AND logic:
 
-## Auth / session
+```sql
+-- pseudo
+WITH tokens AS (
+  SELECT unnest(
+    string_to_array(regexp_replace(trim(_search), '\s+', ' ', 'g'), ' ')
+  ) AS tok
+  WHERE _search IS NOT NULL AND _search <> ''
+)
+-- in WHERE:
+AND (
+  _search IS NULL OR _search = '' OR NOT EXISTS (
+    SELECT 1 FROM tokens t
+    WHERE NOT (
+      c.item_code    ILIKE '%' || t.tok || '%' OR
+      c.name         ILIKE '%' || t.tok || '%' OR
+      c.sku          ILIKE '%' || t.tok || '%' OR
+      c.barcode      ILIKE '%' || t.tok || '%' OR
+      c.brand        ILIKE '%' || t.tok || '%' OR
+      c.manufacturer ILIKE '%' || t.tok || '%'
+    )
+  )
+)
+```
 
-- No `cookieOptions.domain` change needed — same origin.
-- `src/integrations/supabase/client.ts` stays on `localStorage` with the existing `lgh-erp-auth` storage key, so a user signed into stores.lgh.lk is already signed into `/scanner` and vice-versa.
+- Each whitespace-separated token must hit at least one searchable column. Order-insensitive, phrase-friendly.
+- Empty / whitespace-only input behaves as "no filter" (unchanged).
+- Per the Search Special Chars memory, escape `%`, `_`, and `\` in each token before substitution.
+- `brand` and `manufacturer` are added to the searchable set so phrases like `tata 12mm` work.
 
-## Domain cleanup
+Function signature, return columns, ordering, and cursor logic are unchanged — no client type changes needed beyond what the hook already returns.
 
-- In Project Settings → Domains, you can remove `scan.lgh.lk` (or leave it pointing at Lovable — it will just 301 to `stores.lgh.lk/`, which is harmless).
-- New install URL: `https://stores.lgh.lk/scanner/` — Add to Home Screen there to get the standalone "LGH Scanner" icon.
+### 2. Client debounce in `CatalogItemCell.tsx`
 
-## QR payloads — intentionally unchanged
+- Add a 200 ms debounce on `search` before passing it to `useWarehouseCatalogPage`. Prevents the "Searching… / No items found" flicker mid-typing.
+- Keep `shouldFilter={false}` and the existing `Load more` infinite-scroll behavior.
+- Keep `CommandEmpty` text reactive to `isFetching` so users see `Searching…` until the debounced query resolves.
 
-`src/utils/binQRPayload.ts` and `src/utils/assetQRPayload.ts` keep `https://stores.lgh.lk/b/{id}` and `/a/{id}`. Reasons:
-1. Already-printed QR labels in the field keep working — no reprint required.
-2. Opening a `stores.lgh.lk/b/...` link inside the installed Scanner PWA (scope `/scanner/`) falls outside scope, so the browser opens it in a normal tab. That's the correct behavior for QR scans done with the phone's native camera — the user lands on the public bin/asset page, can sign in, and acts.
-3. Inside the Scanner PWA itself, the in-app camera scanner (`/scanner/scan`) decodes the QR and routes internally to `/scanner/b/:id` or `/scanner/a/:assetId` — handled by a tiny rewrite in `ScanQR.tsx`'s "navigate to result" handler (strip the `https://stores.lgh.lk` prefix and prepend `/scanner` when the host matches).
+### 3. Verification
 
-## Verification
-
-1. Desktop `stores.lgh.lk/warehouse/item-bin-master` — full ERP unchanged.
-2. Desktop `stores.lgh.lk/scanner/` — Scanner home (two cards), no sidebar, no ERP nav.
-3. iPhone Safari → `stores.lgh.lk/scanner/` → Share → Add to Home Screen → app launches into Scanner home; icon labeled "LGH Scanner", separate from any ERP PWA install.
-4. Sign in inside the Scanner PWA → stays at `/scanner/` (no redirect to `/`).
-5. In-app scan of a printed bin QR → opens `/scanner/b/:id` with the adjust-stock dialog auto-open.
-6. Native camera scan of the same printed QR → opens `stores.lgh.lk/b/:id` in a normal browser tab (existing public flow).
+- Manual: open `/warehouse/inventory` → Bulk add from catalog → pick item → type a multi-word phrase that exists in any item name (e.g. `rod 12mm`, `steel reinforcement`). Items should appear regardless of word order.
+- Spot-check single-token queries (`ITM-001`, `barcode digits`) still work.
+- Confirm pagination cursor still advances on `Load more` after a filtered query.
 
 ## Out of scope
 
-- No DB migrations, RPC changes, RLS, or edge function edits.
-- No new icons unless the user wants different artwork.
-- No removal of `scan.lgh.lk` from DNS (user can do it later in Project Settings).
+- No schema or RLS changes on `warehouse_item_catalog`.
+- No changes to other catalog pickers that don't use `list_warehouse_catalog`.
+- No full-text search index — token ILIKE is sufficient for current catalog size and keeps behavior predictable.
