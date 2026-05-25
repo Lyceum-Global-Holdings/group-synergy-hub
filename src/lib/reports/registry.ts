@@ -54,6 +54,14 @@ export type ReportParameter =
   | {
       key: string;
       label: string;
+      /** Searchable picker over warehouse_item_catalog (global item master). */
+      type: "item";
+      required?: boolean;
+      placeholder?: string;
+    }
+  | {
+      key: string;
+      label: string;
       type: "text";
       placeholder?: string;
       required?: boolean;
@@ -227,6 +235,49 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "batch_number", label: "Batch", type: "string", width: 16 },
       { key: "status", label: "Status", type: "string", width: 12 },
       { key: "age_days", label: "Age (d)", type: "integer", width: 10, align: "right" },
+    ],
+  },
+
+  {
+    code: "WH-ITEM-AVAIL-001",
+    title: "Item Stock Availability (Group-wide)",
+    description:
+      "On-hand, reserved, available quantity and value for a single item across every company, warehouse, sub-location and bin the user can access.",
+    moduleKey: "warehouse",
+    group: "Inventory",
+    standard: "IAS 2 / SAP EWM hierarchy",
+    hookId: "warehouse.itemStockAvailability",
+    parameters: [
+      { key: "catalogItemId", label: "Item", type: "item", required: true, placeholder: "Search by code or name (e.g. Cement)" },
+      { key: "locationId", label: "Location (optional)", type: "location" },
+      { key: "binId", label: "Bin (optional)", type: "bin", dependsOn: "locationId" },
+      {
+        key: "groupBy",
+        label: "Group by",
+        type: "select",
+        options: [
+          { value: "bin", label: "Bin (most detail)" },
+          { value: "location", label: "Location" },
+          { value: "company", label: "Company" },
+        ],
+        defaultValue: "bin",
+      },
+      { key: "includeBatches", label: "Show batch breakdown", type: "boolean", defaultValue: false },
+      { key: "includeZero", label: "Include zero-stock rows", type: "boolean", defaultValue: false },
+    ],
+    columns: [
+      { key: "company_name", label: "Company", type: "string", width: 24 },
+      { key: "location_path", label: "Location", type: "string", width: 32 },
+      { key: "bin_code", label: "Bin Code", type: "string", width: 14 },
+      { key: "bin_name", label: "Bin Name", type: "string", width: 22 },
+      { key: "batch_number", label: "Batch", type: "string", width: 16 },
+      { key: "unit_name", label: "UoM", type: "string", width: 10 },
+      { key: "on_hand_qty", label: "On Hand", type: "number", width: 12, align: "right" },
+      { key: "reserved_qty", label: "Reserved", type: "number", width: 12, align: "right" },
+      { key: "available_qty", label: "Available", type: "number", width: 12, align: "right" },
+      { key: "unit_cost", label: "Unit Cost", type: "currency", width: 14, align: "right" },
+      { key: "stock_value", label: "Stock Value", type: "currency", width: 16, align: "right" },
+      { key: "status", label: "Status", type: "string", width: 12 },
     ],
   },
 

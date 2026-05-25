@@ -21,6 +21,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { LocationTreePicker } from "@/components/management/reports/LocationTreePicker";
 import { useBinsAtLocation } from "@/hooks/warehouse/useBinsAtLocation";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface Props {
   definition: ReportDefinition;
@@ -279,6 +287,15 @@ function ParameterInput({
       return (
         <Input id={param.key} disabled placeholder="Supplier filter (coming soon)" />
       );
+    case "item":
+      return (
+        <ItemParamInput
+          paramKey={param.key}
+          value={(value as string) ?? null}
+          onChange={onChange}
+          placeholder={param.placeholder}
+        />
+      );
     case "textOperator": {
       const v = (value as { op?: string; term?: string } | undefined) ?? {};
       const op = (v.op as NotesOp) || "contains";
@@ -366,5 +383,130 @@ function BinParamInput({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function ItemParamInput({
+  paramKey,
+  value,
+  onChange,
+  placeholder,
+}: {
+  paramKey: string;
+  value: string | null;
+  onChange: (v: unknown) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  // Search results — paged ilike on item_code + name.
+  const { data: results = [], isFetching } = useQuery({
+    queryKey: ["report-item-picker", search],
+    queryFn: async () => {
+      const term = search.trim();
+      let q = supabase
+        .from("warehouse_item_catalog")
+        .select("id, item_code, name, brand")
+        .order("item_code", { ascending: true })
+        .limit(25);
+      if (term) {
+        // Escape PostgREST reserved chars in the user-typed term.
+        const safe = term.replace(/[%,()]/g, " ").trim();
+        if (safe) {
+          q = q.or(`item_code.ilike.%${safe}%,name.ilike.%${safe}%`);
+        }
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as { id: string; item_code: string; name: string; brand: string | null }[];
+    },
+    staleTime: 30_000,
+  });
+
+  // Fetch the label for the currently-selected id (in case it isn't in the
+  // current search results).
+  const { data: selected } = useQuery({
+    queryKey: ["report-item-picker-selected", value],
+    queryFn: async () => {
+      if (!value) return null;
+      const { data, error } = await supabase
+        .from("warehouse_item_catalog")
+        .select("id, item_code, name")
+        .eq("id", value)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; item_code: string; name: string } | null;
+    },
+    enabled: !!value,
+    staleTime: 60_000,
+  });
+
+  const triggerLabel = selected
+    ? `${selected.item_code} — ${selected.name}`
+    : placeholder ?? "Search item…";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={paramKey}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between font-normal", !value && "text-muted-foreground")}
+        >
+          <span className="truncate">{triggerLabel}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(28rem,90vw)] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search by item code or name…"
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList>
+            {isFetching && (
+              <div className="flex items-center justify-center py-4 text-xs text-muted-foreground">
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                Searching…
+              </div>
+            )}
+            {!isFetching && results.length === 0 && (
+              <CommandEmpty>No items found.</CommandEmpty>
+            )}
+            <CommandGroup>
+              {results.map((it) => (
+                <CommandItem
+                  key={it.id}
+                  value={it.id}
+                  onSelect={() => {
+                    onChange(it.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === it.id ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {it.item_code} — {it.name}
+                    </span>
+                    {it.brand && (
+                      <span className="text-xs text-muted-foreground">{it.brand}</span>
+                    )}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
