@@ -42,30 +42,87 @@ function withAction(path: string, action: 'adjust' | 'move'): string {
 }
 
 
+const INTENT_COPY: Record<Exclude<Intent, null>, { title: string; description: string; expects: string; backLabel: string; backTo: string }> = {
+  'adjust-stock': {
+    title: 'Scan to adjust stock',
+    description: 'Point your camera at a bin QR label. We\'ll open the bin and let you adjust the on-hand quantity straight away.',
+    expects: 'bin',
+    backLabel: 'Back to Bin Allocations',
+    backTo: '/warehouse/bin-allocations',
+  },
+  'move-asset': {
+    title: 'Scan to move asset',
+    description: 'Point your camera at an asset QR label. We\'ll open the asset and let you transfer it to a new location.',
+    expects: 'asset',
+    backLabel: 'Back to Asset Management',
+    backTo: '/warehouse/asset-management',
+  },
+};
+
+function parseIntent(value: string | null): Intent {
+  if (value === 'adjust-stock' || value === 'move-asset') return value;
+  return null;
+}
+
 export default function ScanQR() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const intent: Intent = parseIntent(searchParams.get('intent'));
+  const copy = intent ? INTENT_COPY[intent] : null;
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
 
   const [status, setStatus] = useState<Status>('idle');
   const [rawResult, setRawResult] = useState<string | null>(null);
+  const [mismatch, setMismatch] = useState<'expected-bin' | 'expected-asset' | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    document.title = 'Scan QR · Lyceum Global Holdings';
-  }, []);
+    document.title = copy ? `${copy.title} · Lyceum Global Holdings` : 'Scan QR · Lyceum Global Holdings';
+  }, [copy]);
 
   const stop = useCallback(() => {
     controlsRef.current?.stop();
     controlsRef.current = null;
   }, []);
 
+  const handleScan = useCallback(
+    (text: string): boolean => {
+      const match = parseScanned(text);
+      if (!match) {
+        setRawResult(text);
+        setMismatch(null);
+        return false;
+      }
+      // Enforce intent gating so a wrong-type label can't open the wrong dialog.
+      if (intent === 'adjust-stock' && match.kind !== 'bin') {
+        setRawResult(text);
+        setMismatch('expected-bin');
+        return false;
+      }
+      if (intent === 'move-asset' && match.kind !== 'asset') {
+        setRawResult(text);
+        setMismatch('expected-asset');
+        return false;
+      }
+      const action = match.kind === 'bin' ? 'adjust' : 'move';
+      // Only append ?action when this scan came from a module intent — bare
+      // /scan keeps the existing read-only landing behaviour.
+      const target = intent ? withAction(match.path, action) : match.path;
+      navigate(target);
+      return true;
+    },
+    [intent, navigate],
+  );
+
   const start = useCallback(async (chosenDeviceId?: string) => {
     setErrMsg(null);
     setRawResult(null);
+    setMismatch(null);
     if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
       setStatus('unsupported');
       return;
@@ -75,7 +132,6 @@ export default function ScanQR() {
       if (!readerRef.current) {
         readerRef.current = new BrowserMultiFormatReader();
       }
-      // Enumerate cameras (after permission is implicitly requested below).
       const videoEl = videoRef.current;
       if (!videoEl) return;
 
@@ -89,14 +145,13 @@ export default function ScanQR() {
         (result, _err, controls) => {
           if (!result) return;
           const text = result.getText();
-          controls.stop();
-          controlsRef.current = null;
-          const target = resolveTarget(text);
-          if (target) {
-            navigate(target);
+          const accepted = handleScan(text);
+          if (accepted) {
+            controls.stop();
+            controlsRef.current = null;
           } else {
-            setRawResult(text);
-            setStatus('idle');
+            // Keep scanning; user can re-aim at a different label.
+            setStatus('scanning');
           }
         },
       );
@@ -118,7 +173,7 @@ export default function ScanQR() {
         setErrMsg((err as Error)?.message || 'Could not start the camera.');
       }
     }
-  }, [navigate]);
+  }, [handleScan]);
 
   useEffect(() => {
     void start();
@@ -134,17 +189,19 @@ export default function ScanQR() {
     await start(next.deviceId);
   }, [devices, deviceId, start, stop]);
 
+  const title = copy?.title ?? 'Scan QR';
+  const description =
+    copy?.description ??
+    "Point your camera at a bin or asset QR code. You'll go straight to the details screen — no re-login needed.";
+
   return (
     <div className="container max-w-xl py-6 space-y-4">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
           <ScanLine className="h-6 w-6 text-primary" />
-          Scan QR
+          {title}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Point your camera at a bin or asset QR code. You'll go straight to the adjustment screen
-          — no re-login needed.
-        </p>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
 
       <Card>
@@ -192,6 +249,14 @@ export default function ScanQR() {
                 Switch camera
               </Button>
             )}
+            {copy && (
+              <Button variant="ghost" size="sm" asChild className="ml-auto">
+                <Link to={copy.backTo}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  {copy.backLabel}
+                </Link>
+              </Button>
+            )}
           </div>
 
           {status === 'denied' && (
@@ -219,7 +284,18 @@ export default function ScanQR() {
               <AlertDescription>{errMsg}</AlertDescription>
             </Alert>
           )}
-          {rawResult && (
+          {mismatch && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Wrong code type</AlertTitle>
+              <AlertDescription>
+                {mismatch === 'expected-bin'
+                  ? "This is an asset QR code. To adjust stock, scan a bin QR label instead."
+                  : "This is a bin QR code. To move an asset, scan an asset QR label instead."}
+              </AlertDescription>
+            </Alert>
+          )}
+          {rawResult && !mismatch && (
             <Alert>
               <AlertTitle>Unrecognised code</AlertTitle>
               <AlertDescription className="break-all">
@@ -236,3 +312,4 @@ export default function ScanQR() {
     </div>
   );
 }
+
