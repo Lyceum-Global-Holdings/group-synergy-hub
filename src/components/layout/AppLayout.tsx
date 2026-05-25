@@ -6,11 +6,13 @@ import { UserProfile } from "@/components/common/UserProfile";
 import { LiveClock } from "@/components/common/LiveClock";
 import { InstallAppButton } from "@/components/common/InstallAppButton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { RealtimeBusProvider } from "@/hooks/useRealtimeBus";
-import { Loader2 } from "lucide-react";
+import { Loader2, SlidersHorizontal } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
