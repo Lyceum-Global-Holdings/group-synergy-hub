@@ -239,6 +239,13 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
         }
       }
 
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['material-issues'] }),
+        queryClient.invalidateQueries({ queryKey: ['cpo-material-issues'] }),
+        queryClient.invalidateQueries({ queryKey: ['daily-material-issues'] }),
+        queryClient.invalidateQueries({ queryKey: ['material-issue', issueId] }),
+      ]);
+
       toast({
         title: 'Success',
         description: returnReference 
