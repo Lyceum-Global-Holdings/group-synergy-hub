@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,11 +45,13 @@ type ErrKind = 'invalid' | 'not_found' | 'unavailable';
 export default function PublicBinAllocation() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<BinQR | null>(null);
   const [loading, setLoading] = useState(true);
   const [errKind, setErrKind] = useState<ErrKind | null>(null);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [autoOpened, setAutoOpened] = useState(false);
 
   const shortId = id ? `${id.slice(0, 8)}…` : '';
 
@@ -121,6 +123,19 @@ export default function PublicBinAllocation() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Auto-open the Adjust dialog when arriving from the in-app scanner
+  // (`/scan?intent=adjust-stock` → `/b/:id?action=adjust`).
+  useEffect(() => {
+    if (autoOpened) return;
+    if (loading || errKind || !data) return;
+    if (searchParams.get('action') !== 'adjust') return;
+    if (!user) return;
+    setAdjustOpen(true);
+    setAutoOpened(true);
+    // Strip the query so a refresh doesn't re-open the dialog.
+    navigate(`/b/${id}`, { replace: true });
+  }, [autoOpened, loading, errKind, data, searchParams, user, id, navigate]);
 
   const handleSignIn = () => {
     navigate(`/auth?redirect=${encodeURIComponent(`/b/${id}`)}`);
