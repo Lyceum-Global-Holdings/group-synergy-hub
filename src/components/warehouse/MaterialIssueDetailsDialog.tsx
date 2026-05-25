@@ -40,6 +40,14 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const invalidateLists = () => {
+    queryClient.invalidateQueries({ queryKey: ['material-issues'] });
+    queryClient.invalidateQueries({ queryKey: ['cpo-material-issues'] });
+    queryClient.invalidateQueries({ queryKey: ['daily-material-issues'] });
+    if (issueId) queryClient.invalidateQueries({ queryKey: ['material-issue', issueId] });
+  };
 
   useEffect(() => {
     if (issueId && open) {
