@@ -73,6 +73,9 @@ const BulkInventoryDeleteDialog = lazy(() =>
 const BulkChangeStockOwnerDialog = lazy(() =>
   import('@/components/warehouse/BulkChangeStockOwnerDialog').then(m => ({ default: m.BulkChangeStockOwnerDialog }))
 );
+const BulkIssueFromInventoryDialog = lazy(() =>
+  import('@/components/warehouse/BulkIssueFromInventoryDialog').then(m => ({ default: m.BulkIssueFromInventoryDialog }))
+);
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -141,6 +144,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
   const [isBulkChangeOwnerOpen, setIsBulkChangeOwnerOpen] = useState(false);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkIssueOpen, setIsBulkIssueOpen] = useState(false);
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -1140,6 +1144,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-background border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
           <CheckSquare className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">{selectedItemIds.size} item(s) selected</span>
+          <Button size="sm" onClick={() => setIsBulkIssueOpen(true)}>Bulk Issue</Button>
           <Button size="sm" variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>Bulk Update</Button>
           <Button size="sm" variant="outline" onClick={() => setIsBulkChangeOwnerOpen(true)}>Change Stock Owner</Button>
           {canDelete && (
@@ -1181,6 +1186,17 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             selectedIds={selectedItemIds}
             onComplete={clearSelection}
             defaultFromOwner={debouncedOwnerLabel || null}
+          />
+        </Suspense>
+      )}
+      {isBulkIssueOpen && (
+        <Suspense fallback={null}>
+          <BulkIssueFromInventoryDialog
+            open={isBulkIssueOpen}
+            onOpenChange={setIsBulkIssueOpen}
+            selectedItems={selectedItems as any}
+            defaultLocationId={globalLocationId || null}
+            onComplete={clearSelection}
           />
         </Suspense>
       )}

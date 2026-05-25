@@ -1,0 +1,406 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, AlertTriangle, PackageCheck } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
+import { useMaterialIssues } from '@/hooks/useMaterialIssues';
+import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
+import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
+
+interface InventoryRow {
+  id: string;
+  item_code?: string | null;
+  name?: string | null;
+  unit_of_measure?: string | null;
+  current_stock?: number | null;
+  location_id?: string | null;
+  bins?: Array<{ id: string; bin_code: string; name?: string; quantity: number }> | null;
+}
+
+interface BulkIssueLine {
+  item_id: string;
+  item_code: string;
+  name: string;
+  unit_of_measure: string;
+  available: number;
+  quantity: number;
+  purpose: string;
+}
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedItems: InventoryRow[];
+  defaultLocationId: string | null;
+  onComplete?: () => void;
+}
+
+export function BulkIssueFromInventoryDialog({
+  open,
+  onOpenChange,
+  selectedItems,
+  defaultLocationId,
+  onComplete,
+}: Props) {
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
+  const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
+  const { createItems, isCreating: isCreatingItems } = useMaterialIssueItems();
+  const { data: stockLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const [header, setHeader] = useState({
+    issue_date: today,
+    requested_by: '',
+    department: '',
+    purpose: '',
+    job_number: '',
+    pr_number: '',
+    po_number: '',
+    srn_number: '',
+    notes: '',
+    location_id: defaultLocationId || globalLocationId || '',
+  });
+
+  const [lines, setLines] = useState<BulkIssueLine[]>([]);
+
+  // Seed lines from the selected inventory rows whenever the dialog opens
+  useEffect(() => {
+    if (!open) return;
+    setHeader((prev) => ({
+      ...prev,
+      location_id: defaultLocationId || globalLocationId || prev.location_id || '',
+    }));
+    setLines(
+      selectedItems.map((it) => {
+        const available = Number(it.current_stock ?? 0);
+        return {
+          item_id: it.id,
+          item_code: it.item_code || '',
+          name: it.name || '',
+          unit_of_measure: it.unit_of_measure || '',
+          available,
+          quantity: available > 0 ? Math.min(1, available) : 0,
+          purpose: '',
+        };
+      }),
+    );
+  }, [open, selectedItems, defaultLocationId, globalLocationId]);
+
+  const updateLine = (idx: number, patch: Partial<BulkIssueLine>) => {
+    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  };
+
+  const removeLine = (idx: number) => {
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const validationErrors = useMemo(() => {
+    const errs: string[] = [];
+    if (!header.location_id) errs.push('Select an issue location.');
+    if (!header.requested_by.trim()) errs.push('Issued To / Requested By is required.');
+    if (lines.length === 0) errs.push('At least one line item is required.');
+    lines.forEach((l) => {
+      if (!l.quantity || l.quantity <= 0)
+        errs.push(`${l.item_code || l.name}: quantity must be greater than zero.`);
+      else if (l.quantity > l.available)
+        errs.push(
+          `${l.item_code || l.name}: quantity ${l.quantity} exceeds available ${l.available}.`,
+        );
+    });
+    return errs;
+  }, [header, lines]);
+
+  const canSubmit =
+    validationErrors.length === 0 && !!selectedCompany?.id && !isCreating && !isCreatingItems;
+
+  const handleSubmit = async () => {
+    if (!canSubmit || !selectedCompany?.id) return;
+    try {
+      const issueNote = await createMaterialIssueAsync({
+        issue_date: header.issue_date,
+        issued_to: header.requested_by,
+        department: header.department || undefined,
+        purpose: header.purpose || undefined,
+        notes: header.notes || undefined,
+        requested_by: header.requested_by,
+        items_required_date: header.issue_date,
+        job_number: header.job_number || undefined,
+        pr_number: header.pr_number || undefined,
+        po_number: header.po_number || undefined,
+        srn_number: header.srn_number || undefined,
+        location_id: header.location_id,
+        company_id: selectedCompany.id,
+      });
+
+      const itemsPayload = lines.map((l, idx) => ({
+        min_id: issueNote.id,
+        item_id: l.item_id,
+        quantity_issued: l.quantity,
+        quantity_required: l.quantity,
+        line_number: idx + 1,
+        item_code: l.item_code,
+        description: l.name,
+        unit_of_measure: l.unit_of_measure,
+        purpose: l.purpose || undefined,
+        from_reservation: false,
+      })) as any;
+
+      await createItems(itemsPayload);
+
+      toast({
+        title: 'Material Issued',
+        description: `MIN ${issueNote.min_number} created with ${lines.length} item(s).`,
+      });
+
+      onOpenChange(false);
+      onComplete?.();
+      navigate('/warehouse/material-issue');
+    } catch (err: any) {
+      console.error('Bulk issue failed', err);
+      toast({
+        title: 'Bulk Issue Failed',
+        description: err?.message || 'Could not create material issue.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PackageCheck className="h-5 w-5 text-primary" />
+            Bulk Issue Materials
+          </DialogTitle>
+          <DialogDescription>
+            Create a single Material Issue Note (MIN) covering the selected inventory items.
+            Stock is deducted from the issue location's bins on submit (SAP-style Goods Issue).
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+          {/* Header */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label>Issue Date *</Label>
+              <Input
+                type="date"
+                value={header.issue_date}
+                onChange={(e) => setHeader({ ...header, issue_date: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Issued To / Requested By *</Label>
+              <Input
+                value={header.requested_by}
+                onChange={(e) => setHeader({ ...header, requested_by: e.target.value })}
+                placeholder="Recipient name"
+              />
+            </div>
+            <div>
+              <Label>Department</Label>
+              <Input
+                value={header.department}
+                onChange={(e) => setHeader({ ...header, department: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Issue Location *</Label>
+              <Select
+                value={header.location_id}
+                onValueChange={(v) => setHeader({ ...header, location_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(stockLocations as any[]).map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Job Number</Label>
+              <Input
+                value={header.job_number}
+                onChange={(e) => setHeader({ ...header, job_number: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>PR / PO Number</Label>
+              <Input
+                value={header.pr_number}
+                onChange={(e) => setHeader({ ...header, pr_number: e.target.value })}
+                placeholder="Reference"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Purpose</Label>
+              <Input
+                value={header.purpose}
+                onChange={(e) => setHeader({ ...header, purpose: e.target.value })}
+                placeholder="e.g. Site consumption, Project ABC"
+              />
+            </div>
+            <div>
+              <Label>SRN Number</Label>
+              <Input
+                value={header.srn_number}
+                onChange={(e) => setHeader({ ...header, srn_number: e.target.value })}
+              />
+            </div>
+            <div className="md:col-span-3">
+              <Label>Notes</Label>
+              <Textarea
+                value={header.notes}
+                onChange={(e) => setHeader({ ...header, notes: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+
+          {/* Validation summary */}
+          {validationErrors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Fix the following before issuing</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-5 space-y-0.5 text-sm">
+                  {validationErrors.slice(0, 6).map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                  {validationErrors.length > 6 && (
+                    <li>…and {validationErrors.length - 6} more</li>
+                  )}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Lines */}
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[140px]">Item Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-[80px]">UoM</TableHead>
+                  <TableHead className="w-[110px] text-right">Available</TableHead>
+                  <TableHead className="w-[140px]">Qty to Issue *</TableHead>
+                  <TableHead>Line Purpose</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lines.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                      No items selected.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  lines.map((l, idx) => {
+                    const over = l.quantity > l.available;
+                    return (
+                      <TableRow key={l.item_id}>
+                        <TableCell className="font-mono text-xs">{l.item_code}</TableCell>
+                        <TableCell className="text-sm">{l.name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {l.unit_of_measure || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={l.available > 0 ? 'secondary' : 'outline'}>
+                            {l.available}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={l.available}
+                            step="any"
+                            value={l.quantity}
+                            onChange={(e) =>
+                              updateLine(idx, { quantity: Number(e.target.value) || 0 })
+                            }
+                            className={over ? 'border-destructive' : ''}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={l.purpose}
+                            onChange={(e) => updateLine(idx, { purpose: e.target.value })}
+                            placeholder="Optional"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLine(idx)}
+                            aria-label="Remove line"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        <DialogFooter className="pt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={!canSubmit}>
+            {isCreating || isCreatingItems
+              ? 'Issuing…'
+              : `Issue ${lines.length} item${lines.length === 1 ? '' : 's'}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
