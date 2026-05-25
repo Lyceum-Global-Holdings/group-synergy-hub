@@ -15256,6 +15256,7 @@ export type Database = {
           mfa_grace_period_days: number
           mfa_policy: Database["public"]["Enums"]["mfa_policy"]
           mfa_remember_device_hours: number
+          status_page_url: string | null
           turnstile_enabled: boolean
           turnstile_surfaces: Json
           updated_at: string
@@ -15268,6 +15269,7 @@ export type Database = {
           mfa_grace_period_days?: number
           mfa_policy?: Database["public"]["Enums"]["mfa_policy"]
           mfa_remember_device_hours?: number
+          status_page_url?: string | null
           turnstile_enabled?: boolean
           turnstile_surfaces?: Json
           updated_at?: string
@@ -15280,6 +15282,7 @@ export type Database = {
           mfa_grace_period_days?: number
           mfa_policy?: Database["public"]["Enums"]["mfa_policy"]
           mfa_remember_device_hours?: number
+          status_page_url?: string | null
           turnstile_enabled?: boolean
           turnstile_surfaces?: Json
           updated_at?: string
@@ -18992,6 +18995,39 @@ export type Database = {
           },
         ]
       }
+      uptime_checks: {
+        Row: {
+          checked_at: string
+          error: string | null
+          id: string
+          latency_ms: number | null
+          ok: boolean
+          status_code: number | null
+          target: string
+          url: string
+        }
+        Insert: {
+          checked_at?: string
+          error?: string | null
+          id?: string
+          latency_ms?: number | null
+          ok: boolean
+          status_code?: number | null
+          target: string
+          url: string
+        }
+        Update: {
+          checked_at?: string
+          error?: string | null
+          id?: string
+          latency_ms?: number | null
+          ok?: boolean
+          status_code?: number | null
+          target?: string
+          url?: string
+        }
+        Relationships: []
+      }
       user_company_access: {
         Row: {
           access_type: string
@@ -20908,6 +20944,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      uptime_rollup_30d: {
+        Row: {
+          checks: number | null
+          failures: number | null
+          last_checked_at: string | null
+          last_ok: boolean | null
+          last_status: number | null
+          p50_ms: number | null
+          p95_ms: number | null
+          target: string | null
+          uptime_pct: number | null
+          url: string | null
+        }
+        Relationships: []
       }
       v_active_accounts_with_balances: {
         Row: {

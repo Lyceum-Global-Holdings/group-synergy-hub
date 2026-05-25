@@ -71,3 +71,44 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Uptime monitoring
+
+Internal dashboard: **/admin/backend → Uptime tab** (admin / super_admin only).
+Shows 30-day uptime %, p50/p95 latency, and 24 h sparkline per probed target.
+
+### Activate the pg_cron schedule (one-time, super_admin only)
+
+Open the Supabase SQL Editor and run, replacing `<UPTIME_PROBE_TOKEN>` with
+the value you stored as the project secret of the same name:
+
+```sql
+select cron.schedule(
+  'uptime-probe-5min', '*/5 * * * *',
+  $$ select net.http_post(
+       url := 'https://ajsyvuozkgcnnvvefeed.supabase.co/functions/v1/uptime-probe',
+       headers := jsonb_build_object(
+         'Content-Type','application/json',
+         'x-probe-token','<UPTIME_PROBE_TOKEN>'
+       )
+     ); $$);
+
+select cron.schedule(
+  'uptime-prune-daily', '15 3 * * *',
+  $$ delete from public.uptime_checks where checked_at < now() - interval '90 days'; $$);
+```
+
+First probe results appear within 5 minutes.
+
+### External monitor (recommended)
+
+For independent third-party verification:
+
+1. Create a free account at https://uptimerobot.com/.
+2. Add an HTTP(s) monitor for `https://stores.lgh.lk` at 5-minute interval.
+3. Add a second HTTP(s) monitor for
+   `https://ajsyvuozkgcnnvvefeed.supabase.co/functions/v1/security-settings-public`.
+4. Enable the public status page and (optionally) paste its URL into
+   `security_settings.status_page_url`.
+
+No outage alerts are sent — the admin dashboard is the source of truth.

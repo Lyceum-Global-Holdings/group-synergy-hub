@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Database, AlertTriangle, Users, ArrowLeftRight, GitBranch, Loader2 } from "lucide-react";
+import { Database, AlertTriangle, Users, ArrowLeftRight, GitBranch, Activity, Loader2 } from "lucide-react";
 
 // Each tab is its own chunk so opening Backend Monitor only loads the
 // shell + the default (Database) tab. Mermaid (Schema), Active Users,
@@ -19,6 +19,9 @@ const SystemErrorLogsPanel = lazy(() =>
 );
 const ActiveUsersPanel = lazy(() =>
   import("@/components/admin/backend/ActiveUsersPanel").then(m => ({ default: m.ActiveUsersPanel }))
+);
+const UptimeMonitorPanel = lazy(() =>
+  import("@/components/admin/backend/UptimeMonitorPanel").then(m => ({ default: m.UptimeMonitorPanel }))
 );
 
 function TabFallback() {
@@ -43,7 +46,7 @@ const BackendDashboard = () => {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+        <TabsList className="grid w-full max-w-3xl grid-cols-6">
           <TabsTrigger value="database" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             <span className="hidden sm:inline">Database</span>
@@ -63,6 +66,10 @@ const BackendDashboard = () => {
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Active Users</span>
+          </TabsTrigger>
+          <TabsTrigger value="uptime" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Uptime</span>
           </TabsTrigger>
         </TabsList>
 
@@ -91,6 +98,11 @@ const BackendDashboard = () => {
         <TabsContent value="users" className="mt-4">
           <Suspense fallback={<TabFallback />}>
             {tab === "users" && <ActiveUsersPanel />}
+          </Suspense>
+        </TabsContent>
+        <TabsContent value="uptime" className="mt-4">
+          <Suspense fallback={<TabFallback />}>
+            {tab === "uptime" && <UptimeMonitorPanel />}
           </Suspense>
         </TabsContent>
       </Tabs>
