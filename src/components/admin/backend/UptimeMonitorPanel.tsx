@@ -27,8 +27,11 @@ function uptimeTone(pct: number | null): { color: string; label: string } {
   return { color: "bg-destructive/15 text-destructive", label: "At risk" };
 }
 
-function buildHourlyOk(recent: UptimeRecentCheck[], target: string, hours = 24): number[] {
-  const buckets = new Array(hours).fill(null) as (number | null)[];
+function buildHourlyOk(
+  recent: UptimeRecentCheck[],
+  target: string,
+  hours = 24,
+): Array<{ d: string; v: number }> {
   const counts = new Array(hours).fill(0) as number[];
   const oks = new Array(hours).fill(0) as number[];
   const now = Date.now();
@@ -39,11 +42,13 @@ function buildHourlyOk(recent: UptimeRecentCheck[], target: string, hours = 24):
     counts[ageH] += 1;
     if (c.ok) oks[ageH] += 1;
   }
-  for (let i = 0; i < hours; i++) {
-    buckets[i] = counts[i] > 0 ? Math.round((oks[i] / counts[i]) * 100) : null;
-  }
   // Sparkline draws oldest -> newest left to right.
-  return buckets.slice().reverse().map((v) => (v == null ? 0 : v));
+  const series: Array<{ d: string; v: number }> = [];
+  for (let i = hours - 1; i >= 0; i--) {
+    const v = counts[i] > 0 ? Math.round((oks[i] / counts[i]) * 100) : 100;
+    series.push({ d: String(i), v });
+  }
+  return series;
 }
 
 function TargetCard({
@@ -89,7 +94,7 @@ function TargetCard({
             <div>{row.checks} checks · {row.failures} fail</div>
           </div>
         </div>
-        <Sparkline data={series} className="h-10 w-full" />
+        <Sparkline data={series} height={40} />
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Last: {row.last_status ?? (row.last_ok ? "OK" : "error")}</span>
           <span>{lastChecked}</span>
