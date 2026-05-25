@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import { buildAssetQRPayload } from './assetQRPayload';
 
 export interface AssetForQR {
   id: string;
@@ -8,8 +9,6 @@ export interface AssetForQR {
   serial_number?: string | null;
   asset_tag?: string | null;
 }
-
-const PUBLISHED_APP_URL = 'https://group-synergy-hub.lovable.app';
 
 export async function generateBulkQRCodePdf(assets: AssetForQR[]): Promise<Blob> {
   // 2x1 inch landscape labels (same as AssetQRCode component)
@@ -21,7 +20,11 @@ export async function generateBulkQRCodePdf(assets: AssetForQR[]): Promise<Blob>
 
   for (let i = 0; i < assets.length; i++) {
     const asset = assets[i];
-    const publicUrl = `${PUBLISHED_APP_URL}/asset/${asset.id}`;
+    const publicUrl = buildAssetQRPayload({
+      assetId: asset.id,
+      assetTag: asset.asset_tag,
+      serialNumber: asset.serial_number,
+    });
     const label = asset.asset_id || asset.serial_number || asset.asset_tag || asset.id.slice(0, 8);
 
     if (i > 0) {
