@@ -69,7 +69,7 @@ export function UserProfile() {
             {getInitials(user.email || 'U')}
           </AvatarFallback>
         </Avatar>
-        <div className="text-left">
+        <div className="text-left hidden md:block">
           <p className="text-sm font-medium">
             {user.user_metadata?.full_name || user.email?.split('@')[0]}
           </p>
