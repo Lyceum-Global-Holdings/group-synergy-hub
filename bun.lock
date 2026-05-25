@@ -42,6 +42,8 @@
         "@tanstack/react-query": "^5.56.2",
         "@tanstack/react-table": "^8.20.5",
         "@tanstack/react-virtual": "^3.13.24",
+        "@zxing/browser": "^0.2.0",
+        "@zxing/library": "^0.23.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.0.0",
@@ -642,6 +644,12 @@
     "@vitest/utils": ["@vitest/utils@4.1.5", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@vitest/utils/-/utils-4.1.5.tgz", { "dependencies": { "@vitest/pretty-format": "4.1.5", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-76wdkrmfXfqGjueGgnb45ITPyUi1ycZ4IHgC2bhPDUfWHklY/q3MdLOAB+TF1e6xfl8NxNY0ZYaPCFNWSsw3Ug=="],
 
     "@webgpu/types": ["@webgpu/types@0.1.69", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@webgpu/types/-/types-0.1.69.tgz", {}, "sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ=="],
+
+    "@zxing/browser": ["@zxing/browser@0.2.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@zxing/browser/-/browser-0.2.0.tgz", { "optionalDependencies": { "@zxing/text-encoding": "^0.9.0" }, "peerDependencies": { "@zxing/library": "^0.22.0" } }, "sha512-+ORhrLva0vm6ck74NDCmvYNW3XLoAG81Mu90qfcssN1PBKJjQadxZGeMCcIk+BdJbD/zEAjjHDXOwEK1QCmRtw=="],
+
+    "@zxing/library": ["@zxing/library@0.23.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@zxing/library/-/library-0.23.0.tgz", { "dependencies": { "ts-custom-error": "^3.3.1" }, "optionalDependencies": { "@zxing/text-encoding": "~0.9.0" } }, "sha512-6fkkoFwP8CHxl6ugnPsj74PLJgX2iRv5zczGAyt5OBzQgxFhuhF0NCEc4t4OvSr8xAv2MRLlI0Iu9ZGDZQ2urA=="],
+
+    "@zxing/text-encoding": ["@zxing/text-encoding@0.9.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@zxing/text-encoding/-/text-encoding-0.9.0.tgz", {}, "sha512-U/4aVJ2mxI0aDNI8Uq0wEhMgY+u4CNtEb0om3+y3+niDAsoTCOB33UF0sxpzqzdqXLqmvc+vZyAt4O8pPdfkwA=="],
 
     "acorn": ["acorn@8.16.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/acorn/-/acorn-8.16.0.tgz", { "bin": "bin/acorn" }, "sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw=="],
 
@@ -1410,6 +1418,8 @@
     "troika-three-utils": ["troika-three-utils@0.52.4", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/troika-three-utils/-/troika-three-utils-0.52.4.tgz", { "peerDependencies": { "three": ">=0.125.0" } }, "sha512-NORAStSVa/BDiG52Mfudk4j1FG4jC4ILutB3foPnfGbOeIs9+G5vZLa0pnmnaftZUGm4UwSoqEpWdqvC7zms3A=="],
 
     "troika-worker-utils": ["troika-worker-utils@0.52.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/troika-worker-utils/-/troika-worker-utils-0.52.0.tgz", {}, "sha512-W1CpvTHykaPH5brv5VHLfQo9D1OYuo0cSBEUQFFT/nBUzM8iD6Lq2/tgG/f1OelbAS1WtaTPQzE5uM49egnngw=="],
+
+    "ts-custom-error": ["ts-custom-error@3.3.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/ts-custom-error/-/ts-custom-error-3.3.1.tgz", {}, "sha512-5OX1tzOjxWEgsr/YEUWSuPrQ00deKLh6D7OTWcvNHm12/7QPyRh8SYpyWvA4IZv8H/+GQWQEh/kwo95Q9OVW1A=="],
 
     "ts-dedent": ["ts-dedent@2.2.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/ts-dedent/-/ts-dedent-2.2.0.tgz", {}, "sha512-q5W7tVM71e2xjHZTlgfTDoPF/SmqKG5hddq9SzR49CH2hayqRKJtQ4mtRlSxKaJlR/+9rEM+mnBHf7I2/BQcpQ=="],
 
