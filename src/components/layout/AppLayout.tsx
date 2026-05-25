@@ -4,6 +4,7 @@ import { CompanySelector } from "@/components/common/CompanySelector";
 import { LocationSelector } from "@/components/common/LocationSelector";
 import { UserProfile } from "@/components/common/UserProfile";
 import { LiveClock } from "@/components/common/LiveClock";
+import { InstallAppButton } from "@/components/common/InstallAppButton";
 import { Badge } from "@/components/ui/badge";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -76,6 +77,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   Viewing as company
                 </Badge>
               )}
+              <InstallAppButton />
               <UserProfile />
             </div>
           </header>

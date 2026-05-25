@@ -11,7 +11,11 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
+    // Stable key — keeps the installed PWA signed in across deploys so QR
+    // scans opened inside the installed app reuse the existing session.
+    storageKey: 'lgh-erp-auth',
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
   }
 });
