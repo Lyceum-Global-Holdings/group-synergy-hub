@@ -147,6 +147,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
       });
       
       fetchIssueDetails();
+      invalidateLists();
     } catch (error) {
       console.error('Error approving:', error);
       toast({
