@@ -27,15 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, AlertTriangle, PackageCheck } from 'lucide-react';
+import { Trash2, AlertTriangle, PackageCheck, Plus, Search, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
+import { useWarehouseItemsLazyInventory } from '@/hooks/useWarehouseItemsLazyInventory';
 
 interface InventoryRow {
   id: string;
