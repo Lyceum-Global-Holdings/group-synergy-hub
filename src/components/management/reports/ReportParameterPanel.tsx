@@ -287,6 +287,15 @@ function ParameterInput({
       return (
         <Input id={param.key} disabled placeholder="Supplier filter (coming soon)" />
       );
+    case "item":
+      return (
+        <ItemParamInput
+          paramKey={param.key}
+          value={(value as string) ?? null}
+          onChange={onChange}
+          placeholder={param.placeholder}
+        />
+      );
     case "textOperator": {
       const v = (value as { op?: string; term?: string } | undefined) ?? {};
       const op = (v.op as NotesOp) || "contains";
