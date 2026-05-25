@@ -12,6 +12,7 @@ export interface BulkCatalogRow {
   opening_qty: string; // keep as string for editing
   unit_cost: string;
   reorder_level: string;
+  reference_no: string;
   notes: string;
   status: RowStatus;
   message: string | null;
