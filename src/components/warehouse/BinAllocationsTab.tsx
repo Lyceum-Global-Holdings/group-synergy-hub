@@ -279,8 +279,14 @@ export function BinAllocationsTab() {
       const blob = await generateBulkBinQRCodePdf(
         filteredAllocations.map((a) => ({
           id: a.id,
-          item_code: a.warehouse_item?.item_code,
-          item_name: a.warehouse_item?.name,
+          item_code:
+            (a.warehouse_item as any)?.catalog?.item_code ??
+            (a.warehouse_item as any)?.item_code ??
+            null,
+          item_name:
+            (a.warehouse_item as any)?.catalog?.name ??
+            (a.warehouse_item as any)?.name ??
+            null,
           bin_code: a.warehouse_bin?.bin_code,
           location_name: a.warehouse_bin?.warehouse_location?.name,
           location_code: a.warehouse_bin?.warehouse_location?.location_code,
