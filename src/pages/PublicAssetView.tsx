@@ -99,13 +99,13 @@ export default function PublicAssetView() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Handle action param after login redirect
+  // Handle action param: `transfer` (legacy post-login redirect) and `move`
+  // (in-app scanner deep-link from `/scan?intent=move-asset`).
   useEffect(() => {
     const action = searchParams.get('action');
-    if (action === 'transfer' && isAuthenticated === true) {
-      // User just logged in and wants to transfer, open dialog
+    if ((action === 'transfer' || action === 'move') && isAuthenticated === true) {
       setShowTransferDialog(true);
-      // Clean up URL
+      // Clean up URL so a refresh doesn't re-open the dialog.
       navigate(`/asset/${assetId}`, { replace: true });
     }
   }, [searchParams, isAuthenticated, assetId, navigate]);
