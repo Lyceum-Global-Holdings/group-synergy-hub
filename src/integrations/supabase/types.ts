@@ -23280,6 +23280,19 @@ export type Database = {
           unrealized_gain_loss: number
         }[]
       }
+      search_warehouse_item_catalog: {
+        Args: { p_limit?: number; p_query?: string }
+        Returns: {
+          brand: string
+          category_name: string
+          id: string
+          item_code: string
+          name: string
+          rank: number
+          status: string
+          unit_name: string
+        }[]
+      }
       set_bin_sharing: {
         Args: { _bin_id: string; _is_shared: boolean }
         Returns: {
