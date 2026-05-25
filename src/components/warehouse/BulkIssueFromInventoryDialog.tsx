@@ -27,15 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, AlertTriangle, PackageCheck } from 'lucide-react';
+import { Trash2, AlertTriangle, PackageCheck, Plus, Search, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
+import { useWarehouseItemsLazyInventory } from '@/hooks/useWarehouseItemsLazyInventory';
 
 interface InventoryRow {
   id: string;
@@ -97,17 +100,22 @@ export function BulkIssueFromInventoryDialog({
 
   const [lines, setLines] = useState<BulkIssueLine[]>([]);
 
-  // Seed lines from the selected inventory rows whenever the dialog opens
+  // Seed lines from the selected inventory rows when the dialog opens.
+  // Merge with any lines already in state so re-opens don't wipe edits,
+  // and dedupe by item_id so passing the same row twice is a no-op.
   useEffect(() => {
     if (!open) return;
     setHeader((prev) => ({
       ...prev,
       location_id: defaultLocationId || globalLocationId || prev.location_id || '',
     }));
-    setLines(
-      selectedItems.map((it) => {
+    setLines((prev) => {
+      const byId = new Map<string, BulkIssueLine>();
+      prev.forEach((l) => byId.set(l.item_id, l));
+      selectedItems.forEach((it) => {
+        if (!it?.id || byId.has(it.id)) return;
         const available = Number(it.current_stock ?? 0);
-        return {
+        byId.set(it.id, {
           item_id: it.id,
           item_code: it.item_code || '',
           name: it.name || '',
@@ -115,10 +123,32 @@ export function BulkIssueFromInventoryDialog({
           available,
           quantity: available > 0 ? Math.min(1, available) : 0,
           purpose: '',
-        };
-      }),
-    );
+        });
+      });
+      return Array.from(byId.values());
+    });
   }, [open, selectedItems, defaultLocationId, globalLocationId]);
+
+  const addLines = (rows: InventoryRow[]) => {
+    setLines((prev) => {
+      const byId = new Map<string, BulkIssueLine>();
+      prev.forEach((l) => byId.set(l.item_id, l));
+      rows.forEach((it) => {
+        if (!it?.id || byId.has(it.id)) return;
+        const available = Number(it.current_stock ?? 0);
+        byId.set(it.id, {
+          item_id: it.id,
+          item_code: it.item_code || '',
+          name: it.name || '',
+          unit_of_measure: it.unit_of_measure || '',
+          available,
+          quantity: available > 0 ? Math.min(1, available) : 0,
+          purpose: '',
+        });
+      });
+      return Array.from(byId.values());
+    });
+  };
 
   const updateLine = (idx: number, patch: Partial<BulkIssueLine>) => {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -315,6 +345,16 @@ export function BulkIssueFromInventoryDialog({
             </Alert>
           )}
 
+          {/* Add items picker */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Items to issue</div>
+            <AddItemsPicker
+              locationId={header.location_id || null}
+              existingIds={new Set(lines.map((l) => l.item_id))}
+              onAdd={addLines}
+            />
+          </div>
+
           {/* Lines */}
           <div className="border rounded-lg overflow-hidden">
             <Table>
@@ -333,7 +373,8 @@ export function BulkIssueFromInventoryDialog({
                 {lines.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
-                      No items selected.
+                      No items yet — click <strong>Add items</strong> above to start, or open this
+                      dialog from the inventory table with rows selected.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -402,5 +443,136 @@ export function BulkIssueFromInventoryDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// In-dialog item picker
+// ---------------------------------------------------------------------------
+
+interface AddItemsPickerProps {
+  locationId: string | null;
+  existingIds: Set<string>;
+  onAdd: (rows: InventoryRow[]) => void;
+}
+
+function AddItemsPicker({ locationId, existingIds, onAdd }: AddItemsPickerProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+
+  const { data, isLoading, isFetching } = useWarehouseItemsLazyInventory({
+    pageSize: 25,
+    search,
+    locationId,
+    stockMode: 'in_stock',
+    sortBy: 'name',
+    sortDir: 'asc',
+  });
+
+  const rows = useMemo(() => {
+    const items = data?.pages?.flatMap((p) => p.items) ?? [];
+    return items.filter((r: any) => !existingIds.has(r.id));
+  }, [data, existingIds]);
+
+  const togglePick = (id: string) => {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleConfirm = () => {
+    const chosen = rows.filter((r: any) => picked.has(r.id)) as InventoryRow[];
+    if (chosen.length > 0) onAdd(chosen);
+    setPicked(new Set());
+    setSearch('');
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Plus className="h-4 w-4 mr-2" />
+          Add items
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[480px] p-0">
+        <div className="p-3 border-b">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search items by code or name…"
+              className="pl-8"
+            />
+          </div>
+        </div>
+        <ScrollArea className="h-72">
+          {isLoading || isFetching ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Loading…
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No matching items with stock at this location.
+            </div>
+          ) : (
+            <ul className="divide-y">
+              {rows.map((r: any) => {
+                const checked = picked.has(r.id);
+                const stock = Number(r.current_stock ?? 0);
+                return (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => togglePick(r.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-muted/60 ${
+                        checked ? 'bg-muted/60' : ''
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        readOnly
+                        className="h-4 w-4"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{r.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono truncate">
+                          {r.item_code}
+                        </div>
+                      </div>
+                      <Badge variant={stock > 0 ? 'secondary' : 'outline'} className="shrink-0">
+                        {stock} {r.unit_of_measure || ''}
+                      </Badge>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </ScrollArea>
+        <div className="p-3 border-t flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
+            {picked.size} selected
+          </span>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleConfirm} disabled={picked.size === 0}>
+              Add {picked.size > 0 ? picked.size : ''}
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
