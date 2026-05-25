@@ -499,13 +499,13 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
             open={issueDialogOpen}
             onOpenChange={setIssueDialogOpen}
             issueId={issueId}
-            onSuccess={fetchIssueDetails}
+            onSuccess={() => { fetchIssueDetails(); invalidateLists(); }}
           />
           <ReceiveItemsDialog
             open={receiveDialogOpen}
             onOpenChange={setReceiveDialogOpen}
             issueId={issueId}
-            onSuccess={fetchIssueDetails}
+            onSuccess={() => { fetchIssueDetails(); invalidateLists(); }}
           />
         </>
       )}
