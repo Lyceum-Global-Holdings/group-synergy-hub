@@ -67,8 +67,17 @@ export default function Dashboard() {
             Realtime view of warehouse, procurement, sourcing and finance.
           </p>
         </div>
-        <LivePulseIndicator live={live} />
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <a href="/scanner/" aria-label="Open Scanner app">
+              <ScanLine className="h-4 w-4" />
+              Open Scanner
+            </a>
+          </Button>
+          <LivePulseIndicator live={live} />
+        </div>
       </div>
+
 
       {/* Location Filter */}
       <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
