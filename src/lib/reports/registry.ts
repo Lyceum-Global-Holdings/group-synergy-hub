@@ -248,7 +248,13 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     standard: "IAS 2 / SAP EWM hierarchy",
     hookId: "warehouse.itemStockAvailability",
     parameters: [
-      { key: "catalogItemId", label: "Item", type: "item", required: true, placeholder: "Search by code or name (e.g. Cement)" },
+      { key: "catalogItemId", label: "Item (pick one)", type: "item", placeholder: "Search by code or name (e.g. Cement)" },
+      {
+        key: "searchPhrase",
+        label: "…or search phrase (matches many items)",
+        type: "text",
+        placeholder: 'e.g. cement, "white portland", m25 grade',
+      },
       { key: "locationId", label: "Location (optional)", type: "location" },
       { key: "binId", label: "Bin (optional)", type: "bin", dependsOn: "locationId" },
       {
@@ -266,6 +272,8 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "includeZero", label: "Include zero-stock rows", type: "boolean", defaultValue: false },
     ],
     columns: [
+      { key: "item_code", label: "Item Code", type: "string", width: 18 },
+      { key: "item_name", label: "Item Name", type: "string", width: 32 },
       { key: "company_name", label: "Company", type: "string", width: 24 },
       { key: "location_path", label: "Location", type: "string", width: 32 },
       { key: "bin_code", label: "Bin Code", type: "string", width: 14 },
@@ -280,6 +288,7 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "status", label: "Status", type: "string", width: 12 },
     ],
   },
+
 
 
 
