@@ -100,17 +100,22 @@ export function BulkIssueFromInventoryDialog({
 
   const [lines, setLines] = useState<BulkIssueLine[]>([]);
 
-  // Seed lines from the selected inventory rows whenever the dialog opens
+  // Seed lines from the selected inventory rows when the dialog opens.
+  // Merge with any lines already in state so re-opens don't wipe edits,
+  // and dedupe by item_id so passing the same row twice is a no-op.
   useEffect(() => {
     if (!open) return;
     setHeader((prev) => ({
       ...prev,
       location_id: defaultLocationId || globalLocationId || prev.location_id || '',
     }));
-    setLines(
-      selectedItems.map((it) => {
+    setLines((prev) => {
+      const byId = new Map<string, BulkIssueLine>();
+      prev.forEach((l) => byId.set(l.item_id, l));
+      selectedItems.forEach((it) => {
+        if (!it?.id || byId.has(it.id)) return;
         const available = Number(it.current_stock ?? 0);
-        return {
+        byId.set(it.id, {
           item_id: it.id,
           item_code: it.item_code || '',
           name: it.name || '',
@@ -118,10 +123,32 @@ export function BulkIssueFromInventoryDialog({
           available,
           quantity: available > 0 ? Math.min(1, available) : 0,
           purpose: '',
-        };
-      }),
-    );
+        });
+      });
+      return Array.from(byId.values());
+    });
   }, [open, selectedItems, defaultLocationId, globalLocationId]);
+
+  const addLines = (rows: InventoryRow[]) => {
+    setLines((prev) => {
+      const byId = new Map<string, BulkIssueLine>();
+      prev.forEach((l) => byId.set(l.item_id, l));
+      rows.forEach((it) => {
+        if (!it?.id || byId.has(it.id)) return;
+        const available = Number(it.current_stock ?? 0);
+        byId.set(it.id, {
+          item_id: it.id,
+          item_code: it.item_code || '',
+          name: it.name || '',
+          unit_of_measure: it.unit_of_measure || '',
+          available,
+          quantity: available > 0 ? Math.min(1, available) : 0,
+          purpose: '',
+        });
+      });
+      return Array.from(byId.values());
+    });
+  };
 
   const updateLine = (idx: number, patch: Partial<BulkIssueLine>) => {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
