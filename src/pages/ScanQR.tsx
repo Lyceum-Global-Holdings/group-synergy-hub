@@ -1,36 +1,46 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ScanLine, CameraOff, RefreshCw, SwitchCamera, AlertCircle } from 'lucide-react';
+import { Loader2, ScanLine, CameraOff, RefreshCw, SwitchCamera, AlertCircle, ArrowLeft } from 'lucide-react';
 
 // RFC 4122 canonical UUID — same as PublicBinAllocation.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type Status = 'idle' | 'starting' | 'scanning' | 'denied' | 'error' | 'unsupported';
+type Intent = 'adjust-stock' | 'move-asset' | null;
+type Match = { kind: 'bin' | 'asset'; path: string };
 
-function resolveTarget(raw: string): string | null {
+/**
+ * Parse a scanned payload (URL or bare UUID) into a typed match.
+ * - Bin allocations: `/b/:uuid`
+ * - Assets: `/a/:uuid` (GS1 Digital Link) or `/asset/:uuid` (legacy alias)
+ * - Bare UUIDs default to bin allocations (back-compat with old labels).
+ */
+function parseScanned(raw: string): Match | null {
   const text = raw.trim();
   if (!text) return null;
-  // Bare UUID → bin allocation.
-  if (UUID_RE.test(text)) return `/b/${text.toLowerCase()}`;
-  // Try to parse as URL.
+  if (UUID_RE.test(text)) return { kind: 'bin', path: `/b/${text.toLowerCase()}` };
   try {
     const url = new URL(text, window.location.origin);
-    if (url.origin === window.location.origin) {
-      return url.pathname + url.search + url.hash;
-    }
-    // Also accept other origins that match the QR conventions used by our PDFs.
-    if (/\/b\/[0-9a-f-]{36}$/i.test(url.pathname) || /\/asset\//i.test(url.pathname)) {
-      return url.pathname + url.search;
-    }
+    const path = url.pathname;
+    const search = url.search;
+    if (/^\/b\/[0-9a-f-]{36}$/i.test(path)) return { kind: 'bin', path: path + search };
+    if (/^\/(a|asset)\/[0-9a-f-]{36}$/i.test(path)) return { kind: 'asset', path: path + search };
   } catch {
     // not a URL
   }
   return null;
 }
+
+/** Attach `?action=...` (preserving any existing params) so the destination auto-opens the right dialog. */
+function withAction(path: string, action: 'adjust' | 'move'): string {
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}action=${action}`;
+}
+
 
 export default function ScanQR() {
   const navigate = useNavigate();
