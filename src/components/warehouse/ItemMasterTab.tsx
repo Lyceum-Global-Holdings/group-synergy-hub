@@ -1189,6 +1189,17 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           />
         </Suspense>
       )}
+      {isBulkIssueOpen && (
+        <Suspense fallback={null}>
+          <BulkIssueFromInventoryDialog
+            open={isBulkIssueOpen}
+            onOpenChange={setIsBulkIssueOpen}
+            selectedItems={selectedItems as any}
+            defaultLocationId={globalLocationId || null}
+            onComplete={clearSelection}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
