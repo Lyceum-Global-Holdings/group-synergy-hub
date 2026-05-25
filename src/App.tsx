@@ -76,6 +76,10 @@ import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { markRouteChange } from "@/lib/perfTelemetry";
 import { prefetchCommonRoutesOnIdle, prefetchNeighborRoutesOnIdle } from "@/lib/routePreload";
 import { RouteSkeleton } from "@/components/layout/RouteSkeleton";
+import { isScannerShell } from "@/lib/scannerShell";
+
+// Lightweight scanner PWA shell mounted at hosts like scan.lgh.lk.
+const ScannerApp = lazy(() => import("./scanner/ScannerApp"));
 
 // Lazy load all page components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -241,6 +245,15 @@ const ProtectedLayout = () => (
 );
 
 function App() {
+  // Field-scanner subdomain (scan.lgh.lk) boots a stripped-down shell
+  // exposing only the two scan-driven workflows.
+  if (isScannerShell()) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <ScannerApp />
+      </Suspense>
+    );
+  }
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

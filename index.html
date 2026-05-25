@@ -19,12 +19,30 @@
     <meta name="theme-color" content="#1e40af" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="ERP System" />
-    <meta name="application-name" content="LGH ERP" />
+    <meta name="apple-mobile-web-app-title" content="ERP System" id="apple-app-title" />
+    <meta name="application-name" content="LGH ERP" id="app-name" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="/manifest.webmanifest" id="app-manifest" />
+    <script>
+      // Swap manifest + app title for the scanner subdomain (scan.lgh.lk).
+      // Runs before React boots so iOS/Android pick up the scanner identity at install time.
+      (function () {
+        try {
+          var host = window.location.hostname || "";
+          if (host.indexOf("scan.") === 0) {
+            var m = document.getElementById("app-manifest");
+            if (m) m.setAttribute("href", "/manifest-scanner.webmanifest");
+            var t = document.getElementById("apple-app-title");
+            if (t) t.setAttribute("content", "LGH Scanner");
+            var a = document.getElementById("app-name");
+            if (a) a.setAttribute("content", "LGH Scanner");
+            document.title = "LGH Scanner";
+          }
+        } catch (e) {}
+      })();
+    </script>
 
     <meta property="og:title" content="Enterprise Procurement Management System | ERP Dashboard" />
     <meta property="og:description" content="Comprehensive enterprise resource planning system for centralized procurement management across multiple companies." />
