@@ -1,36 +1,43 @@
-## Plan: Make “Bulk add from catalog” item search reliable
+## Plan: Make “Bulk add from catalog” search by item name phrase reliable
 
-### Problem
-The picker is calling `list_warehouse_catalog`, but the requests are timing out (`57014 canceling statement due to statement timeout`). Because the RPC times out, the UI shows “No items found” even though items exist in the item master.
+### Root cause
+The picker is calling `list_warehouse_catalog`, but name-phrase searches still time out for common terms like `test`. The current RPC still evaluates broad `ILIKE '%phrase%'` and `similarity(...)` predicates across active catalog rows, so PostgreSQL can fall back to expensive scans before returning the first 25 rows.
 
-### Best-practice fix
-1. **Replace the slow catalog list/search SQL with an indexed pattern**
-   - Keep the existing `list_warehouse_catalog` RPC signature and return columns so the UI does not break.
-   - Remove the expensive full-table `count(*) OVER ()` and token `ILIKE` scan that is causing timeouts.
-   - Use indexed predicates for active item master rows and keyset pagination.
-   - Search across item code, name, SKU, barcode, brand, manufacturer, and description.
+### Fix
+1. **Rewrite `list_warehouse_catalog` with a bounded search pipeline**
+   - Keep the same RPC signature and returned columns so the UI stays compatible.
+   - Normalize the input phrase once: lowercase, trim spaces, escape wildcard characters.
+   - Tokenize the phrase into meaningful words.
+   - Build a small candidate set from indexed branches instead of scanning the full catalog.
 
-2. **Use international-standard search behavior**
-   - Exact item code match ranks first.
-   - Prefix matches rank next.
-   - Full-text phrase/token search handles multi-word item names.
-   - Trigram fallback handles partial words and typos such as “sand”, “sands”, or reordered phrases.
-   - Escape user input safely to avoid wildcard/special-character search failures.
+2. **Use international-standard ranking**
+   - Exact item code / SKU / barcode matches first.
+   - Prefix matches next.
+   - Exact name phrase containment next.
+   - Full-text token/phrase matches next.
+   - Trigram fuzzy matches last.
+   - Return results ordered by relevance first, then `created_at DESC, id DESC` for deterministic pagination.
 
-3. **Improve database indexes**
-   - Add/ensure GIN full-text index for the item master searchable fields.
-   - Add trigram indexes for name and item code, plus optional SKU/barcode indexes if needed.
-   - Add a status + created_at + id keyset index for fast first-page loading.
+3. **Add the missing optimized indexes**
+   - Functional GIN full-text index for item code, name, brand, manufacturer, SKU, barcode, and description.
+   - Lowercase trigram indexes for `name`, `item_code`, `sku`, `barcode`, `brand`, and `manufacturer`.
+   - Existing keyset index for `status, created_at DESC, id DESC` remains.
 
-4. **Improve the picker UI state**
-   - Keep the existing debounced input.
-   - Show a real error message if the catalog RPC fails instead of silently displaying “No items found”.
-   - Keep the current infinite-scroll “Load more” behavior.
+4. **Avoid slow fallback behavior**
+   - Remove unbounded `similarity()` scans from the main `WHERE` clause.
+   - Use trigram operator/index-backed candidate selection with a capped candidate pool.
+   - For very short searches, use prefix/contains matching and avoid costly fuzzy ranking.
 
-5. **Verify**
-   - Confirm the RPC returns rows for no search, single-word searches like `sand`, and multi-word item-name phrases.
-   - Confirm active item master items appear in the bulk-add picker without timeout.
+5. **Improve picker behavior only where needed**
+   - Keep debounce and infinite scroll.
+   - Do not show “No items found” while a debounced search is still loading.
+   - Keep RPC error text visible if the backend fails.
 
-### Files to change
-- Add a new Supabase migration for `list_warehouse_catalog` and supporting indexes.
-- Update `src/components/warehouse/bulk-catalog-import/CatalogItemCell.tsx` to display RPC errors clearly.
+6. **Verify after implementation**
+   - Test RPC responses for:
+     - no search
+     - short search: `te`
+     - common word: `test`
+     - multi-word phrase: `computer science notes`
+     - partial item phrase: `cable lug`
+   - Confirm no statement timeout and that active item master rows appear in the bulk-add picker.
