@@ -542,6 +542,8 @@ export async function buildReportEnvelope(
       return fetchStockMovement(def, ctx, params as never);
     case "warehouse.partialPiecesOnHand":
       return fetchPartialPiecesOnHand(def, ctx, params as never);
+    case "warehouse.itemStockAvailability":
+      return fetchItemStockAvailability(def, ctx, params as never);
     case "warehouse.partialPiecesMovement":
       return fetchPartialPiecesMovement(def, ctx, params as never);
     case "warehouse.cycleCountVariance":
