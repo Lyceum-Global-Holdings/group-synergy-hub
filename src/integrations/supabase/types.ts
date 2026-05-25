@@ -22774,6 +22774,33 @@ export type Database = {
           weighted_avg_value: number
         }[]
       }
+      report_item_stock_availability: {
+        Args: {
+          p_bin_id?: string
+          p_catalog_item_id: string
+          p_group_by?: string
+          p_include_batches?: boolean
+          p_include_zero?: boolean
+          p_location_id?: string
+        }
+        Returns: {
+          available_qty: number
+          batch_number: string
+          bin_code: string
+          bin_id: string
+          bin_name: string
+          company_id: string
+          company_name: string
+          location_id: string
+          location_path: string
+          on_hand_qty: number
+          reserved_qty: number
+          status: string
+          stock_value: number
+          unit_cost: number
+          unit_name: string
+        }[]
+      }
       report_open_po: {
         Args: { p_company_id: string }
         Returns: {
