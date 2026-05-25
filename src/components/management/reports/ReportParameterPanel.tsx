@@ -21,6 +21,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { LocationTreePicker } from "@/components/management/reports/LocationTreePicker";
 import { useBinsAtLocation } from "@/hooks/warehouse/useBinsAtLocation";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface Props {
   definition: ReportDefinition;
