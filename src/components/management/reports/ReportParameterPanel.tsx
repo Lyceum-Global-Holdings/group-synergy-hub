@@ -400,26 +400,25 @@ function ItemParamInput({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Search results — paged ilike on item_code + name.
+  // Phrase-aware search via the search_warehouse_item_catalog RPC
+  // (PostgreSQL FTS with websearch_to_tsquery + trigram typo tolerance).
+  // Supports multi-word phrases in any order, "quoted phrases", OR and -exclude.
   const { data: results = [], isFetching } = useQuery({
     queryKey: ["report-item-picker", search],
     queryFn: async () => {
-      const term = search.trim();
-      let q = supabase
-        .from("warehouse_item_catalog")
-        .select("id, item_code, name, brand")
-        .order("item_code", { ascending: true })
-        .limit(25);
-      if (term) {
-        // Escape PostgREST reserved chars in the user-typed term.
-        const safe = term.replace(/[%,()]/g, " ").trim();
-        if (safe) {
-          q = q.or(`item_code.ilike.%${safe}%,name.ilike.%${safe}%`);
-        }
-      }
-      const { data, error } = await q;
+      const { data, error } = await supabase.rpc("search_warehouse_item_catalog", {
+        p_query: search.trim() || null,
+        p_limit: 25,
+      } as never);
       if (error) throw error;
-      return (data ?? []) as { id: string; item_code: string; name: string; brand: string | null }[];
+      return (data ?? []) as {
+        id: string;
+        item_code: string;
+        name: string;
+        brand: string | null;
+        category_name: string | null;
+        unit_name: string | null;
+      }[];
     },
     staleTime: 30_000,
   });
