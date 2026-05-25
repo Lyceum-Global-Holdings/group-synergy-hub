@@ -144,6 +144,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
   const [isBulkChangeOwnerOpen, setIsBulkChangeOwnerOpen] = useState(false);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkIssueOpen, setIsBulkIssueOpen] = useState(false);
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
