@@ -1,43 +1,34 @@
-## Plan: Make “Bulk add from catalog” search by item name phrase reliable
+## Problem
 
-### Root cause
-The picker is calling `list_warehouse_catalog`, but name-phrase searches still time out for common terms like `test`. The current RPC still evaluates broad `ILIKE '%phrase%'` and `similarity(...)` predicates across active catalog rows, so PostgreSQL can fall back to expensive scans before returning the first 25 rows.
+Bulk-generated QR labels show blank item code and item name (only the bin code "NGN" renders). Single-label QR works because it already reads from the catalog embed.
 
-### Fix
-1. **Rewrite `list_warehouse_catalog` with a bounded search pipeline**
-   - Keep the same RPC signature and returned columns so the UI stays compatible.
-   - Normalize the input phrase once: lowercase, trim spaces, escape wildcard characters.
-   - Tokenize the phrase into meaningful words.
-   - Build a small candidate set from indexed branches instead of scanning the full catalog.
+## Root cause
 
-2. **Use international-standard ranking**
-   - Exact item code / SKU / barcode matches first.
-   - Prefix matches next.
-   - Exact name phrase containment next.
-   - Full-text token/phrase matches next.
-   - Trigram fuzzy matches last.
-   - Return results ordered by relevance first, then `created_at DESC, id DESC` for deterministic pagination.
+`src/components/warehouse/BinAllocationsTab.tsx` (lines 282–283) builds the bulk payload from the now-dropped mirrored columns:
 
-3. **Add the missing optimized indexes**
-   - Functional GIN full-text index for item code, name, brand, manufacturer, SKU, barcode, and description.
-   - Lowercase trigram indexes for `name`, `item_code`, `sku`, `barcode`, `brand`, and `manufacturer`.
-   - Existing keyset index for `status, created_at DESC, id DESC` remains.
+```ts
+item_code: a.warehouse_item?.item_code,
+item_name: a.warehouse_item?.name,
+```
 
-4. **Avoid slow fallback behavior**
-   - Remove unbounded `similarity()` scans from the main `WHERE` clause.
-   - Use trigram operator/index-backed candidate selection with a capped candidate pool.
-   - For very short searches, use prefix/contains matching and avoid costly fuzzy ranking.
+Per the Stage 6b warehouse item master rule, item-master fields live only on `warehouse_item_catalog`. Everywhere else in this same file (sort comparator, table cells) already reads via `warehouse_item.catalog.item_code` / `catalog.name` with the legacy mirror as fallback — bulk print was missed.
 
-5. **Improve picker behavior only where needed**
-   - Keep debounce and infinite scroll.
-   - Do not show “No items found” while a debounced search is still loading.
-   - Keep RPC error text visible if the backend fails.
+## Fix
 
-6. **Verify after implementation**
-   - Test RPC responses for:
-     - no search
-     - short search: `te`
-     - common word: `test`
-     - multi-word phrase: `computer science notes`
-     - partial item phrase: `cable lug`
-   - Confirm no statement timeout and that active item master rows appear in the bulk-add picker.
+One-line edit in `BinAllocationsTab.tsx` `handleBulkPrint` to mirror the same fallback used by the table:
+
+```ts
+item_code:
+  (a.warehouse_item as any)?.catalog?.item_code ??
+  (a.warehouse_item as any)?.item_code ?? null,
+item_name:
+  (a.warehouse_item as any)?.catalog?.name ??
+  (a.warehouse_item as any)?.name ?? null,
+```
+
+No changes to `bulkBinQRCodePdf.ts`, the GS1 payload builder, the RPC, or the QR layout. Single-label QR and on-screen table remain untouched.
+
+## Verification
+
+- Trigger "Bulk QR" on Bin Allocations and open the produced PDF — each label shows item code (top, monospace) and item name (below) alongside the bin code, matching the single-label `BinAllocationQRDialog` output.
+- QR payload still encodes `01={item_code}` so scans resolve correctly.
