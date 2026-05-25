@@ -22,7 +22,7 @@ export function CatalogItemCell({ value, display, onChange }: Props) {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data, isFetching, fetchNextPage, hasNextPage } = useWarehouseCatalogPage({
+  const { data, isFetching, fetchNextPage, hasNextPage, error } = useWarehouseCatalogPage({
     search: debouncedSearch || undefined,
     status: 'active',
     pageSize: 25,
@@ -47,7 +47,13 @@ export function CatalogItemCell({ value, display, onChange }: Props) {
         <Command shouldFilter={false}>
           <CommandInput placeholder="Search by code, name, GTIN…" value={search} onValueChange={setSearch} />
           <CommandList>
-            <CommandEmpty>{isFetching ? 'Searching…' : 'No items found.'}</CommandEmpty>
+            <CommandEmpty>
+              {isFetching
+                ? 'Searching…'
+                : error
+                ? `Search failed: ${(error as Error).message}`
+                : 'No items found.'}
+            </CommandEmpty>
             <CommandGroup>
               {items.map((it) => (
                 <CommandItem
