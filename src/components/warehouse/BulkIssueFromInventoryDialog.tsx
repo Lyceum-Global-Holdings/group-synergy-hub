@@ -345,6 +345,16 @@ export function BulkIssueFromInventoryDialog({
             </Alert>
           )}
 
+          {/* Add items picker */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Items to issue</div>
+            <AddItemsPicker
+              locationId={header.location_id || null}
+              existingIds={new Set(lines.map((l) => l.item_id))}
+              onAdd={addLines}
+            />
+          </div>
+
           {/* Lines */}
           <div className="border rounded-lg overflow-hidden">
             <Table>
@@ -363,7 +373,8 @@ export function BulkIssueFromInventoryDialog({
                 {lines.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
-                      No items selected.
+                      No items yet — click <strong>Add items</strong> above to start, or open this
+                      dialog from the inventory table with rows selected.
                     </TableCell>
                   </TableRow>
                 ) : (
