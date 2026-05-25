@@ -210,7 +210,7 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
                   <th className="px-2 py-2 text-right w-24">Opening qty</th>
                   <th className="px-2 py-2 text-right w-24">Unit cost</th>
                   <th className="px-2 py-2 text-right w-24">Reorder</th>
-                  <th className="px-2 py-2 text-left w-32">PO/SMR No</th>
+                  <th className="px-2 py-2 text-left w-32">PO/CMR No</th>
                   <th className="px-2 py-2 text-left min-w-[180px]">Status</th>
                   <th className="px-2 py-2 w-10"></th>
                 </tr>
@@ -388,7 +388,7 @@ function Row({ index, row, companies, locations, defaultLocationId, onChange, on
           type="text"
           value={row.reference_no}
           onChange={(e) => onChange({ reference_no: e.target.value })}
-          placeholder="PO/SMR No"
+          placeholder="PO/CMR No"
           className="h-8 text-xs"
         />
       </td>

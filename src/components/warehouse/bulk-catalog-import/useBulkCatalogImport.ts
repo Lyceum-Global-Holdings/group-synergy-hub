@@ -192,8 +192,8 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
         const baseNotes = r.notes?.trim() || '';
         const combinedNotes = ref
           ? baseNotes
-            ? `PO/SMR: ${ref} — ${baseNotes}`
-            : `PO/SMR: ${ref}`
+          ? `PO/CMR: ${ref} — ${baseNotes}`
+          : `PO/CMR: ${ref}`
           : baseNotes || null;
         return {
           rowId: r.rowId,
