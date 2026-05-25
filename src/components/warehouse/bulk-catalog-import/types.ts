@@ -47,6 +47,7 @@ export function newRow(partial: Partial<BulkCatalogRow> = {}): BulkCatalogRow {
     opening_qty: '',
     unit_cost: '',
     reorder_level: '',
+    reference_no: '',
     notes: '',
     status: 'pending',
     message: null,
