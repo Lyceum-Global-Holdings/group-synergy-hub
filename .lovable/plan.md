@@ -1,34 +1,14 @@
-## Problem
+## Plan
 
-Bulk-generated QR labels show blank item code and item name (only the bin code "NGN" renders). Single-label QR works because it already reads from the catalog embed.
+1. **Fix the database search function**
+   - Add a new Supabase migration that rewrites `public.list_warehouse_catalog`.
+   - Qualify the ambiguous `id` reference in the `dedup` CTE as `candidates.id`, because the function returns a column named `id`, which currently conflicts with the CTE column.
+   - Keep the existing international-standard search behavior: exact code, code contains, name phrase, SKU/barcode, brand/manufacturer, and full-text search ranking.
 
-## Root cause
+2. **Preserve the bulk catalog picker behavior**
+   - No UI changes needed in `CatalogItemCell.tsx`; it already calls the catalog RPC correctly with `shouldFilter={false}`.
+   - The picker will start returning proper results once the RPC no longer errors.
 
-`src/components/warehouse/BinAllocationsTab.tsx` (lines 282–283) builds the bulk payload from the now-dropped mirrored columns:
-
-```ts
-item_code: a.warehouse_item?.item_code,
-item_name: a.warehouse_item?.name,
-```
-
-Per the Stage 6b warehouse item master rule, item-master fields live only on `warehouse_item_catalog`. Everywhere else in this same file (sort comparator, table cells) already reads via `warehouse_item.catalog.item_code` / `catalog.name` with the legacy mirror as fallback — bulk print was missed.
-
-## Fix
-
-One-line edit in `BinAllocationsTab.tsx` `handleBulkPrint` to mirror the same fallback used by the table:
-
-```ts
-item_code:
-  (a.warehouse_item as any)?.catalog?.item_code ??
-  (a.warehouse_item as any)?.item_code ?? null,
-item_name:
-  (a.warehouse_item as any)?.catalog?.name ??
-  (a.warehouse_item as any)?.name ?? null,
-```
-
-No changes to `bulkBinQRCodePdf.ts`, the GS1 payload builder, the RPC, or the QR layout. Single-label QR and on-screen table remain untouched.
-
-## Verification
-
-- Trigger "Bulk QR" on Bin Allocations and open the produced PDF — each label shows item code (top, monospace) and item name (below) alongside the bin code, matching the single-label `BinAllocationQRDialog` output.
-- QR payload still encodes `01={item_code}` so scans resolve correctly.
+3. **Verify the fix**
+   - Run a read-only RPC check for a sample phrase such as `test` after migration approval.
+   - Confirm the search no longer returns `column reference "id" is ambiguous` and returns matching catalog rows or a clean “No items found” state.
