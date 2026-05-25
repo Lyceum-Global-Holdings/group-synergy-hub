@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { IssueItemsDialog } from './IssueItemsDialog';
 import { ReceiveItemsDialog } from './ReceiveItemsDialog';
 import { SrnDocumentUploadField } from './SrnDocumentUploadField';
@@ -39,6 +40,14 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const invalidateLists = () => {
+    queryClient.invalidateQueries({ queryKey: ['material-issues'] });
+    queryClient.invalidateQueries({ queryKey: ['cpo-material-issues'] });
+    queryClient.invalidateQueries({ queryKey: ['daily-material-issues'] });
+    if (issueId) queryClient.invalidateQueries({ queryKey: ['material-issue', issueId] });
+  };
 
   useEffect(() => {
     if (issueId && open) {
@@ -104,6 +113,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
       });
       
       fetchIssueDetails();
+      invalidateLists();
     } catch (error) {
       console.error('Error approving:', error);
       toast({
@@ -137,6 +147,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
       });
       
       fetchIssueDetails();
+      invalidateLists();
     } catch (error) {
       console.error('Error approving:', error);
       toast({
@@ -488,13 +499,13 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
             open={issueDialogOpen}
             onOpenChange={setIssueDialogOpen}
             issueId={issueId}
-            onSuccess={fetchIssueDetails}
+            onSuccess={() => { fetchIssueDetails(); invalidateLists(); }}
           />
           <ReceiveItemsDialog
             open={receiveDialogOpen}
             onOpenChange={setReceiveDialogOpen}
             issueId={issueId}
-            onSuccess={fetchIssueDetails}
+            onSuccess={() => { fetchIssueDetails(); invalidateLists(); }}
           />
         </>
       )}
