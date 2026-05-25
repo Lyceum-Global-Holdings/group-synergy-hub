@@ -251,9 +251,10 @@ export default function ScanQR() {
             )}
             {copy && (() => {
               // In the scanner PWA shell there are no module pages — back goes home.
+              // Router basename is `/scanner`, so `to="/"` resolves to /scanner/.
               const inScannerShell =
                 typeof window !== 'undefined' &&
-                (window.location.hostname.startsWith('scan.') ||
+                (window.location.pathname.startsWith('/scanner') ||
                   (() => { try { return sessionStorage.getItem('lgh-scanner-app') === '1'; } catch { return false; } })());
               const backTo = inScannerShell ? '/' : copy.backTo;
               const backLabel = inScannerShell ? 'Back' : copy.backLabel;

@@ -1,9 +1,9 @@
 {
   "name": "LGH Scanner",
   "short_name": "Scanner",
-  "id": "/?app=scanner",
-  "start_url": "/?app=scanner",
-  "scope": "/",
+  "id": "/scanner/",
+  "start_url": "/scanner/",
+  "scope": "/scanner/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b1220",
@@ -19,13 +19,13 @@
     {
       "name": "Adjust stock",
       "short_name": "Adjust",
-      "url": "/scan?intent=adjust-stock",
+      "url": "/scanner/scan?intent=adjust-stock",
       "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     },
     {
       "name": "Move asset",
       "short_name": "Move",
-      "url": "/scan?intent=move-asset",
+      "url": "/scanner/scan?intent=move-asset",
       "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     }
   ]
