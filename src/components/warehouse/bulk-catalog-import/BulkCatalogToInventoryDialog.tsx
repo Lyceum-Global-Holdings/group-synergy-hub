@@ -384,6 +384,15 @@ function Row({ index, row, companies, locations, defaultLocationId, onChange, on
         />
       </td>
       <td className="px-2 py-1.5">
+        <Input
+          type="text"
+          value={row.reference_no}
+          onChange={(e) => onChange({ reference_no: e.target.value })}
+          placeholder="PO/SMR No"
+          className="h-8 text-xs"
+        />
+      </td>
+      <td className="px-2 py-1.5">
         <div className="flex flex-col gap-0.5">
           {statusBadge()}
           {row.message && <span className="text-xs text-muted-foreground line-clamp-2">{row.message}</span>}
