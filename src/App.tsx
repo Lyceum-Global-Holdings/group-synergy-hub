@@ -1,5 +1,31 @@
 // App version: 1.0.2 - Code splitting for performance
-import { Suspense, lazy } from "react";
+import { Suspense, lazy as reactLazy, ComponentType } from "react";
+
+// Wrap React.lazy so a failed dynamic import (typically caused by a stale
+// index.html pointing at a chunk hash that no longer exists after a deploy)
+// triggers a one-shot full reload instead of a blank screen inside Suspense.
+const lazy = <T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+) =>
+  reactLazy(() =>
+    factory().catch((err) => {
+      const message = err?.message ?? String(err);
+      const isChunkError =
+        message.includes("Failed to fetch dynamically imported module") ||
+        message.includes("Importing a module script failed") ||
+        message.includes("error loading dynamically imported module");
+      if (isChunkError && typeof window !== "undefined") {
+        const key = "__chunk_reload_attempt__";
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          window.location.reload();
+          // Return a never-resolving promise so Suspense holds while reloading.
+          return new Promise<{ default: T }>(() => {});
+        }
+      }
+      throw err;
+    }),
+  );
 
 // Auto-recover from stale chunk references after a new deploy.
 // When index.html is cached but references chunks that no longer exist,
