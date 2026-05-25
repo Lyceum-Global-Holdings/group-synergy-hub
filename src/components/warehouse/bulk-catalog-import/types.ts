@@ -12,6 +12,7 @@ export interface BulkCatalogRow {
   opening_qty: string; // keep as string for editing
   unit_cost: string;
   reorder_level: string;
+  reference_no: string;
   notes: string;
   status: RowStatus;
   message: string | null;
@@ -46,6 +47,7 @@ export function newRow(partial: Partial<BulkCatalogRow> = {}): BulkCatalogRow {
     opening_qty: '',
     unit_cost: '',
     reorder_level: '',
+    reference_no: '',
     notes: '',
     status: 'pending',
     message: null,

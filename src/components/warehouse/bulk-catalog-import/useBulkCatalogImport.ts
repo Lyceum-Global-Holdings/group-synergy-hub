@@ -187,17 +187,27 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
   const submit = useCallback(async () => {
     const payload = validatedRows
       .filter((r) => r.status === 'valid')
-      .map((r) => ({
-        rowId: r.rowId,
-        catalog_item_id: r.catalog_item_id,
-        company_id: r.company_id,
-        location_id: r.location_id,
-        bin_id: r.bin_id,
-        opening_qty: r.opening_qty ? Number(r.opening_qty) : 0,
-        unit_cost: r.unit_cost ? Number(r.unit_cost) : null,
-        reorder_level: r.reorder_level ? Number(r.reorder_level) : null,
-        notes: r.notes || null,
-      }));
+      .map((r) => {
+        const ref = r.reference_no?.trim();
+        const baseNotes = r.notes?.trim() || '';
+        const combinedNotes = ref
+          ? baseNotes
+            ? `PO/SMR: ${ref} — ${baseNotes}`
+            : `PO/SMR: ${ref}`
+          : baseNotes || null;
+        return {
+          rowId: r.rowId,
+          catalog_item_id: r.catalog_item_id,
+          company_id: r.company_id,
+          location_id: r.location_id,
+          bin_id: r.bin_id,
+          opening_qty: r.opening_qty ? Number(r.opening_qty) : 0,
+          unit_cost: r.unit_cost ? Number(r.unit_cost) : null,
+          reorder_level: r.reorder_level ? Number(r.reorder_level) : null,
+          reference_no: ref || null,
+          notes: combinedNotes,
+        };
+      });
 
     if (payload.length === 0) return [] as ImportResultRow[];
 
