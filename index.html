@@ -26,12 +26,14 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" id="app-manifest" />
     <script>
-      // Swap manifest + app title for the scanner subdomain (scan.lgh.lk).
-      // Runs before React boots so iOS/Android pick up the scanner identity at install time.
+      // Swap manifest + app identity when running under the /scanner path.
+      // Path-based (not subdomain-based) because Lovable hosting redirects
+      // non-primary custom domains to the Primary one. Runs before React boots
+      // so iOS/Android pick up the scanner identity at install time.
       (function () {
         try {
-          var host = window.location.hostname || "";
-          if (host.indexOf("scan.") === 0) {
+          var path = window.location.pathname || "";
+          if (path === "/scanner" || path.indexOf("/scanner/") === 0) {
             var m = document.getElementById("app-manifest");
             if (m) m.setAttribute("href", "/manifest-scanner.webmanifest");
             var t = document.getElementById("apple-app-title");

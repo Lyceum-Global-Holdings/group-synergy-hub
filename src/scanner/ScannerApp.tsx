@@ -17,6 +17,7 @@ import MfaEnforcementGate from "@/components/auth/MfaEnforcementGate";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import { Loader2 } from "lucide-react";
 import ScannerLayout from "./ScannerLayout";
+import { SCANNER_BASENAME } from "@/lib/scannerShell";
 
 const Auth = lazy(() => import("@/pages/Auth"));
 const MfaChallenge = lazy(() => import("@/pages/auth/MfaChallenge"));
@@ -71,6 +72,7 @@ export default function ScannerApp() {
         <Toaster />
         <Sonner />
         <BrowserRouter
+          basename={SCANNER_BASENAME}
           future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
         >
           <ScrollToTop />
