@@ -249,14 +249,23 @@ export default function ScanQR() {
                 Switch camera
               </Button>
             )}
-            {copy && (
-              <Button variant="ghost" size="sm" asChild className="ml-auto">
-                <Link to={copy.backTo}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  {copy.backLabel}
-                </Link>
-              </Button>
-            )}
+            {copy && (() => {
+              // In the scanner PWA shell there are no module pages — back goes home.
+              const inScannerShell =
+                typeof window !== 'undefined' &&
+                (window.location.hostname.startsWith('scan.') ||
+                  (() => { try { return sessionStorage.getItem('lgh-scanner-app') === '1'; } catch { return false; } })());
+              const backTo = inScannerShell ? '/' : copy.backTo;
+              const backLabel = inScannerShell ? 'Back' : copy.backLabel;
+              return (
+                <Button variant="ghost" size="sm" asChild className="ml-auto">
+                  <Link to={backTo}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    {backLabel}
+                  </Link>
+                </Button>
+              );
+            })()}
           </div>
 
           {status === 'denied' && (

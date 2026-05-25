@@ -1,73 +1,67 @@
-# In-app QR scanning: Warehouse "Adjust stock" + Asset "Move asset"
+# Scanner PWA at `scan.lgh.lk`
 
-The PWA already ships a working `/scan` page (zxing-based camera scanner) and two destination pages:
-- `/b/:id` → bin allocation with "Adjust stock" dialog
-- `/asset/:assetId` → asset view with "Move asset" (PublicAssetTransferDialog)
+A focused, installable mobile shell exposing only two actions — **Scan to adjust stock** and **Scan to move asset** — served from a new subdomain. Same codebase, same Supabase backend, same auth session. The existing full ERP at `stores.lgh.lk` is unchanged.
 
-What's missing: discoverable in-app entry points from the two modules, intent-aware routing (only accept the right kind of QR), and auto-opening the action dialog after the scan.
+## How it works
 
-## Scope (exactly what the user asked)
+When the browser hits `scan.lgh.lk`, `App.tsx` mounts a minimal `<ScannerApp />` router instead of the full ERP. Everything else (RLS, RPCs, scan dialogs, Turnstile, MFA) is reused as-is.
 
-1. **Warehouse Management** → single "Scan to adjust stock" entry point
-2. **Asset Management** → single "Scan to move asset" entry point
-3. No global scan FAB, no other intents
+```text
+scan.lgh.lk
+  /            ScannerHome      → two big tap cards
+  /scan        ScanQR           → reuses existing scanner with ?intent
+  /b/:id       PublicBinAllocation + auto-open Adjust dialog
+  /a/:id       PublicAssetView   + auto-open Move dialog
+  /asset/:id   alias (legacy printed labels)
+  /login       Auth (shared .lgh.lk cookie)
+  *            redirect → /
+```
 
-## Design — aligned with international standards
+## Files
 
-- **QR payload**: GS1 Digital Link URI Syntax v1.4 (already used for bin QR via `buildBinQRPayload`). Add `buildAssetQRPayload` so asset labels become
-  `https://stores.lgh.lk/a/{asset_id}?8004={asset_tag}` (AI 8004 = GS1 "Serial shipping container / serialized asset identifier"). Keep the existing `/asset/:id` path as a permanent alias so already-printed labels still resolve.
-- **Resolver host**: pinned to `stores.lgh.lk` (per existing project rule — printed labels live for years).
-- **Camera**: WebRTC `getUserMedia` with `facingMode: environment`, multi-format decode (ISO/IEC 18004 QR + Code 128 fallback already supported by `BrowserMultiFormatReader`).
-- **Privacy**: scanner page already sets `noindex,nofollow`; we keep that.
-- **Auth model**: unchanged — public pages render anonymously; the action buttons (Adjust / Move) require sign-in (existing behaviour).
+**New**
+- `src/scanner/ScannerApp.tsx` — minimal router + layout (no sidebar, no module nav, mobile-first).
+- `src/scanner/ScannerLayout.tsx` — top bar with company/location switch + sign-out only.
+- `src/pages/scanner/ScannerHome.tsx` — two cards: "Scan to adjust stock" (`ScanLine`), "Scan to move asset" (`PackageCheck`). Tap → `/scan?intent=adjust-stock|move-asset`.
+- `public/manifest-scanner.webmanifest` — `name: "LGH Scanner"`, `short_name: "Scanner"`, `id: "/?app=scanner"`, `start_url: "/?app=scanner"`, `scope: "/"`, `display: "standalone"`, `theme_color` matching brand, dedicated icon set.
+- `public/scanner-icon-192.png`, `public/scanner-icon-512.png` — generated icons (distinct from main ERP icons so the home-screen tile is recognisable).
 
-## Changes
+**Edited**
+- `src/App.tsx` — at boot, detect `window.location.hostname === 'scan.lgh.lk'` (or `?app=scanner` for PWA-installed launches). If true, render `<ScannerApp />`; else render today's full app. No other change.
+- `index.html` — small inline script before `<link rel="manifest">` that swaps `href` to `/manifest-scanner.webmanifest` when the host matches. Update `<title>` and `theme-color` conditionally for the scanner host.
+- `src/integrations/supabase/client.ts` — set auth `cookieOptions.domain = '.lgh.lk'` so a single sign-in works on both hosts. Guarded so localhost / preview / `.lovable.app` keep current behaviour.
+- `src/pages/Auth.tsx` — after successful login, if `window.location.hostname === 'scan.lgh.lk'`, redirect to `/` (Scanner home) instead of the dashboard.
 
-### 1. `src/pages/ScanQR.tsx` — intent gating
-- Read `?intent=adjust-stock | move-asset` from the URL.
-- Update `resolveTarget()` so:
-  - `adjust-stock` only accepts `/b/:uuid` (bin allocations); asset codes show a friendly "Wrong code type — scan a bin QR" message.
-  - `move-asset` only accepts `/asset/:uuid` and the new `/a/:uuid` GS1 form; bin codes show the inverse message.
-  - No intent → current behaviour (accept both).
-- After a successful match, append `?action=adjust` or `?action=move` to the target so the destination page auto-opens the right dialog.
-- Update the heading/description to reflect the active intent.
+**Unchanged but reused**
+- `src/pages/ScanQR.tsx` — already supports `?intent=adjust-stock|move-asset`; the scanner shell just lands users here.
+- `src/pages/PublicBinAllocation.tsx`, `src/pages/PublicAssetView.tsx` — already auto-open the right dialog from `?action=`.
+- All warehouse RPCs, RLS, edge functions, Turnstile, MFA — zero changes.
 
-### 2. `src/pages/PublicBinAllocation.tsx`
-- When `?action=adjust` is present and the user is signed in, auto-open `ScannedBinAdjustmentDialog` once data loads.
+## Auth & session
 
-### 3. `src/pages/PublicAssetView.tsx`
-- When `?action=move` is present and the user is signed in, auto-open `PublicAssetTransferDialog` once data loads.
-- Accept the new `/a/:assetId` route as an alias (add a `<Route path="/a/:assetId" element={<PublicAssetView />} />` in `src/App.tsx`).
+Single sign-on across both hosts via cookie domain `.lgh.lk`. A user signs in once (on either host) and the Supabase session is visible to the other. No new auth flow, no new tables.
 
-### 4. Module entry points
-- **Warehouse Management** (`src/pages/warehouse/AssetManagement.tsx` is the Asset module — the warehouse "Adjust stock" entry belongs on the bin/stock pages). Add a primary button **"Scan to adjust stock"** in the page header of `src/pages/warehouse/BinAllocations.tsx` (and the same button on `src/pages/warehouse/ItemBinMaster.tsx` since both are stock-adjustment surfaces) that navigates to `/scan?intent=adjust-stock`. Icon: `ScanLine`. Mobile-friendly sizing (`size="sm"` on `md:`, full-width on `sm:`).
-- **Asset Management** (`src/pages/warehouse/AssetManagement.tsx`): add **"Scan to move asset"** in the page header → `/scan?intent=move-asset`.
-- Both buttons are visible to any signed-in user with module access; the destination dialogs already enforce role/permission checks server-side.
+## Module access
 
-### 5. GS1 asset payload util
-- New `src/utils/assetQRPayload.ts` mirroring `binQRPayload.ts`:
-  ```ts
-  buildAssetQRPayload({ assetId, assetTag })
-    → `https://stores.lgh.lk/a/${assetId}?8004=${assetTag}`
-  ```
-- Update `src/components/warehouse/AssetQRCode.tsx` and `src/utils/bulkQRCodePdf.ts` to use the new helper (replaces hard-coded `group-synergy-hub.lovable.app/asset/...`). Existing printed labels keep working because `/asset/:id` route stays mounted.
-
-### 6. Tiny polish
-- ScanQR adds a "Cancel" link back to the originating module when `intent` is set, using `document.referrer` fallback to `/`.
+Scanner shell calls the same `useModuleAccess` checks already enforced inside the bin/asset RPCs. If a user lacks warehouse or asset access, the dialogs reject server-side — no client-side bypass risk.
 
 ## Out of scope
-- Native barcode (`BarcodeDetector`) fast-path — defer; zxing already works on iOS Safari 17+ and all evergreen browsers.
-- Offline scan queue — defer.
-- New permissions, RLS, RPCs, or migrations — none needed.
+
+- No new tables, migrations, RPCs, or edge functions.
+- No native iOS/Android app.
+- No offline scan queue / BarcodeDetector fast path (can be added later).
+- No new permissions or RBAC changes.
+
+## DNS / publish steps (user-side)
+
+1. After this code change is published, open **Project Settings → Domains → Connect Domain** and add `scan.lgh.lk`.
+2. Add an A record `scan` → `185.158.133.1` at the registrar (same target as `stores.lgh.lk`).
+3. Wait for SSL provisioning (usually minutes).
+4. On iPhone Safari → open `https://scan.lgh.lk` → **Share → Add to Home Screen**. The "LGH Scanner" tile appears separately from the main ERP app.
 
 ## Verification
-- iPhone Safari (PWA installed) at `stores.lgh.lk`:
-  1. Asset Management → tap "Scan to move asset" → camera opens → scan an asset QR → `/a/:id?action=move` loads → Move dialog auto-opens.
-  2. Bin Allocations → tap "Scan to adjust stock" → scan a bin QR → `/b/:id?action=adjust` → Adjust dialog auto-opens.
-  3. Scan the wrong type for the active intent → friendly mismatch message, no navigation.
-- Desktop Chrome: same flows still work.
-- Existing printed `/asset/:id` and `/b/:id` labels (without `?action`) continue to render the read-only card.
 
-## Files touched
-- edit: `src/pages/ScanQR.tsx`, `src/pages/PublicBinAllocation.tsx`, `src/pages/PublicAssetView.tsx`, `src/App.tsx`, `src/pages/warehouse/BinAllocations.tsx`, `src/pages/warehouse/ItemBinMaster.tsx`, `src/pages/warehouse/AssetManagement.tsx`, `src/components/warehouse/AssetQRCode.tsx`, `src/utils/bulkQRCodePdf.ts`
-- create: `src/utils/assetQRPayload.ts`
+- Desktop `stores.lgh.lk/warehouse/item-bin-master` — unchanged, still shows full ERP.
+- Desktop `scan.lgh.lk/` — shows Scanner home with two cards only, no sidebar.
+- iPhone PWA installed from `scan.lgh.lk` — launches into Scanner home, scans bin QR → Adjust dialog opens; scans asset QR → Move dialog opens; wrong-type scan shows the existing mismatch alert.
+- Sign in on `stores.lgh.lk`, then open `scan.lgh.lk` in the same browser — already signed in (shared cookie).

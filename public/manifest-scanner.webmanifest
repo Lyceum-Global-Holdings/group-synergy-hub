@@ -1,0 +1,32 @@
+{
+  "name": "LGH Scanner",
+  "short_name": "Scanner",
+  "id": "/?app=scanner",
+  "start_url": "/?app=scanner",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#1e40af",
+  "description": "Field scanner for Lyceum Global Holdings — adjust stock and move assets by scanning QR codes.",
+  "icons": [
+    { "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Adjust stock",
+      "short_name": "Adjust",
+      "url": "/scan?intent=adjust-stock",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Move asset",
+      "short_name": "Move",
+      "url": "/scan?intent=move-asset",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}
