@@ -6,11 +6,13 @@ import { UserProfile } from "@/components/common/UserProfile";
 import { LiveClock } from "@/components/common/LiveClock";
 import { InstallAppButton } from "@/components/common/InstallAppButton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { RealtimeBusProvider } from "@/hooks/useRealtimeBus";
-import { Loader2 } from "lucide-react";
+import { Loader2, SlidersHorizontal } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -58,16 +60,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         
         <div className="flex-1 flex flex-col min-w-0 h-svh">
           {/* Header — clean enterprise shell bar (viewport-locked) */}
-          <header className="h-14 flex items-center justify-between bg-card px-5 shadow-[var(--shadow-sm)] border-b border-border/40 shrink-0 sticky top-0 z-20">
-            <div className="flex items-center gap-3 min-w-0">
-              <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-              <div className="h-5 w-px bg-border/60" />
+          <header className="h-14 flex items-center justify-between gap-2 bg-card px-3 sm:px-5 shadow-[var(--shadow-sm)] border-b border-border/40 shrink-0 sticky top-0 z-20">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <SidebarTrigger className="text-muted-foreground hover:text-foreground shrink-0" />
+              <div className="h-5 w-px bg-border/60 hidden sm:block" />
               <h1 className="text-sm font-semibold text-foreground truncate tracking-tight">
-                Enterprise Management System
+                <span className="hidden sm:inline">Enterprise Management System</span>
+                <span className="sm:hidden">Lyceum ERP</span>
               </h1>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Desktop controls */}
+            <div className="hidden lg:flex items-center gap-2 shrink-0">
               <LiveClock />
               <div className="h-5 w-px bg-border/60" />
               <CompanySelector />
@@ -78,6 +82,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Badge>
               )}
               <InstallAppButton />
+              <UserProfile />
+            </div>
+
+            {/* Mobile/tablet controls — popover groups secondary actions */}
+            <div className="flex lg:hidden items-center gap-1 shrink-0">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Open header options">
+                    <SlidersHorizontal className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[280px] p-3 space-y-3">
+                  <LiveClock />
+                  <div className="h-px bg-border/60" />
+                  <CompanySelector />
+                  <LocationSelector />
+                  {isSuperAdmin && !isViewingAllCompanies && companies.length > 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      Viewing as company
+                    </Badge>
+                  )}
+                  <InstallAppButton />
+                </PopoverContent>
+              </Popover>
               <UserProfile />
             </div>
           </header>
