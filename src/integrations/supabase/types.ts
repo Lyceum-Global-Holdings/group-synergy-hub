@@ -22777,11 +22777,12 @@ export type Database = {
       report_item_stock_availability: {
         Args: {
           p_bin_id?: string
-          p_catalog_item_id: string
+          p_catalog_item_id?: string
           p_group_by?: string
           p_include_batches?: boolean
           p_include_zero?: boolean
           p_location_id?: string
+          p_search_phrase?: string
         }
         Returns: {
           available_qty: number
@@ -22789,8 +22790,11 @@ export type Database = {
           bin_code: string
           bin_id: string
           bin_name: string
+          catalog_item_id: string
           company_id: string
           company_name: string
+          item_code: string
+          item_name: string
           location_id: string
           location_path: string
           on_hand_qty: number
