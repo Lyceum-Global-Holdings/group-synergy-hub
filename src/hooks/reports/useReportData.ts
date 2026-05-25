@@ -171,6 +171,7 @@ export async function fetchItemStockAvailability(
   ctx: BuildEnvelopeContext,
   params: {
     catalogItemId?: string | null;
+    searchPhrase?: string | null;
     locationId?: string | null;
     binId?: string | null;
     groupBy?: string | null;
@@ -178,13 +179,15 @@ export async function fetchItemStockAvailability(
     includeBatches?: boolean;
   },
 ): Promise<ReportEnvelope> {
-  if (!params.catalogItemId) {
-    // Item is required — return an empty envelope rather than throwing so the
-    // preview shows a friendly "no rows" state until the user picks one.
+  const phrase = (params.searchPhrase ?? "").trim();
+  // Either an explicit item or a non-empty phrase is required; otherwise
+  // return an empty envelope so the preview shows a friendly empty state.
+  if (!params.catalogItemId && !phrase) {
     return envelopeBase(def, ctx, []);
   }
   const { data, error } = await supabase.rpc("report_item_stock_availability", {
-    p_catalog_item_id: params.catalogItemId,
+    p_catalog_item_id: params.catalogItemId || null,
+    p_search_phrase: phrase || null,
     p_location_id: params.locationId || null,
     p_bin_id: params.binId || null,
     p_group_by: params.groupBy || "bin",
@@ -200,6 +203,7 @@ export async function fetchItemStockAvailability(
     stock_value: sumCol(rows, "stock_value"),
   });
 }
+
 
 export async function fetchInventoryValuation(
   def: ReportDefinition,
