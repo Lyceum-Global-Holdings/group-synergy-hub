@@ -462,7 +462,7 @@ function ItemParamInput({
       <PopoverContent className="w-[min(28rem,90vw)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search by item code or name…"
+            placeholder={'Type any phrase — e.g. "white cement", portland m25'}
             value={search}
             onValueChange={setSearch}
           />
@@ -477,31 +477,36 @@ function ItemParamInput({
               <CommandEmpty>No items found.</CommandEmpty>
             )}
             <CommandGroup>
-              {results.map((it) => (
-                <CommandItem
-                  key={it.id}
-                  value={it.id}
-                  onSelect={() => {
-                    onChange(it.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === it.id ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <div className="flex flex-col">
-                    <span className="font-medium">
-                      {it.item_code} — {it.name}
-                    </span>
-                    {it.brand && (
-                      <span className="text-xs text-muted-foreground">{it.brand}</span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
+              {results.map((it) => {
+                const meta = [it.brand, it.category_name, it.unit_name]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <CommandItem
+                    key={it.id}
+                    value={it.id}
+                    onSelect={() => {
+                      onChange(it.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === it.id ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {it.item_code} — {it.name}
+                      </span>
+                      {meta && (
+                        <span className="text-xs text-muted-foreground">{meta}</span>
+                      )}
+                    </div>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
