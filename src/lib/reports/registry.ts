@@ -54,6 +54,14 @@ export type ReportParameter =
   | {
       key: string;
       label: string;
+      /** Searchable picker over warehouse_item_catalog (global item master). */
+      type: "item";
+      required?: boolean;
+      placeholder?: string;
+    }
+  | {
+      key: string;
+      label: string;
       type: "text";
       placeholder?: string;
       required?: boolean;
