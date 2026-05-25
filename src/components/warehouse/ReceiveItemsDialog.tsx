@@ -79,9 +79,11 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
     // Initialize receive data
     const initialData: Record<string, ItemReceiveData> = {};
     data?.forEach(item => {
+      const issuedQty = Number(item.quantity_issued || item.quantity_required || 0);
+      const alreadyReceived = Number(item.quantity_received || 0);
       initialData[item.id] = {
         itemId: item.id,
-        receivedQty: item.quantity_received ?? 0,
+        receivedQty: issuedQty > 0 ? Math.max(alreadyReceived, issuedQty) : alreadyReceived,
         condition: 'good',
         createReturn: false
       };
@@ -103,7 +105,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
     const item = items.find(i => i.id === itemId);
     const data = receiveData[itemId];
     if (!item || !data) return 0;
-    const issued = item.quantity_issued || 0;
+    const issued = Number(item.quantity_issued || item.quantity_required || 0);
     return issued - data.receivedQty;
   };
 
@@ -126,7 +128,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
       const varianceItemsForReturn: any[] = [];
 
       // Update each item with received quantity and variance data
-      const updatePromises = items.map(item => {
+      const updatePromises = items.map(async item => {
         const data = receiveData[item.id];
         const variance = calculateVariance(item.id);
         
@@ -141,13 +143,15 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
           });
         }
 
-        return supabase
+        const { error } = await supabase
           .from('material_issue_items')
           .update({
             quantity_received: data.receivedQty,
             received_at: currentTimestamp
           })
           .eq('id', item.id);
+
+        if (error) throw error;
       });
 
       await Promise.all(updatePromises);
@@ -155,7 +159,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
       // Check if all items are fully received
       const allReceived = items.every((item) => {
         const data = receiveData[item.id];
-        const issued = item.quantity_issued || 0;
+        const issued = Number(item.quantity_issued || item.quantity_required || 0);
         return data.receivedQty >= issued;
       });
 
@@ -174,7 +178,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
       }
 
       // Update the material issue note
-      const { error: updateError } = await supabase
+      const { data: updatedIssue, error: updateError } = await supabase
         .from('material_issue_notes')
         .update({
           status: newStatus,
@@ -183,9 +187,16 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
           received_date: new Date().toISOString(),
           order_completed: allReceived,
         })
-        .eq('id', issueId);
+        .eq('id', issueId)
+        .select('*, warehouse_locations(name)')
+        .single();
 
       if (updateError) throw updateError;
+
+      queryClient.setQueriesData({ queryKey: ['material-issues'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((issue: any) => (issue.id === issueId ? { ...issue, ...updatedIssue } : issue));
+      });
 
       // Auto-create Material Return Note for variance items if requested
       let returnReference = '';
