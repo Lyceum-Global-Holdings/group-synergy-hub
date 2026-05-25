@@ -166,6 +166,41 @@ export async function fetchStockOnHand(
   });
 }
 
+export async function fetchItemStockAvailability(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: {
+    catalogItemId?: string | null;
+    locationId?: string | null;
+    binId?: string | null;
+    groupBy?: string | null;
+    includeZero?: boolean;
+    includeBatches?: boolean;
+  },
+): Promise<ReportEnvelope> {
+  if (!params.catalogItemId) {
+    // Item is required — return an empty envelope rather than throwing so the
+    // preview shows a friendly "no rows" state until the user picks one.
+    return envelopeBase(def, ctx, []);
+  }
+  const { data, error } = await supabase.rpc("report_item_stock_availability", {
+    p_catalog_item_id: params.catalogItemId,
+    p_location_id: params.locationId || null,
+    p_bin_id: params.binId || null,
+    p_group_by: params.groupBy || "bin",
+    p_include_zero: params.includeZero ?? false,
+    p_include_batches: params.includeBatches ?? false,
+  } as never);
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, {
+    on_hand_qty: sumCol(rows, "on_hand_qty"),
+    reserved_qty: sumCol(rows, "reserved_qty"),
+    available_qty: sumCol(rows, "available_qty"),
+    stock_value: sumCol(rows, "stock_value"),
+  });
+}
+
 export async function fetchInventoryValuation(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
