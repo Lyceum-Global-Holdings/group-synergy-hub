@@ -24,6 +24,8 @@ const getStatusColor = (status: string): "default" | "destructive" | "secondary"
       return 'secondary';
     case 'approved':
     case 'issued':
+    case 'partially_received':
+    case 'completed':
     case 'returned':
       return 'default';
     case 'cancelled':
@@ -138,8 +140,8 @@ export default function MaterialIssueReturn() {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => (
-        <Badge variant={getStatusColor(row.original.status)}>
-          {row.original.status}
+        <Badge variant={getStatusColor(row.original.status)} className="capitalize">
+          {row.original.status.replace(/_/g, ' ')}
         </Badge>
       )
     },
