@@ -52,6 +52,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
     icon: Package,
     subModules: [
       { key: 'warehouse-network', name: 'Warehouse Network', description: 'Org → Company → Warehouse → Sub-location interconnectivity map', url: '/warehouse/network' },
+      { key: 'scan-qr', name: 'Scan QR', description: 'Scan a bin or asset QR code from inside the app', url: '/scan' },
       { key: 'item-bin-master', name: 'Item & Bin Master', description: 'Item and location management', url: '/warehouse/item-bin-master' },
       { key: 'bin-allocations', name: 'Bin Allocations', description: 'Item-to-bin assignments and quantities', url: '/warehouse/bin-allocations' },
       { key: 'inventory', name: 'Inventory', description: 'On-hand stock by item, location and bin', url: '/warehouse/inventory' },

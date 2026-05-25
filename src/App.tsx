@@ -169,6 +169,8 @@ const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/Te
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
 const SecuritySettingsPage = lazy(() => import("./pages/admin/SecuritySettings"));
 const TelegramReportsPage = lazy(() => import("./pages/admin/TelegramReports"));
+const InstallApp = lazy(() => import("./pages/InstallApp"));
+const ScanQR = lazy(() => import("./pages/ScanQR"));
 
 // Supplier Portal pages
 const PortalLayout = lazy(() => import("./components/portal/PortalLayout").then((m) => ({ default: m.PortalLayout })));
@@ -307,6 +309,8 @@ function App() {
               <Route element={<ProtectedLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/account/mfa" element={<MfaSetup />} />
+                <Route path="/install" element={<InstallApp />} />
+                <Route path="/scan" element={<ScanQR />} />
                 
                 {/* Admin routes - protected by AdminRoute */}
                 <Route path="/admin/companies" element={<AdminRoute><CompanyManagement /></AdminRoute>} />
