@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,15 @@ interface Props {
 export function CatalogItemCell({ value, display, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 200);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const { data, isFetching, fetchNextPage, hasNextPage } = useWarehouseCatalogPage({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: 'active',
     pageSize: 25,
     enabled: open,
