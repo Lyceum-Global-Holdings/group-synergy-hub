@@ -400,26 +400,25 @@ function ItemParamInput({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Search results — paged ilike on item_code + name.
+  // Phrase-aware search via the search_warehouse_item_catalog RPC
+  // (PostgreSQL FTS with websearch_to_tsquery + trigram typo tolerance).
+  // Supports multi-word phrases in any order, "quoted phrases", OR and -exclude.
   const { data: results = [], isFetching } = useQuery({
     queryKey: ["report-item-picker", search],
     queryFn: async () => {
-      const term = search.trim();
-      let q = supabase
-        .from("warehouse_item_catalog")
-        .select("id, item_code, name, brand")
-        .order("item_code", { ascending: true })
-        .limit(25);
-      if (term) {
-        // Escape PostgREST reserved chars in the user-typed term.
-        const safe = term.replace(/[%,()]/g, " ").trim();
-        if (safe) {
-          q = q.or(`item_code.ilike.%${safe}%,name.ilike.%${safe}%`);
-        }
-      }
-      const { data, error } = await q;
+      const { data, error } = await supabase.rpc("search_warehouse_item_catalog", {
+        p_query: search.trim() || null,
+        p_limit: 25,
+      } as never);
       if (error) throw error;
-      return (data ?? []) as { id: string; item_code: string; name: string; brand: string | null }[];
+      return (data ?? []) as {
+        id: string;
+        item_code: string;
+        name: string;
+        brand: string | null;
+        category_name: string | null;
+        unit_name: string | null;
+      }[];
     },
     staleTime: 30_000,
   });
@@ -463,7 +462,7 @@ function ItemParamInput({
       <PopoverContent className="w-[min(28rem,90vw)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search by item code or name…"
+            placeholder={'Type any phrase — e.g. "white cement", portland m25'}
             value={search}
             onValueChange={setSearch}
           />
@@ -478,31 +477,36 @@ function ItemParamInput({
               <CommandEmpty>No items found.</CommandEmpty>
             )}
             <CommandGroup>
-              {results.map((it) => (
-                <CommandItem
-                  key={it.id}
-                  value={it.id}
-                  onSelect={() => {
-                    onChange(it.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === it.id ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <div className="flex flex-col">
-                    <span className="font-medium">
-                      {it.item_code} — {it.name}
-                    </span>
-                    {it.brand && (
-                      <span className="text-xs text-muted-foreground">{it.brand}</span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
+              {results.map((it) => {
+                const meta = [it.brand, it.category_name, it.unit_name]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <CommandItem
+                    key={it.id}
+                    value={it.id}
+                    onSelect={() => {
+                      onChange(it.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === it.id ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {it.item_code} — {it.name}
+                      </span>
+                      {meta && (
+                        <span className="text-xs text-muted-foreground">{meta}</span>
+                      )}
+                    </div>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
