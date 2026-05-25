@@ -1,49 +1,73 @@
-# Fix "Temporarily unavailable" on /b/:id bin QR
+# In-app QR scanning: Warehouse "Adjust stock" + Asset "Move asset"
 
-## Root cause
-The `/b/:id` scan calls edge function `public-bin-qr`, which calls the SECURITY DEFINER RPC `get_public_bin_allocation_qr`. Edge logs show:
+The PWA already ships a working `/scan` page (zxing-based camera scanner) and two destination pages:
+- `/b/:id` → bin allocation with "Adjust stock" dialog
+- `/asset/:assetId` → asset view with "Move asset" (PublicAssetTransferDialog)
 
-```
-ERROR public-bin-qr rpc failed { code: "42703", message: "column i.item_code does not exist" }
-```
+What's missing: discoverable in-app entry points from the two modules, intent-aware routing (only accept the right kind of QR), and auto-opening the action dialog after the scan.
 
-The RPC still joins `public.warehouse_items i` and selects `i.item_code`, `i.name`. Per the warehouse item master refactor (Stage 6b memory), those mirrored columns were dropped from `warehouse_items` and now live only on `warehouse_item_catalog`, exposed via the `warehouse_items_full` view. The RPC was missed in that migration.
+## Scope (exactly what the user asked)
 
-## Fix
-One DB migration replacing the RPC so it reads item master fields from `warehouse_items_full` (per the "Server-side SQL must read item master from warehouse_items_full" core rule). No edge function or frontend code changes — the contract and JSON shape are identical.
+1. **Warehouse Management** → single "Scan to adjust stock" entry point
+2. **Asset Management** → single "Scan to move asset" entry point
+3. No global scan FAB, no other intents
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_public_bin_allocation_qr(p_id uuid)
-RETURNS jsonb
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-  SELECT jsonb_build_object(
-    'id', a.id,
-    'item_code', i.item_code,
-    'item_name', i.name,
-    'bin_code', b.bin_code,
-    'bin_name', b.name,
-    'location_name', l.name,
-    'location_code', l.location_code,
-    'company_name', c.name,
-    'allocated_quantity', a.allocated_quantity,
-    'available_quantity', a.available_quantity,
-    'updated_at', a.updated_at
-  )
-  FROM public.warehouse_bin_allocations a
-  JOIN public.warehouse_items_full i ON i.id = a.warehouse_item_id
-  JOIN public.warehouse_bins b ON b.id = a.bin_id
-  LEFT JOIN public.warehouse_locations l ON l.id = b.location_id
-  LEFT JOIN public.companies c ON c.id = a.company_id
-  WHERE a.id = p_id
-  LIMIT 1;
-$$;
-```
+## Design — aligned with international standards
+
+- **QR payload**: GS1 Digital Link URI Syntax v1.4 (already used for bin QR via `buildBinQRPayload`). Add `buildAssetQRPayload` so asset labels become
+  `https://stores.lgh.lk/a/{asset_id}?8004={asset_tag}` (AI 8004 = GS1 "Serial shipping container / serialized asset identifier"). Keep the existing `/asset/:id` path as a permanent alias so already-printed labels still resolve.
+- **Resolver host**: pinned to `stores.lgh.lk` (per existing project rule — printed labels live for years).
+- **Camera**: WebRTC `getUserMedia` with `facingMode: environment`, multi-format decode (ISO/IEC 18004 QR + Code 128 fallback already supported by `BrowserMultiFormatReader`).
+- **Privacy**: scanner page already sets `noindex,nofollow`; we keep that.
+- **Auth model**: unchanged — public pages render anonymously; the action buttons (Adjust / Move) require sign-in (existing behaviour).
+
+## Changes
+
+### 1. `src/pages/ScanQR.tsx` — intent gating
+- Read `?intent=adjust-stock | move-asset` from the URL.
+- Update `resolveTarget()` so:
+  - `adjust-stock` only accepts `/b/:uuid` (bin allocations); asset codes show a friendly "Wrong code type — scan a bin QR" message.
+  - `move-asset` only accepts `/asset/:uuid` and the new `/a/:uuid` GS1 form; bin codes show the inverse message.
+  - No intent → current behaviour (accept both).
+- After a successful match, append `?action=adjust` or `?action=move` to the target so the destination page auto-opens the right dialog.
+- Update the heading/description to reflect the active intent.
+
+### 2. `src/pages/PublicBinAllocation.tsx`
+- When `?action=adjust` is present and the user is signed in, auto-open `ScannedBinAdjustmentDialog` once data loads.
+
+### 3. `src/pages/PublicAssetView.tsx`
+- When `?action=move` is present and the user is signed in, auto-open `PublicAssetTransferDialog` once data loads.
+- Accept the new `/a/:assetId` route as an alias (add a `<Route path="/a/:assetId" element={<PublicAssetView />} />` in `src/App.tsx`).
+
+### 4. Module entry points
+- **Warehouse Management** (`src/pages/warehouse/AssetManagement.tsx` is the Asset module — the warehouse "Adjust stock" entry belongs on the bin/stock pages). Add a primary button **"Scan to adjust stock"** in the page header of `src/pages/warehouse/BinAllocations.tsx` (and the same button on `src/pages/warehouse/ItemBinMaster.tsx` since both are stock-adjustment surfaces) that navigates to `/scan?intent=adjust-stock`. Icon: `ScanLine`. Mobile-friendly sizing (`size="sm"` on `md:`, full-width on `sm:`).
+- **Asset Management** (`src/pages/warehouse/AssetManagement.tsx`): add **"Scan to move asset"** in the page header → `/scan?intent=move-asset`.
+- Both buttons are visible to any signed-in user with module access; the destination dialogs already enforce role/permission checks server-side.
+
+### 5. GS1 asset payload util
+- New `src/utils/assetQRPayload.ts` mirroring `binQRPayload.ts`:
+  ```ts
+  buildAssetQRPayload({ assetId, assetTag })
+    → `https://stores.lgh.lk/a/${assetId}?8004=${assetTag}`
+  ```
+- Update `src/components/warehouse/AssetQRCode.tsx` and `src/utils/bulkQRCodePdf.ts` to use the new helper (replaces hard-coded `group-synergy-hub.lovable.app/asset/...`). Existing printed labels keep working because `/asset/:id` route stays mounted.
+
+### 6. Tiny polish
+- ScanQR adds a "Cancel" link back to the originating module when `intent` is set, using `document.referrer` fallback to `/`.
+
+## Out of scope
+- Native barcode (`BarcodeDetector`) fast-path — defer; zxing already works on iOS Safari 17+ and all evergreen browsers.
+- Offline scan queue — defer.
+- New permissions, RLS, RPCs, or migrations — none needed.
 
 ## Verification
-- Re-curl `public-bin-qr?id=<real allocation id>` → expect 200 with populated `item_code` / `item_name`.
-- Reload `https://stores.lgh.lk/b/<id>` on mobile → card renders instead of "Temporarily unavailable".
+- iPhone Safari (PWA installed) at `stores.lgh.lk`:
+  1. Asset Management → tap "Scan to move asset" → camera opens → scan an asset QR → `/a/:id?action=move` loads → Move dialog auto-opens.
+  2. Bin Allocations → tap "Scan to adjust stock" → scan a bin QR → `/b/:id?action=adjust` → Adjust dialog auto-opens.
+  3. Scan the wrong type for the active intent → friendly mismatch message, no navigation.
+- Desktop Chrome: same flows still work.
+- Existing printed `/asset/:id` and `/b/:id` labels (without `?action`) continue to render the read-only card.
 
-## Follow-up audit (same migration turn, read-only)
-Grep other RPCs/views for `FROM warehouse_items\b` selecting `item_code`/`name` and flag any other stragglers, but only fix this one now unless others are also broken in production.
+## Files touched
+- edit: `src/pages/ScanQR.tsx`, `src/pages/PublicBinAllocation.tsx`, `src/pages/PublicAssetView.tsx`, `src/App.tsx`, `src/pages/warehouse/BinAllocations.tsx`, `src/pages/warehouse/ItemBinMaster.tsx`, `src/pages/warehouse/AssetManagement.tsx`, `src/components/warehouse/AssetQRCode.tsx`, `src/utils/bulkQRCodePdf.ts`
+- create: `src/utils/assetQRPayload.ts`

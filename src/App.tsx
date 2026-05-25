@@ -264,6 +264,8 @@ function App() {
                 </AuthProvider>
               } />
               <Route path="/asset/:assetId" element={<PublicAssetView />} />
+              {/* GS1 Digital Link alias for newly-printed asset QR labels */}
+              <Route path="/a/:assetId" element={<PublicAssetView />} />
               <Route path="/b/:id" element={
                 <AuthProvider>
                   <PublicBinAllocation />

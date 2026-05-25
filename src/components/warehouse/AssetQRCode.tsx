@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { QrCode, Download, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
+import { buildAssetQRPayload } from '@/utils/assetQRPayload';
 
 interface AssetQRCodeProps {
   assetId: string;
@@ -18,9 +19,9 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Use the published URL so QR codes work publicly without Lovable login
-  const PUBLISHED_APP_URL = 'https://group-synergy-hub.lovable.app';
-  const publicUrl = `${PUBLISHED_APP_URL}/asset/${assetId}`;
+  // GS1 Digital Link payload pinned to the stable resolver domain — see
+  // src/utils/assetQRPayload.ts for the format contract.
+  const publicUrl = buildAssetQRPayload({ assetId, assetTag: assetIdentifier });
 
   const generateQRCode = async () => {
     if (!publicUrl || !assetId) {

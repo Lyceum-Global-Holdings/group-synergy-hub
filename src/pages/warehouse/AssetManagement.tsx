@@ -38,7 +38,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye, BarChart3, Layers } from "lucide-react";
+import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye, BarChart3, Layers, ScanLine } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -457,7 +458,13 @@ export default function AssetManagement() {
             Track and manage warehouse assets, equipment, and machinery
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button asChild variant="default">
+            <Link to="/scan?intent=move-asset">
+              <ScanLine className="h-4 w-4 mr-2" />
+              Scan to move asset
+            </Link>
+          </Button>
           <BulkAssetImportDialog />
           <CategoryManagementDialog />
           <LocationManagementDialog />
