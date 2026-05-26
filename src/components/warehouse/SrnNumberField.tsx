@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, AlertCircle, FileText } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
-  SRN_FORMAT,
   checkSrnExists,
   useGenerateSrnNumber,
 } from '@/hooks/useSrnNumber';
@@ -70,10 +69,6 @@ export function SrnNumberField({
   const handleBlur = async () => {
     setError(null);
     if (!value) return;
-    if (!SRN_FORMAT.test(value)) {
-      setError('Format must be SRN-YYYY-NNNNNN');
-      return;
-    }
     if (!selectedCompany?.id) return;
     try {
       setChecking(true);
@@ -103,11 +98,11 @@ export function SrnNumberField({
           id="srn_number"
           value={value}
           onChange={(e) => {
-            onChange(e.target.value.toUpperCase());
+            onChange(e.target.value);
             setMode('manual');
           }}
           onBlur={handleBlur}
-          placeholder="SRN-YYYY-NNNNNN"
+          placeholder="Enter SRN number"
           disabled={disabled || generate.isPending}
           aria-invalid={!!error}
           className={error ? 'border-destructive' : ''}
@@ -133,7 +128,7 @@ export function SrnNumberField({
         <p className="text-xs text-muted-foreground">
           {checking
             ? 'Checking availability…'
-            : 'Auto-generated. Click the refresh icon to regenerate, or type to enter your own number.'}
+            : 'Auto-generated. Click refresh to regenerate, or type any SRN number.'}
         </p>
       )}
     </div>

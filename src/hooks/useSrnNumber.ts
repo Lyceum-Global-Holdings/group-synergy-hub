@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export const SRN_FORMAT = /^SRN-\d{4}-\d{6}$/;
+
 
 export const useGenerateSrnNumber = () => {
   return useMutation({
