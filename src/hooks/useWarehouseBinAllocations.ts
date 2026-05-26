@@ -595,6 +595,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
                 allocated_quantity: expectedQty,
                 reserved_quantity: 0,
                 company_id: selectedCompany.id,
+                location_id: locationId,
                 created_by: user.user?.id,
               });
 
