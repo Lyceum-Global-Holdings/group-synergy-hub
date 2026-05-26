@@ -101,6 +101,8 @@ export function BulkIssueFromInventoryDialog({
   });
 
   const [lines, setLines] = useState<BulkIssueLine[]>([]);
+  const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
+
 
   // Seed lines from the selected inventory rows when the dialog opens.
   // Merge with any lines already in state so re-opens don't wipe edits,
