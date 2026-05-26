@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, AlertCircle, FileText } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
-  SRN_FORMAT,
   checkSrnExists,
   useGenerateSrnNumber,
 } from '@/hooks/useSrnNumber';
