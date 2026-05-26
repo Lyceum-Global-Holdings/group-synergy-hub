@@ -176,6 +176,7 @@ export function CreateStockTransferDialog({
         company_id: resolvedCompanyId,
         from_location_id: fromBin?.location_id ?? null,
         to_location_id: toBin?.location_id ?? null,
+        ...(isAdminOrHigher ? { status: 'approved' as const } : {}),
       };
 
       const transfer = await createTransfer.mutateAsync(transferData);
