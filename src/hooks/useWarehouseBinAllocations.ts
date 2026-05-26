@@ -43,7 +43,8 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
             )
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(0, 49999);
 
       if (fetchError) throw fetchError;
 
