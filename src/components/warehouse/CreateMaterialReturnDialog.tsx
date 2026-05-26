@@ -111,6 +111,24 @@ export function CreateMaterialReturnDialog({
         srn_number: srnNumber || undefined,
       });
 
+      // Move SRN document from temp/ into the new MRN folder, then persist column.
+      if (srnDocumentTempPath && newReturn?.id && selectedCompany?.id) {
+        try {
+          const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
+          const finalPath = `${selectedCompany.id}/${newReturn.id}/srn_${Date.now()}.${ext}`;
+          const { error: moveErr } = await supabase.storage
+            .from('min-srn-documents')
+            .move(srnDocumentTempPath, finalPath);
+          const persistedPath = moveErr ? srnDocumentTempPath : finalPath;
+          await supabase
+            .from('material_return_notes')
+            .update({ srn_document_url: persistedPath })
+            .eq('id', newReturn.id);
+        } catch (e) {
+          console.error('Failed to attach SRN document to MRN', e);
+        }
+      }
+
       const returnItems = items.map((item) => ({
         mrn_id: newReturn.id,
         item_id: item.warehouse_item_id,
@@ -133,12 +151,14 @@ export function CreateMaterialReturnDialog({
       setReason('');
       setNotes('');
       setSrnNumber('');
+      setSrnDocumentTempPath('');
       setItems([]);
       onOpenChange(false);
     } catch (error) {
       console.error('Error creating material return:', error);
     }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
