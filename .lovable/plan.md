@@ -1,68 +1,56 @@
-# Material Issue stock deduction fix
+## Goal
 
-## Diagnosis (verified against DB)
+Make every Material Issue Note (MIN) appear in each item's Stock Movement History with the **document number, document type, and clickable reference** — aligned with SAP MM / Oracle Inventory / GS1 LIM conventions where every goods-movement line is traceable to its source material document.
 
-Recent MINs were marked `completed` but stock was not reduced. Two concrete failure modes:
+## Findings
 
-1. **Location/bin hierarchy mismatch** — The RPC `process_material_issue_stock_update` only deducts from bins whose `warehouse_bins.location_id` **exactly equals** the MIN's `location_id`. But MINs are commonly issued at a **parent warehouse / sub-location** (e.g. `de0c4bd9…`), while the item's bins sit at **child sub-locations** (e.g. `0630cfec…`, `735ddaab…`). Result: RPC raises *"Insufficient stock at selected location"* → frontend just shows a toast.
+- `stock_transactions` already has 707 MIN-derived rows (39 `manual` + 668 `transfer`-flavoured) with correct `item_id`, `location_id`, `bin_id`. They DO render in `StockMovementDialog`, **but**:
+  1. `reference_type` is written as `'manual'` instead of the standard `'mrn'` → the row looks generic, not a goods-issue document.
+  2. The "Reference" column shows the raw `reference_id` UUID; the MIN number is only buried in `notes` ("Material Issue: MIN-20260526-003").
+  3. There is no link from the history row back to the source MIN.
+- The two `process_material_issue_stock_update` RPC overloads hard-code `reference_type => 'manual'`. The companion `warehouse_stock_movements` row already uses the correct `'material_issue'` + `reference_number` — only `stock_transactions` is out of step.
+- Symmetric gap: `material_returns` writes are fine (`reference_type='mrn'`), but no enum value exists for MIN documents specifically — `mrn` is currently shared by both issues and returns, which is acceptable internationally (both are "Material Movement Notes").
 
-   Example — `MIN-20260525-002` at `de0c4bd9…` deducted **0** of 15 lines (master stock 316/5/45/34/… untouched; zero `stock_transactions` rows).
+## Solution (international standard, SAP MM-style)
 
-2. **Non-atomic write** — `useMaterialIssueItems` inserts `material_issue_items` first, then calls the RPC in a separate request. When the RPC throws, the MIN/items remain and the MIN is later marked `completed/issued` even though no stock moved.
+### 1. Database migration
 
-## Fix
+- Update both `process_material_issue_stock_update` overloads so the `stock_transactions` insert uses:
+  - `reference_type := 'mrn'`
+  - `reference_id := p_min_id`
+  - keep `notes` as the human readable line.
+- Backfill: `UPDATE stock_transactions SET reference_type='mrn' WHERE transaction_type='material_issue' AND reference_type='manual' AND reference_id IN (SELECT id FROM material_issue_notes)`.
+- Extend `get_bin_scoped_stock_movements` to also return a resolved `reference_number` and `reference_doc_type` by joining the source document table per `reference_type`:
+  - `mrn` → `material_issue_notes.min_number` (issue) or `material_return_notes.mrn_number` (return) — resolved by checking `transaction_type`.
+  - `grn` → `goods_receipt_notes.grn_number`.
+  - `transfer` → `stock_transfer_requests.request_number` (fall back to `stock_transfers.transfer_number`).
+  - `adjustment` → `stock_adjustments.adjustment_number` (or notes).
+  - `project` → `construction_projects.project_code`.
+- Add a partial index `(reference_type, reference_id)` to keep the join cheap.
 
-### A. DB — make RPC location-hierarchy aware
+### 2. Reader hook + dialog (`useStockTransactions`, `StockMovementDialog`)
 
-Update `process_material_issue_stock_update` (both overloads) so the location filter resolves the **subtree** of `p_location_id` instead of an exact match:
+- Carry the new `reference_number` and `reference_doc_type` fields through `useStockTransactions`.
+- In `StockMovementDialog`, replace the raw-UUID "Reference" cell with:
+  - Primary line: document number (e.g. `MIN-20260526-003`) as a `Link` to the source viewer when the doc type is known.
+  - Secondary line: small muted label of the document type ("Material Issue Note", "GRN", "Transfer", "Adjustment").
+  - Fallback to `—` only when no document is linked (truly manual adjustments).
+- Refresh the `transactionTypeLabels` / colour map to also recognise `material_issue` rows that came from the standard MIN flow.
 
-```text
-WITH RECURSIVE loc_tree AS (
-  SELECT id FROM warehouse_locations WHERE id = p_location_id
-  UNION ALL
-  SELECT wl.id FROM warehouse_locations wl
-  JOIN loc_tree t ON wl.parent_id = t.id
-)
-… WHERE wb.location_id IN (SELECT id FROM loc_tree)
-```
+### 3. Verification
 
-Applies to: availability check, bin-validation check, FIFO loop. `stock_transactions.location_id` records the actual bin's location (real storage), not the parent.
+- Re-open Inventory → any item issued via MIN-20260525-002 / MIN-20260526-003 → confirm rows show "Material Issue • MIN-…" with link.
+- New MIN posted from UI → row appears with `reference_type='mrn'` and resolves to its MIN number.
+- No regressions for GRN, transfers, adjustments, project moves.
 
-If `p_bin_allocation_id` is provided, still require that bin's location ∈ subtree.
+### Out of scope
 
-### B. DB — atomic wrapper RPC for full issue
+- No UI work on the MIN list/print itself.
+- No changes to bin allocation or stock numbers (only labelling + linkage).
+- No new enum value (`mrn` already exists and is the international "Material Movement Note" convention shared by issues and returns).
 
-Add `process_material_issue_full(p_min_id uuid, p_items jsonb)` that, in a single transaction:
-1. Inserts each `material_issue_items` row.
-2. Calls the stock-update logic inline per line (same FIFO/hierarchy logic).
-3. Updates reservation rows (`update_reservation_on_issue`) when `from_reservation`.
-4. Sets `material_issue_notes.status = 'issued'` only on success.
-5. On any exception: full rollback, surface error.
+## Technical notes
 
-### C. Frontend — call the wrapper, fail loudly
-
-`src/hooks/useMaterialIssueItems.ts`:
-- Replace the current "insert → loop RPC with try/catch toasting" pattern with a single `supabase.rpc('process_material_issue_full', { p_min_id, p_items })`.
-- On error, **throw** so the mutation rejects, the dialog stays open, and the MIN is not advanced.
-- Keep the same query invalidations on success.
-
-No UI/copy changes; same caller surface (`createItems`).
-
-### D. Reconciliation for already-completed MINs
-
-One-off migration: for every `material_issue_items` row whose parent MIN is `completed`/`issued` and has **zero** matching `stock_transactions` rows, replay the (now hierarchy-aware) deduction. Items whose total subtree stock is still insufficient are reported via a `min_issue_reconciliation_log` table (id, min_id, item_id, reason) rather than silently skipped.
-
-## Files
-
-- `supabase/migrations/<ts>_material_issue_hierarchy_and_atomic.sql`
-  - Replace both `process_material_issue_stock_update` overloads with hierarchy-aware versions.
-  - Add `process_material_issue_full` RPC.
-  - Create `min_issue_reconciliation_log` table (+ RLS: super_admin/admin select).
-  - Replay backfill block for pending unreduced MIN lines.
-- `src/hooks/useMaterialIssueItems.ts` — switch to `process_material_issue_full`, surface errors.
-
-## Out of scope
-
-- No UI redesign, no changes to MaterialIssueDialog fields.
-- No changes to material returns / GRN flows.
-- Multi-tenant `company_id` scoping unchanged (RPC keeps SECURITY DEFINER + company resolution from MIN).
+- `stock_transactions.quantity_before/after` continues to be set by the `set_stock_transaction_balances` trigger — untouched.
+- The reader RPC stays `SECURITY INVOKER` and respects existing RLS.
+- Migration is forward-only and idempotent (the backfill `UPDATE` is safe to re-run).
