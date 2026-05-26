@@ -207,13 +207,23 @@ export function useToolBinAllocations(toolId?: string) {
           .eq("id", dest.id);
         if (incErr) throw incErr;
       } else {
+        const { data: destBin, error: destBinErr } = await supabase
+          .from("warehouse_bins")
+          .select("location_id, company_id")
+          .eq("id", input.to_bin_id)
+          .single();
+        if (destBinErr) throw destBinErr;
+        if (!destBin?.location_id || !destBin?.company_id) {
+          throw new Error("Destination bin is missing location/company assignment.");
+        }
         const { error: insErr } = await supabase
           .from("warehouse_bin_allocations")
           .insert({
             warehouse_item_id: warehouseItemId,
             bin_id: input.to_bin_id,
             allocated_quantity: input.quantity,
-            company_id: source.company_id ?? selectedCompany?.id ?? null,
+            company_id: destBin.company_id,
+            location_id: destBin.location_id,
             created_by: userData.user?.id ?? null,
           });
         if (insErr) throw insErr;
