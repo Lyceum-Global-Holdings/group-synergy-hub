@@ -10,30 +10,42 @@ const BUCKET = "min-srn-documents";
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
 
+type SrnPersistTable =
+  | "material_issue_notes"
+  | "material_requests"
+  | "material_return_notes";
+
 interface SrnDocumentUploadFieldProps {
   /** Owning company id — used as the first path segment for RLS. */
   companyId?: string;
-  /** Existing MIN id (when editing). If omitted, files are uploaded under a `temp/` folder. */
+  /** Existing record id (when editing). If omitted, files are uploaded under a `temp/` folder. */
+  recordId?: string;
+  /** @deprecated use recordId */
   minId?: string;
   /** Current stored object path. */
   currentDocumentUrl?: string;
   /** Notifies parent of the new path (or empty string if removed). */
   onUpload: (path: string) => void;
-  /** When true, persists the path to material_issue_notes.srn_document_url after upload/remove. */
+  /** When true, persists the path on the configured table after upload/remove. */
   persistOnChange?: boolean;
+  /** Target table for persistOnChange. Defaults to material_issue_notes. */
+  table?: SrnPersistTable;
   disabled?: boolean;
   label?: string;
 }
 
 export function SrnDocumentUploadField({
   companyId,
+  recordId,
   minId,
   currentDocumentUrl,
   onUpload,
   persistOnChange = false,
+  table = "material_issue_notes",
   disabled,
   label = "SRN Document (photo / scan)",
 }: SrnDocumentUploadFieldProps) {
+  const effectiveId = recordId ?? minId;
   const [uploading, setUploading] = useState(false);
   const [documentPath, setDocumentPath] = useState<string | undefined>(currentDocumentUrl);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -66,13 +78,14 @@ export function SrnDocumentUploadField({
   }, [documentPath]);
 
   const persist = async (newPath: string | null) => {
-    if (!persistOnChange || !minId) return;
+    if (!persistOnChange || !effectiveId) return;
     const { error } = await supabase
-      .from("material_issue_notes")
+      .from(table)
       .update({ srn_document_url: newPath })
-      .eq("id", minId);
+      .eq("id", effectiveId);
     if (error) throw error;
   };
+
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
@@ -104,7 +117,7 @@ export function SrnDocumentUploadField({
     try {
       setUploading(true);
       const ext = (file.name.split(".").pop() || "bin").toLowerCase();
-      const folder = minId ?? "temp";
+      const folder = effectiveId ?? "temp";
       const path = `${companyId}/${folder}/srn_${Date.now()}.${ext}`;
 
       const { data, error } = await supabase.storage

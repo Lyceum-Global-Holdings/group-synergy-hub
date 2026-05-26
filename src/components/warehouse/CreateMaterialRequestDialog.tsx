@@ -16,6 +16,8 @@ import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
+import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUploadField";
+import { useCompany } from "@/contexts/CompanyContext";
 import { MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { WarehouseItem } from "@/types/itemBin";
 import { ReservationWithDetails } from "@/types/warehouseReservation";
@@ -58,7 +60,9 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
   });
   const [items, setItems] = useState<RequestItem[]>([]);
   const [cpoReservations, setCpoReservations] = useState<ReservationWithDetails[]>([]);
-  
+  const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>("");
+
+  const { selectedCompany } = useCompany();
   const { createRequestAsync, isCreating } = useMaterialRequests();
   const { createItems } = useMaterialRequestItems();
   const { locations } = useWarehouseLocations();
@@ -178,7 +182,25 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     try {
       // Create the request
       const newRequest = await createRequestAsync(requestData);
-      
+
+      // Move SRN document from temp/ into the new request folder, then persist column.
+      if (srnDocumentTempPath && newRequest?.id && selectedCompany?.id) {
+        try {
+          const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
+          const finalPath = `${selectedCompany.id}/${newRequest.id}/srn_${Date.now()}.${ext}`;
+          const { error: moveErr } = await supabase.storage
+            .from('min-srn-documents')
+            .move(srnDocumentTempPath, finalPath);
+          const persistedPath = moveErr ? srnDocumentTempPath : finalPath;
+          await supabase
+            .from('material_requests')
+            .update({ srn_document_url: persistedPath })
+            .eq('id', newRequest.id);
+        } catch (e) {
+          console.error('Failed to attach SRN document to request', e);
+        }
+      }
+
       // Create the items
       if (items.length > 0 && newRequest) {
         await createItems(items.map((item, index) => ({
@@ -206,6 +228,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     }
   };
 
+
   const resetForm = () => {
     setStep(1);
     setRequestData({
@@ -225,7 +248,9 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     });
     setItems([]);
     setCpoReservations([]);
+    setSrnDocumentTempPath("");
   };
+
 
   const canProceedToStep2 = requestData.requested_by && requestData.items_required_date && requestData.purpose;
   const canSubmit = items.length > 0;
@@ -380,6 +405,13 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
               value={requestData.srn_number}
               onChange={(v) => setRequestData({ ...requestData, srn_number: v })}
             />
+
+            <SrnDocumentUploadField
+              companyId={selectedCompany?.id}
+              currentDocumentUrl={srnDocumentTempPath}
+              onUpload={setSrnDocumentTempPath}
+            />
+
 
             <div>
               <Label htmlFor="purpose">Purpose *</Label>

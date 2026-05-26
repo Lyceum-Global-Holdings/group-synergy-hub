@@ -10771,6 +10771,7 @@ export type Database = {
           request_date: string
           request_number: string
           requested_by: string
+          srn_document_url: string | null
           srn_number: string | null
           status: Database["public"]["Enums"]["material_request_status"]
           updated_at: string
@@ -10802,6 +10803,7 @@ export type Database = {
           request_date?: string
           request_number: string
           requested_by: string
+          srn_document_url?: string | null
           srn_number?: string | null
           status?: Database["public"]["Enums"]["material_request_status"]
           updated_at?: string
@@ -10833,6 +10835,7 @@ export type Database = {
           request_date?: string
           request_number?: string
           requested_by?: string
+          srn_document_url?: string | null
           srn_number?: string | null
           status?: Database["public"]["Enums"]["material_request_status"]
           updated_at?: string
@@ -10951,6 +10954,7 @@ export type Database = {
           return_date: string
           return_type: string
           returned_by: string
+          srn_document_url: string | null
           srn_number: string | null
           status: string
           total_value: number | null
@@ -10971,6 +10975,7 @@ export type Database = {
           return_date?: string
           return_type?: string
           returned_by: string
+          srn_document_url?: string | null
           srn_number?: string | null
           status?: string
           total_value?: number | null
@@ -10991,6 +10996,7 @@ export type Database = {
           return_date?: string
           return_type?: string
           returned_by?: string
+          srn_document_url?: string | null
           srn_number?: string | null
           status?: string
           total_value?: number | null

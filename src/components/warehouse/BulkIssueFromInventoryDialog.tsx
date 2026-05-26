@@ -39,6 +39,8 @@ import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
 import { useWarehouseItemsLazyInventory } from '@/hooks/useWarehouseItemsLazyInventory';
+import { SrnDocumentUploadField } from '@/components/warehouse/SrnDocumentUploadField';
+import { supabase } from '@/integrations/supabase/client';
 
 interface InventoryRow {
   id: string;
@@ -99,6 +101,8 @@ export function BulkIssueFromInventoryDialog({
   });
 
   const [lines, setLines] = useState<BulkIssueLine[]>([]);
+  const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
+
 
   // Seed lines from the selected inventory rows when the dialog opens.
   // Merge with any lines already in state so re-opens don't wipe edits,
@@ -195,6 +199,25 @@ export function BulkIssueFromInventoryDialog({
         location_id: header.location_id,
         company_id: selectedCompany.id,
       });
+
+      // Move SRN document from temp/ into the new MIN folder, then persist column.
+      if (srnDocumentTempPath && issueNote?.id && selectedCompany?.id) {
+        try {
+          const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
+          const finalPath = `${selectedCompany.id}/${issueNote.id}/srn_${Date.now()}.${ext}`;
+          const { error: moveErr } = await supabase.storage
+            .from('min-srn-documents')
+            .move(srnDocumentTempPath, finalPath);
+          const persistedPath = moveErr ? srnDocumentTempPath : finalPath;
+          await supabase
+            .from('material_issue_notes')
+            .update({ srn_document_url: persistedPath })
+            .eq('id', issueNote.id);
+        } catch (e) {
+          console.error('Failed to attach SRN document to MIN', e);
+        }
+      }
+
 
       const itemsPayload = lines.map((l, idx) => ({
         min_id: issueNote.id,
@@ -325,7 +348,17 @@ export function BulkIssueFromInventoryDialog({
                 rows={2}
               />
             </div>
+            <div className="md:col-span-3">
+              <SrnDocumentUploadField
+                companyId={selectedCompany?.id}
+                currentDocumentUrl={srnDocumentTempPath}
+                onUpload={setSrnDocumentTempPath}
+              />
+            </div>
           </div>
+
+
+
 
           {/* Validation summary */}
           {validationErrors.length > 0 && (
