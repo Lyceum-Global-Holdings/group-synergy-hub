@@ -1,34 +1,48 @@
-## Goal
-Let users attach a photo or scanned file of the signed SRN to material requests, individual issues, bulk issues, and material returns. Individual issue already has this — extend it to the other three surfaces using the existing `SrnDocumentUploadField` and `min-srn-documents` storage bucket.
+## Problem
 
-## Backend
-Add the storage column to the two tables that don't have it yet:
+Clicking **Confirm Receipt** in the Receive Items dialog returns `PGRST116 — 0 rows` and the toast "Failed to receive items". As a side effect, the downstream stock movements/status that depend on `quantity_received` never get written, so stock figures never settle.
 
-```sql
-ALTER TABLE public.material_requests     ADD COLUMN IF NOT EXISTS srn_document_url text;
-ALTER TABLE public.material_return_notes ADD COLUMN IF NOT EXISTS srn_document_url text;
-```
+Root cause is in Row-Level Security, not the dialog code:
 
-No new bucket, no new RLS — the existing `min-srn-documents` bucket and its company-scoped storage policies already cover all three header tables (policies key off `company_id` as the first folder segment).
+- `material_issue_notes` UPDATE policy only allows:
+  - admins, OR
+  - the creator while `status = 'draft'`.
+- `material_issue_items` ALL policy mirrors the same rule.
 
-## Frontend
-Reuse `SrnDocumentUploadField` (already supports JPG/PNG/WEBP/PDF, camera capture, 5MB cap, signed URL preview). Wire it in next to the SRN number field, using the same "upload to `temp/`, then move/update path after insert" pattern as `CreateMaterialIssueDialog`:
+By the time someone receives an issue, the note is already in `status = 'issued'`, so the UPDATE returns 0 rows and `.single()` throws. Non-admin receivers can never close the loop.
 
-- **`BulkIssueFromInventoryDialog.tsx`** — add field; after MIN insert, persist path via `update({ srn_document_url })` on `material_issue_notes`.
-- **`CreateMaterialRequestDialog.tsx`** — add field; after request insert, persist on `material_requests`.
-- **`CreateMaterialReturnDialog.tsx`** — add field; after return insert, persist on `material_return_notes`.
+## Fix
 
-Generalise `SrnDocumentUploadField` so `persistOnChange` works for any of the three tables: add a `table` prop (`'material_issue_notes' | 'material_requests' | 'material_return_notes'`, default `material_issue_notes` to preserve current behavior). Rename `minId` → `recordId` (keep `minId` as deprecated alias to avoid breaking existing call sites).
+Tighten the RLS so the receiving flow works for legitimate users without weakening draft-edit protection.
 
-## Display
-Show the attached document in the existing details dialogs when present:
-- `MaterialIssueDetailsDialog` — already shows it (no change).
-- `MaterialRequestDetailsDialog` / `MaterialReturnDetailsDialog` — render `SrnDocumentUploadField` in read-only mode (disabled) bound to the record's `srn_document_url`.
+### Migration (single migration)
 
-## Types
-Extend `src/types/materialIssueReturn.ts` to add `srn_document_url?: string | null` on `MaterialRequest` and `MaterialReturnNote`. `src/integrations/supabase/types.ts` regenerates automatically after the migration.
+1. Drop and recreate the UPDATE policy on `public.material_issue_notes`:
+   - Admins: full update (unchanged).
+   - Creator while `status = 'draft'`: full update (unchanged).
+   - Any user with `can_access_company(company_id)` may update **only** when the note is in a receivable state (`status IN ('issued','partially_received')`). This is what `ReceiveItemsDialog` needs to flip status to `partially_received` / `completed` and stamp `received_by`, `received_by_name`, `received_date`, `order_completed`.
+
+2. Drop and recreate the ALL policy on `public.material_issue_items` to mirror the same logic, so `quantity_received` / `received_at` updates succeed for receivers in the same company. INSERT/DELETE remain limited to creators-in-draft and admins.
+
+3. Keep all other policies (SELECT, INSERT, DELETE) unchanged.
+
+No schema columns are added. No trigger changes. The `trigger_update_material_issue_note_receipt_status` trigger and any existing stock-movement logic continue to run on the now-successful UPDATEs.
+
+### Why this is safe
+
+- Draft editing stays locked to creator + admins.
+- Receiving is a company-scoped operation gated by `can_access_company`, the same predicate already used for SELECT.
+- No code changes in `ReceiveItemsDialog.tsx` are needed — once RLS allows the UPDATE, the existing flow (`quantity_received` per item → note status → optional auto-MRN → cache invalidation) completes and stock reconciles.
 
 ## Out of scope
-- No change to SRN number validation (already removed previously).
-- No bulk-history viewer changes beyond the details dialogs above.
-- File size/type rules stay as today (5MB, JPG/PNG/WEBP/PDF).
+
+- Changing how/when stock is deducted (issue-time vs receive-time logic stays as-is).
+- UI changes to the Receive Items dialog.
+- SRN validation or attachments.
+
+## Verification
+
+After the migration, retry the failing flow on `MIN-20260526-002`:
+- Receive succeeds, toast shows success.
+- Note status flips to `completed`, `received_by/date` populated.
+- Stock-related queries (`warehouse-items`, `stock-transactions`) reflect the receipt.
