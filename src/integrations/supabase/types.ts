@@ -21666,7 +21666,9 @@ export type Database = {
           quantity_after: number
           quantity_before: number
           quantity_change: number
+          reference_doc_type: string
           reference_id: string
+          reference_number: string
           reference_type: string
           total_value: number
           transaction_type: string
