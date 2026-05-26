@@ -94,7 +94,9 @@ export function StockMovementDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('warehouse_bin_allocations')
-        .select('bin_id, allocated_quantity, warehouse_bins(id, bin_code, name, location_id)')
+        .select(
+          'bin_id, allocated_quantity, warehouse_bins(id, bin_code, name, location_id, root_location_id)',
+        )
         .eq('warehouse_item_id', itemId);
       if (error) throw error;
 
@@ -103,7 +105,15 @@ export function StockMovementDialog({
       (data || []).forEach((row: any) => {
         const b = row.warehouse_bins;
         if (!b?.id || seen.has(b.id)) return;
-        if (locationId && b.location_id !== locationId) return; // strict location scope
+        // Subtree scope (read-only): include bins whose exact location OR whose
+        // root warehouse matches the selected location. This lets root-warehouse
+        // scope surface bins sitting in sub-locations under that warehouse.
+        if (
+          locationId &&
+          b.location_id !== locationId &&
+          b.root_location_id !== locationId
+        )
+          return;
         seen.add(b.id);
         opts.push({
           id: b.id,
@@ -112,6 +122,8 @@ export function StockMovementDialog({
           quantity: Number(row.allocated_quantity || 0),
         });
       });
+      // Prefer bins with stock first so the default selection is meaningful.
+      opts.sort((a, b) => b.quantity - a.quantity);
       return opts;
     },
   });
