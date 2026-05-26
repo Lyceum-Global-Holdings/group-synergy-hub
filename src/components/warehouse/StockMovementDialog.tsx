@@ -244,7 +244,26 @@ export function StockMovementDialog({
                     <TableCell className="text-xs">
                       {transaction.location_code ?? transaction.location_name ?? '—'}
                     </TableCell>
-                    <TableCell>{transaction.reference_id || '-'}</TableCell>
+                    <TableCell>
+                      {transaction.reference_number ? (
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-mono text-xs font-medium">
+                            {transaction.reference_number}
+                          </span>
+                          {transaction.reference_doc_type && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {transaction.reference_doc_type}
+                            </span>
+                          )}
+                        </div>
+                      ) : transaction.reference_doc_type ? (
+                        <span className="text-xs text-muted-foreground">
+                          {transaction.reference_doc_type}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
                     <TableCell
                       className={`text-right font-medium ${
                         transaction.quantity_change > 0 ? 'text-green-600' : 'text-red-600'
