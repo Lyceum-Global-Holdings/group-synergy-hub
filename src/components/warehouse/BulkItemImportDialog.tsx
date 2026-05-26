@@ -402,25 +402,28 @@ export function BulkItemImportDialog() {
         warehouse_item_id: string;
         bin_id: string;
         allocated_quantity: number;
-        location_id?: string;
-        company_id?: string;
+        location_id: string;
+        company_id: string;
         created_by?: string;
       }> = [];
-      
+
       for (const createdItem of createdItems) {
         // Find the original parsed item by item_code to get initial_stock and bin_id
-        const originalItem = parsedData.find(p => 
-          p.item_code === createdItem.item_code && 
+        const originalItem = parsedData.find(p =>
+          p.item_code === createdItem.item_code &&
           p.errors.length === 0
         );
-        
-        if (originalItem?.initial_stock && originalItem.initial_stock > 0 && originalItem?.bin_id) {
+
+        if (
+          originalItem?.initial_stock && originalItem.initial_stock > 0 &&
+          originalItem?.bin_id && originalItem?.location_id && selectedCompany?.id
+        ) {
           binAllocations.push({
             warehouse_item_id: createdItem.id,
             bin_id: originalItem.bin_id,
             allocated_quantity: originalItem.initial_stock,
             location_id: originalItem.location_id,
-            company_id: selectedCompany?.id,
+            company_id: selectedCompany.id,
             created_by: user.user?.id,
           });
         }
