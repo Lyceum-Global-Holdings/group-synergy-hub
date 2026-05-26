@@ -212,7 +212,9 @@ export function CreateStockTransferDialog({
         <DialogHeader>
           <DialogTitle>Create Stock Transfer</DialogTitle>
           <DialogDescription>
-            Creates a transfer request (pending approval). Stock physically moves only after the request is approved and completed. For an immediate bin-to-bin move, use the “Move stock” action on Bin Allocations.
+            {isAdminOrHigher
+              ? "Transfer is auto-approved. Mark items as completed to physically move stock. For an immediate bin-to-bin move, use the “Move stock” action on Bin Allocations."
+              : "Creates a transfer request (pending approval). Stock physically moves only after the request is approved and completed. For an immediate bin-to-bin move, use the “Move stock” action on Bin Allocations."}
           </DialogDescription>
         </DialogHeader>
 
