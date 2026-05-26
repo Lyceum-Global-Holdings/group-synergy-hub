@@ -1,21 +1,20 @@
 ## Goal
-Remove the strict `SRN-YYYY-NNNNNN` format requirement when issuing materials (individual via `CreateMaterialIssueDialog` and bulk via `BulkIssueFromInventoryDialog`). Users should be able to type any SRN number (or keep the auto‑generated one) without the form rejecting it.
+Let admins and above create stock transfers as already-approved, skipping the approval queue. Regular users still submit for approval as today.
 
-## Scope
-Frontend only. No DB schema, RLS, or RPC changes — there is no DB CHECK constraint on `srn_number`, so removing the client format check is safe. Auto‑generation (`generate_srn_number` RPC) and duplicate‑check (`srn_number_exists` RPC) stay as‑is.
+## Backend
+No DB changes. `useCreateStockTransfer` already supports `status: 'approved'` and auto-fills `approved_by`/`approved_date` when passed.
 
-## Changes
+## Frontend changes
 
-1. **`src/components/warehouse/SrnNumberField.tsx`**
-   - Drop the `SRN_FORMAT.test(value)` check in `handleBlur`. Keep the duplicate‑existence check.
-   - Update `placeholder` from `"SRN-YYYY-NNNNNN"` to a neutral hint like `"Enter SRN number"`.
-   - Update helper text to no longer imply a required format ("Auto‑generated. Edit to enter your own number.").
-   - Remove the `.toUpperCase()` forced casing on manual input (optional but consistent with "no format").
-
-2. **`src/hooks/useSrnNumber.ts`**
-   - Remove the now‑unused `SRN_FORMAT` export (and the import in `SrnNumberField.tsx`).
-
-No changes needed in `CreateMaterialIssueDialog.tsx` or `BulkIssueFromInventoryDialog.tsx` — they already pass the value through; removing field‑level validation is enough.
+**`src/components/warehouse/CreateStockTransferDialog.tsx`**
+- Import `useIsAdminOrHigher` (returns `canDelete` flag covering admin/super_admin/moderator — same gate used elsewhere for elevated actions).
+- In `onSubmit`, when the current user is admin-or-higher, add `status: 'approved'` to `transferData` so the transfer skips the approval workflow.
+- Update the `DialogDescription` text dynamically:
+  - Admin+: "Transfer is auto-approved. Mark items as completed to physically move stock."
+  - Others: keep current "Creates a transfer request (pending approval)…" text.
+- Change submit button label conditionally: "Create & Approve Transfer" (admin+) vs "Submit for Approval" (others). If the current button text is generic ("Create Transfer"), keep that for non-admin and switch admin to "Create & Approve".
 
 ## Out of scope
-- The auto‑generated SRN will still follow `SRN-YYYY-NNNNNN` because that's how `generate_srn_number` produces it server‑side. The user only asked to remove the *required* format, not the generator output. If they want the generator changed too, that's a separate DB migration.
+- No change to existing pending-approval records or the Approvals console flow.
+- No change to permission to *complete* a transfer (stock movement still happens at completion step).
+- Roles allowed: admin, super_admin, moderator (matches `useIsAdminOrHigher`). Confirm if you want a stricter gate (admin/super_admin only).
