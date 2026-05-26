@@ -200,6 +200,25 @@ export function BulkIssueFromInventoryDialog({
         company_id: selectedCompany.id,
       });
 
+      // Move SRN document from temp/ into the new MIN folder, then persist column.
+      if (srnDocumentTempPath && issueNote?.id && selectedCompany?.id) {
+        try {
+          const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
+          const finalPath = `${selectedCompany.id}/${issueNote.id}/srn_${Date.now()}.${ext}`;
+          const { error: moveErr } = await supabase.storage
+            .from('min-srn-documents')
+            .move(srnDocumentTempPath, finalPath);
+          const persistedPath = moveErr ? srnDocumentTempPath : finalPath;
+          await supabase
+            .from('material_issue_notes')
+            .update({ srn_document_url: persistedPath })
+            .eq('id', issueNote.id);
+        } catch (e) {
+          console.error('Failed to attach SRN document to MIN', e);
+        }
+      }
+
+
       const itemsPayload = lines.map((l, idx) => ({
         min_id: issueNote.id,
         item_id: l.item_id,
