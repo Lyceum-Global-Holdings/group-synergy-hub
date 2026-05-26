@@ -98,11 +98,11 @@ export function SrnNumberField({
           id="srn_number"
           value={value}
           onChange={(e) => {
-            onChange(e.target.value.toUpperCase());
+            onChange(e.target.value);
             setMode('manual');
           }}
           onBlur={handleBlur}
-          placeholder="SRN-YYYY-NNNNNN"
+          placeholder="Enter SRN number"
           disabled={disabled || generate.isPending}
           aria-invalid={!!error}
           className={error ? 'border-destructive' : ''}
