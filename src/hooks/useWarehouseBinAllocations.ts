@@ -17,7 +17,10 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
   const { data: binAllocations, isLoading, error } = useQuery({
     queryKey: ['warehouse-bin-allocations', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      const { data: allAllocations, error: fetchError } = await supabase
+      // Server-side scope by company to avoid the PostgREST 1000-row cap hiding
+      // older allocations. allocation.company_id is NOT NULL and equals the
+      // owning item's company.
+      let query = supabase
         .from('warehouse_bin_allocations')
         .select(`
           *,
@@ -46,15 +49,12 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         .order('created_at', { ascending: false })
         .range(0, 49999);
 
-      if (fetchError) throw fetchError;
-
-      // Filter by warehouse item's company_id (not allocation's company_id)
-      // This ensures allocations show if the item belongs to the selected company
       if (!isViewingAllCompanies && selectedCompany?.id) {
-        return (allAllocations as unknown as unknown as BinAllocationWithDetails[]).filter(
-          (allocation) => (allocation.warehouse_item as { item_code: string; name: string; company_id: string | null })?.company_id === selectedCompany.id
-        );
+        query = query.eq('company_id', selectedCompany.id);
       }
+
+      const { data: allAllocations, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
 
       return allAllocations as unknown as unknown as BinAllocationWithDetails[];
     },
