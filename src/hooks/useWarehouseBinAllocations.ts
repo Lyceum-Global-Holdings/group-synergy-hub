@@ -109,11 +109,20 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         throw new Error('Please select a company first');
       }
       
+      const { data: bin, error: binErr } = await supabase
+        .from('warehouse_bins')
+        .select('location_id, company_id')
+        .eq('id', (data as any).bin_id)
+        .single();
+      if (binErr) throw binErr;
+      if (!bin?.location_id) throw new Error('Selected bin is missing a location.');
+
       const { data: allocation, error } = await supabase
         .from('warehouse_bin_allocations')
         .insert({
-          ...data,
-          company_id: selectedCompany.id,
+          ...(data as any),
+          company_id: bin.company_id ?? selectedCompany.id,
+          location_id: bin.location_id,
           created_by: user.user?.id,
         })
         .select()
@@ -586,6 +595,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
                 allocated_quantity: expectedQty,
                 reserved_quantity: 0,
                 company_id: selectedCompany.id,
+                location_id: locationId,
                 created_by: user.user?.id,
               });
 

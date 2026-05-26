@@ -1,56 +1,78 @@
+# Fix: Bin Allocations Coverage + Company/Location Scoping
+
+## Problem
+
+Two related defects observed on `/warehouse/bin-allocations` and across stock screens:
+
+1. **Coverage gap** — `warehouse_bin_allocations` is written ad-hoc by ~10 client/RPC paths (GRN, transfers, MIN, bulk upload, adjustments, opening stock, project issue/return, tool moves). Today **509 / 3 533 `stock_transactions` rows have `bin_id IS NULL`** (adjustments, opening stock, transfer_in/out, a handful of MIN/GRN/project rows). When the client code fails or is skipped, the ledger and the allocation table drift, so the bin-allocations page does not show every item that has on-hand stock.
+2. **Scoping leak** — RLS on `warehouse_bin_allocations` still permits `company_id IS NULL` ("Company users can view bin allocations: USING ((company_id IS NULL) OR can_access_company(company_id))"). Although today 0 rows are NULL, the policy is an open door. The list query also does not filter by the active company/location scope at the DB layer.
+
 ## Goal
 
-Make every Material Issue Note (MIN) appear in each item's Stock Movement History with the **document number, document type, and clickable reference** — aligned with SAP MM / Oracle Inventory / GS1 LIM conventions where every goods-movement line is traceable to its source material document.
+Every stock-changing operation produces (or updates) exactly one `warehouse_bin_allocations` row and one `stock_transactions` row in the same transaction, both stamped with `company_id`, `location_id`, `bin_id`. The bin-allocations screen and item stock-movement dialogs only show rows the user can access for the currently selected company and location subtree.
 
-## Findings
+## Plan
 
-- `stock_transactions` already has 707 MIN-derived rows (39 `manual` + 668 `transfer`-flavoured) with correct `item_id`, `location_id`, `bin_id`. They DO render in `StockMovementDialog`, **but**:
-  1. `reference_type` is written as `'manual'` instead of the standard `'mrn'` → the row looks generic, not a goods-issue document.
-  2. The "Reference" column shows the raw `reference_id` UUID; the MIN number is only buried in `notes` ("Material Issue: MIN-20260526-003").
-  3. There is no link from the history row back to the source MIN.
-- The two `process_material_issue_stock_update` RPC overloads hard-code `reference_type => 'manual'`. The companion `warehouse_stock_movements` row already uses the correct `'material_issue'` + `reference_number` — only `stock_transactions` is out of step.
-- Symmetric gap: `material_returns` writes are fine (`reference_type='mrn'`), but no enum value exists for MIN documents specifically — `mrn` is currently shared by both issues and returns, which is acceptable internationally (both are "Material Movement Notes").
+### 1. Database: single source of truth for bin allocations
 
-## Solution (international standard, SAP MM-style)
+- New SECURITY DEFINER RPC `apply_bin_allocation_delta(p_item_id, p_bin_id, p_qty_delta, p_secondary_delta, p_transaction_type, p_reference_type, p_reference_id, p_reference_number, p_notes)`:
+  - Resolves `company_id` and `location_id` from the target `warehouse_bins` row (enforces SAP EWM bin parity per the existing `bin-allocation-location-parity` memory).
+  - `INSERT ... ON CONFLICT (warehouse_item_id, bin_id) DO UPDATE` to keep one row per (item, bin); blocks the row going negative.
+  - Writes the matching `stock_transactions` row with `bin_id`, `location_id`, `company_id`, qty_before/qty_after (relying on the existing immutable-balances trigger).
+  - Refreshes `warehouse_items.current_stock` from the sum of allocations for that item.
+- Refactor every server-side writer to call this RPC instead of inserting directly:
+  - `process_material_issue_stock_update` (both overloads)
+  - `transfer_stock_fifo` (transfer_in + transfer_out legs)
+  - `tool_adjustment_post_ledger`
+  - New helper RPCs for the operations that today only exist client-side: `grn_post_allocation`, `adjust_bin_stock`, `post_opening_stock`, `project_issue_stock`, `project_return_stock`.
+- Hard constraints on `warehouse_bin_allocations`:
+  - Backfill any nulls, then `ALTER COLUMN company_id SET NOT NULL`, `location_id SET NOT NULL`.
+  - Drop the existing `enforce_bin_allocation_location_parity` trigger only after the RPC subsumes it (keeps current memory rules intact).
 
-### 1. Database migration
+### 2. Database: backfill the 509 orphan transactions + missing allocations
 
-- Update both `process_material_issue_stock_update` overloads so the `stock_transactions` insert uses:
-  - `reference_type := 'mrn'`
-  - `reference_id := p_min_id`
-  - keep `notes` as the human readable line.
-- Backfill: `UPDATE stock_transactions SET reference_type='mrn' WHERE transaction_type='material_issue' AND reference_type='manual' AND reference_id IN (SELECT id FROM material_issue_notes)`.
-- Extend `get_bin_scoped_stock_movements` to also return a resolved `reference_number` and `reference_doc_type` by joining the source document table per `reference_type`:
-  - `mrn` → `material_issue_notes.min_number` (issue) or `material_return_notes.mrn_number` (return) — resolved by checking `transaction_type`.
-  - `grn` → `goods_receipt_notes.grn_number`.
-  - `transfer` → `stock_transfer_requests.request_number` (fall back to `stock_transfers.transfer_number`).
-  - `adjustment` → `stock_adjustments.adjustment_number` (or notes).
-  - `project` → `construction_projects.project_code`.
-- Add a partial index `(reference_type, reference_id)` to keep the join cheap.
+One-time migration:
+- For each `stock_transactions` row with `bin_id IS NULL`, infer the bin from `(item_id, location_id)` when exactly one allocation exists; otherwise insert into a per-location system bin `SYS-LEGACY` and tag `notes` with `[backfill]`.
+- For every `warehouse_items` row with `current_stock > 0` but no allocation rows in its location, create a `SYS-LEGACY` allocation so the bin-allocations screen shows it.
+- Re-run `current_stock = SUM(allocated_quantity)` per item.
 
-### 2. Reader hook + dialog (`useStockTransactions`, `StockMovementDialog`)
+### 3. Database: tighten RLS / scoping
 
-- Carry the new `reference_number` and `reference_doc_type` fields through `useStockTransactions`.
-- In `StockMovementDialog`, replace the raw-UUID "Reference" cell with:
-  - Primary line: document number (e.g. `MIN-20260526-003`) as a `Link` to the source viewer when the doc type is known.
-  - Secondary line: small muted label of the document type ("Material Issue Note", "GRN", "Transfer", "Adjustment").
-  - Fallback to `—` only when no document is linked (truly manual adjustments).
-- Refresh the `transactionTypeLabels` / colour map to also recognise `material_issue` rows that came from the standard MIN flow.
+- Drop the `OR company_id IS NULL` branch from all four `warehouse_bin_allocations` policies (SELECT, INSERT, UPDATE, DELETE). Replace with `can_access_company(company_id)` only.
+- Mirror the same hardening on `stock_transactions` if any policy still allows NULL company.
+- Add composite indexes `(company_id, location_id, warehouse_item_id)` and `(bin_id)` for the list query.
 
-### 3. Verification
+### 4. Reader: location-subtree + company filter at the DB
 
-- Re-open Inventory → any item issued via MIN-20260525-002 / MIN-20260526-003 → confirm rows show "Material Issue • MIN-…" with link.
-- New MIN posted from UI → row appears with `reference_type='mrn'` and resolves to its MIN number.
-- No regressions for GRN, transfers, adjustments, project moves.
+- New SECURITY INVOKER RPC `list_bin_allocations(p_company_id, p_location_id, p_search, p_limit, p_offset)`:
+  - Walks the location subtree (root + sub-locations + departments) the same way `BinAllocationsTab` does today.
+  - Returns flat rows joined with item code/name, bin code, location path, on-hand and reserved.
+- Switch `useWarehouseBinAllocations` to this RPC; remove the client-side scope walk and the "all companies" fallback (admins still call the RPC with `p_company_id := NULL` and get whatever RLS lets through).
 
-### Out of scope
+### 5. Frontend cleanup
 
-- No UI work on the MIN list/print itself.
-- No changes to bin allocation or stock numbers (only labelling + linkage).
-- No new enum value (`mrn` already exists and is the international "Material Movement Note" convention shared by issues and returns).
+- Replace every `supabase.from('warehouse_bin_allocations').insert/update/delete` in:
+  - `BulkStockUploadDialog.tsx`
+  - `useGoodsReceiptNotes.ts`
+  - `useStockTransfer.ts`
+  - `useMaterialReturns.ts`
+  - `BulkInventoryUpdateDialog.tsx`
+  - `RelocateBinDialog.tsx`
+  - `IssueItemsDialog.tsx`
+  with calls to the corresponding RPC. Removes the silent-failure surface area.
+- `BinAllocationsTab` already calls `useInvalidateWarehouseStock`; just point it at the new hook output.
+- `StockMovementDialog` bin picker keeps the existing subtree fix from the previous fix but now reads from the same RPC for consistency.
 
-## Technical notes
+### 6. Verification
 
-- `stock_transactions.quantity_before/after` continues to be set by the `set_stock_transaction_balances` trigger — untouched.
-- The reader RPC stays `SECURITY INVOKER` and respects existing RLS.
-- Migration is forward-only and idempotent (the backfill `UPDATE` is safe to re-run).
+- After migration: `SELECT COUNT(*) FROM stock_transactions WHERE bin_id IS NULL` → 0.
+- `SELECT COUNT(*) FROM warehouse_bin_allocations WHERE company_id IS NULL OR location_id IS NULL` → 0.
+- Each item with `current_stock > 0` has ≥ 1 allocation row in the same location.
+- From a non-admin session: bin-allocations list and item stock-movement dialog return zero rows for items belonging to companies the user cannot access, even with `company_id IS NULL` rows manually inserted (RLS denies).
+- Smoke test each write path (GRN approval, transfer in/out, MIN, MRN, adjustment, opening stock, bulk upload, project issue/return, scanned bin adjustment) and confirm a matching allocation + ledger row appears.
+
+## Out of scope
+
+- No UI redesign of the bin-allocations page.
+- No change to bin master / sub-bin hierarchy rules.
+- No change to GRN / MIN / transfer business workflows beyond the storage layer.
