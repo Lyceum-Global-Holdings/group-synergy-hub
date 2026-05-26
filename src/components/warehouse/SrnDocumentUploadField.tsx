@@ -117,7 +117,7 @@ export function SrnDocumentUploadField({
     try {
       setUploading(true);
       const ext = (file.name.split(".").pop() || "bin").toLowerCase();
-      const folder = minId ?? "temp";
+      const folder = effectiveId ?? "temp";
       const path = `${companyId}/${folder}/srn_${Date.now()}.${ext}`;
 
       const { data, error } = await supabase.storage
