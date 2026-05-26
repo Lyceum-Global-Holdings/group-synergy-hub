@@ -128,7 +128,7 @@ export function SrnNumberField({
         <p className="text-xs text-muted-foreground">
           {checking
             ? 'Checking availability…'
-            : 'Auto-generated. Click the refresh icon to regenerate, or type to enter your own number.'}
+            : 'Auto-generated. Click refresh to regenerate, or type any SRN number.'}
         </p>
       )}
     </div>
