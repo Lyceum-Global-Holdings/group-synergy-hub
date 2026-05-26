@@ -206,6 +206,13 @@ export function CreateMaterialReturnDialog({
 
           <SrnNumberField value={srnNumber} onChange={setSrnNumber} />
 
+          <SrnDocumentUploadField
+            companyId={selectedCompany?.id}
+            currentDocumentUrl={srnDocumentTempPath}
+            onUpload={setSrnDocumentTempPath}
+          />
+
+
           <div>
             <Label htmlFor="reason">Reason for Return *</Label>
             <Textarea
