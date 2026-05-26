@@ -35,6 +35,7 @@ import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
 
 const formSchema = z.object({
   transfer_date: z.string(),
@@ -91,6 +92,7 @@ export function CreateStockTransferDialog({
   const { locations = [] } = useWarehouseLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();
   const { selectedCompany } = useCompany();
+  const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
 
   // Filter bins to only show those at locations user can edit
   const editableBins = useMemo(() => {
@@ -174,6 +176,7 @@ export function CreateStockTransferDialog({
         company_id: resolvedCompanyId,
         from_location_id: fromBin?.location_id ?? null,
         to_location_id: toBin?.location_id ?? null,
+        ...(isAdminOrHigher ? { status: 'approved' as const } : {}),
       };
 
       const transfer = await createTransfer.mutateAsync(transferData);
@@ -209,7 +212,9 @@ export function CreateStockTransferDialog({
         <DialogHeader>
           <DialogTitle>Create Stock Transfer</DialogTitle>
           <DialogDescription>
-            Creates a transfer request (pending approval). Stock physically moves only after the request is approved and completed. For an immediate bin-to-bin move, use the “Move stock” action on Bin Allocations.
+            {isAdminOrHigher
+              ? "Transfer is auto-approved. Mark items as completed to physically move stock. For an immediate bin-to-bin move, use the “Move stock” action on Bin Allocations."
+              : "Creates a transfer request (pending approval). Stock physically moves only after the request is approved and completed. For an immediate bin-to-bin move, use the “Move stock” action on Bin Allocations."}
           </DialogDescription>
         </DialogHeader>
 
@@ -458,7 +463,7 @@ export function CreateStockTransferDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={createTransfer.isPending}>
-                Create Transfer
+                {isAdminOrHigher ? "Create & Approve Transfer" : "Submit for Approval"}
               </Button>
             </div>
           </form>
