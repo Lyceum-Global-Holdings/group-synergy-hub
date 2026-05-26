@@ -34,6 +34,7 @@ import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const formSchema = z.object({
   transfer_date: z.string(),
@@ -89,6 +90,7 @@ export function CreateStockTransferDialog({
   const { items: warehouseItems = [] } = useWarehouseItems();
   const { locations = [] } = useWarehouseLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();
+  const { selectedCompany } = useCompany();
 
   // Filter bins to only show those at locations user can edit
   const editableBins = useMemo(() => {
@@ -146,6 +148,20 @@ export function CreateStockTransferDialog({
     }
 
     try {
+      const fromBin = editableBins.find((b) => b.id === values.from_bin_id);
+      const toBin = editableBins.find((b) => b.id === values.to_bin_id);
+      const resolvedCompanyId =
+        (fromBin as any)?.company_id ||
+        (toBin as any)?.company_id ||
+        selectedCompany?.id;
+
+      if (!resolvedCompanyId) {
+        form.setError("root", {
+          message: "Cannot determine company for this transfer. Select an active company in the header and try again.",
+        });
+        return;
+      }
+
       const transferData = {
         transfer_date: values.transfer_date || new Date().toISOString().split("T")[0],
         transfer_type: values.transfer_type,
@@ -155,8 +171,11 @@ export function CreateStockTransferDialog({
         expected_completion_date: values.expected_completion_date,
         reason: values.reason,
         notes: values.notes,
+        company_id: resolvedCompanyId,
+        from_location_id: fromBin?.location_id ?? null,
+        to_location_id: toBin?.location_id ?? null,
       };
-      
+
       const transfer = await createTransfer.mutateAsync(transferData);
 
       // Create all items
