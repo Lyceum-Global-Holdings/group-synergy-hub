@@ -248,7 +248,9 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     });
     setItems([]);
     setCpoReservations([]);
+    setSrnDocumentTempPath("");
   };
+
 
   const canProceedToStep2 = requestData.requested_by && requestData.items_required_date && requestData.purpose;
   const canSubmit = items.length > 0;
