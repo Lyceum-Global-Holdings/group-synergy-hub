@@ -122,6 +122,15 @@ export function useToolBinAllocations(toolId?: string) {
         return data;
       }
 
+      const { data: bin, error: binErr } = await supabase
+        .from("warehouse_bins")
+        .select("location_id, company_id")
+        .eq("id", input.bin_id)
+        .single();
+      if (binErr) throw binErr;
+      if (!bin?.location_id || !bin?.company_id) {
+        throw new Error("Selected bin is missing location/company assignment.");
+      }
       const { data, error } = await supabase
         .from("warehouse_bin_allocations")
         .insert({
@@ -129,7 +138,8 @@ export function useToolBinAllocations(toolId?: string) {
           bin_id: input.bin_id,
           allocated_quantity: input.allocated_quantity,
           notes: input.notes ?? null,
-          company_id: selectedCompany?.id ?? null,
+          company_id: bin.company_id,
+          location_id: bin.location_id,
           created_by: userData.user.id,
         })
         .select()
