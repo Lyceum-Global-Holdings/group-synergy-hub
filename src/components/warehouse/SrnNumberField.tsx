@@ -69,10 +69,6 @@ export function SrnNumberField({
   const handleBlur = async () => {
     setError(null);
     if (!value) return;
-    if (!SRN_FORMAT.test(value)) {
-      setError('Format must be SRN-YYYY-NNNNNN');
-      return;
-    }
     if (!selectedCompany?.id) return;
     try {
       setChecking(true);
