@@ -19551,11 +19551,11 @@ export type Database = {
           allocated_quantity: number
           available_quantity: number | null
           bin_id: string
-          company_id: string | null
+          company_id: string
           created_at: string
           created_by: string | null
           id: string
-          location_id: string | null
+          location_id: string
           notes: string | null
           reserved_quantity: number
           secondary_quantity: number | null
@@ -19567,11 +19567,11 @@ export type Database = {
           allocated_quantity?: number
           available_quantity?: number | null
           bin_id: string
-          company_id?: string | null
+          company_id: string
           created_at?: string
           created_by?: string | null
           id?: string
-          location_id?: string | null
+          location_id: string
           notes?: string | null
           reserved_quantity?: number
           secondary_quantity?: number | null
@@ -19583,11 +19583,11 @@ export type Database = {
           allocated_quantity?: number
           available_quantity?: number | null
           bin_id?: string
-          company_id?: string | null
+          company_id?: string
           created_at?: string
           created_by?: string | null
           id?: string
-          location_id?: string | null
+          location_id?: string
           notes?: string | null
           reserved_quantity?: number
           secondary_quantity?: number | null
@@ -21248,11 +21248,11 @@ export type Database = {
           allocated_quantity: number
           available_quantity: number | null
           bin_id: string
-          company_id: string | null
+          company_id: string
           created_at: string
           created_by: string | null
           id: string
-          location_id: string | null
+          location_id: string
           notes: string | null
           reserved_quantity: number
           secondary_quantity: number | null
