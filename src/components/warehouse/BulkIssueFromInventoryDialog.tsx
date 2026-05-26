@@ -39,6 +39,8 @@ import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
 import { useWarehouseItemsLazyInventory } from '@/hooks/useWarehouseItemsLazyInventory';
+import { SrnDocumentUploadField } from '@/components/warehouse/SrnDocumentUploadField';
+import { supabase } from '@/integrations/supabase/client';
 
 interface InventoryRow {
   id: string;
