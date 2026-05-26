@@ -463,7 +463,7 @@ export function CreateStockTransferDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={createTransfer.isPending}>
-                Create Transfer
+                {isAdminOrHigher ? "Create & Approve Transfer" : "Submit for Approval"}
               </Button>
             </div>
           </form>
