@@ -347,8 +347,15 @@ export function BulkIssueFromInventoryDialog({
                 onChange={(e) => setHeader({ ...header, notes: e.target.value })}
                 rows={2}
               />
+            <div className="md:col-span-3">
+              <SrnDocumentUploadField
+                companyId={selectedCompany?.id}
+                currentDocumentUrl={srnDocumentTempPath}
+                onUpload={setSrnDocumentTempPath}
+              />
             </div>
           </div>
+
 
           {/* Validation summary */}
           {validationErrors.length > 0 && (
