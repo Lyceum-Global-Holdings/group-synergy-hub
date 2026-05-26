@@ -11,8 +11,10 @@ import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { DualQuantityInput } from "@/components/warehouse/DualQuantityInput";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
+import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUploadField";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 interface ReturnItem {
