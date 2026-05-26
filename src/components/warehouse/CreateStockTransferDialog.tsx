@@ -92,6 +92,7 @@ export function CreateStockTransferDialog({
   const { locations = [] } = useWarehouseLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();
   const { selectedCompany } = useCompany();
+  const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
 
   // Filter bins to only show those at locations user can edit
   const editableBins = useMemo(() => {
