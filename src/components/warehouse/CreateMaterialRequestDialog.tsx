@@ -16,6 +16,8 @@ import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
+import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUploadField";
+import { useCompany } from "@/contexts/CompanyContext";
 import { MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { WarehouseItem } from "@/types/itemBin";
 import { ReservationWithDetails } from "@/types/warehouseReservation";
