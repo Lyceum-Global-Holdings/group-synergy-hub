@@ -34,6 +34,7 @@ import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const formSchema = z.object({
   transfer_date: z.string(),
