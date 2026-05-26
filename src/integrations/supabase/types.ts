@@ -10645,6 +10645,39 @@ export type Database = {
           },
         ]
       }
+      material_issue_reconciliation_log: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          item_id: string
+          min_id: string
+          min_number: string | null
+          quantity_issued: number
+          reason: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          min_id: string
+          min_number?: string | null
+          quantity_issued: number
+          reason: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          min_id?: string
+          min_number?: string | null
+          quantity_issued?: number
+          reason?: string
+        }
+        Relationships: []
+      }
       material_request_items: {
         Row: {
           adjustment_reason: string | null
