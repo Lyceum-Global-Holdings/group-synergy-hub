@@ -17,46 +17,56 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
   const { data: binAllocations, isLoading, error } = useQuery({
     queryKey: ['warehouse-bin-allocations', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      // Server-side scope by company to avoid the PostgREST 1000-row cap hiding
-      // older allocations. allocation.company_id is NOT NULL and equals the
-      // owning item's company.
-      let query = supabase
-        .from('warehouse_bin_allocations')
-        .select(`
-          *,
-          warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
-            id,
-            company_id,
-            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, item_type)
-          ),
-          warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(
-            bin_code,
-            name,
-            location_id,
-            warehouse_location:warehouse_locations!warehouse_bins_location_id_fkey(
+      // PostgREST max-rows is 1000 on this project. Page through up to 10,000
+      // rows so older allocations remain visible.
+      const PAGE = 1000;
+      const HARD_CAP = 10000;
+      const buildQuery = (from: number, to: number) => {
+        let q = supabase
+          .from('warehouse_bin_allocations')
+          .select(`
+            *,
+            warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
               id,
+              company_id,
+              catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, item_type)
+            ),
+            warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(
+              bin_code,
               name,
-              location_code,
-              parent_id,
-              parent:warehouse_locations!parent_id(
+              location_id,
+              warehouse_location:warehouse_locations!warehouse_bins_location_id_fkey(
                 id,
                 name,
-                location_code
+                location_code,
+                parent_id,
+                parent:warehouse_locations!parent_id(
+                  id,
+                  name,
+                  location_code
+                )
               )
             )
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .range(0, 9999);
+          `)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+        if (!isViewingAllCompanies && selectedCompany?.id) {
+          q = q.eq('company_id', selectedCompany.id);
+        }
+        return q;
+      };
 
-      if (!isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
+      const all: any[] = [];
+      for (let from = 0; from < HARD_CAP; from += PAGE) {
+        const to = Math.min(from + PAGE - 1, HARD_CAP - 1);
+        const { data, error: fetchError } = await buildQuery(from, to);
+        if (fetchError) throw fetchError;
+        const rows = data ?? [];
+        all.push(...rows);
+        if (rows.length < PAGE) break;
       }
 
-      const { data: allAllocations, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-
-      return allAllocations as unknown as unknown as BinAllocationWithDetails[];
+      return all as unknown as BinAllocationWithDetails[];
     },
     enabled: !options?.disableFetch && !!(isViewingAllCompanies || selectedCompany?.id),
     // Live-critical: bin allocations drive available stock numbers.
