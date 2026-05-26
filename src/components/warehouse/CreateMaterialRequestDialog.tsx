@@ -60,7 +60,9 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
   });
   const [items, setItems] = useState<RequestItem[]>([]);
   const [cpoReservations, setCpoReservations] = useState<ReservationWithDetails[]>([]);
-  
+  const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>("");
+
+  const { selectedCompany } = useCompany();
   const { createRequestAsync, isCreating } = useMaterialRequests();
   const { createItems } = useMaterialRequestItems();
   const { locations } = useWarehouseLocations();
