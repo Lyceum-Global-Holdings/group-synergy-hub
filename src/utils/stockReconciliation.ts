@@ -86,6 +86,7 @@ export async function reconcileItem(
           allocated_quantity: item.current_stock,
           reserved_quantity: 0,
           company_id: companyId,
+          location_id: effectiveLocationId,
           created_by: user?.id || null,
         });
 
