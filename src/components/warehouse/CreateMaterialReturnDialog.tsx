@@ -54,7 +54,9 @@ export function CreateMaterialReturnDialog({
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [srnNumber, setSrnNumber] = useState('');
+  const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
   const [items, setItems] = useState<ReturnItem[]>([]);
+
 
   const handleAddItem = () => {
     setItems([...items, {
