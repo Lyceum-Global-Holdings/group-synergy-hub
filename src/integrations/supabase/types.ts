@@ -22456,13 +22456,6 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
-      reconcile_bin_allocations: {
-        Args: { p_company_id?: string; p_location_id?: string }
-        Returns: {
-          items_backfilled: number
-          qty_backfilled: number
-        }[]
-      }
       reconcile_stock_batch:
         | {
             Args: {
