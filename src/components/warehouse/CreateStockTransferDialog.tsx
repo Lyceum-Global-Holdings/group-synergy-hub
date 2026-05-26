@@ -148,6 +148,20 @@ export function CreateStockTransferDialog({
     }
 
     try {
+      const fromBin = editableBins.find((b) => b.id === values.from_bin_id);
+      const toBin = editableBins.find((b) => b.id === values.to_bin_id);
+      const resolvedCompanyId =
+        (fromBin as any)?.company_id ||
+        (toBin as any)?.company_id ||
+        selectedCompany?.id;
+
+      if (!resolvedCompanyId) {
+        form.setError("root", {
+          message: "Cannot determine company for this transfer. Select an active company in the header and try again.",
+        });
+        return;
+      }
+
       const transferData = {
         transfer_date: values.transfer_date || new Date().toISOString().split("T")[0],
         transfer_type: values.transfer_type,
@@ -157,8 +171,11 @@ export function CreateStockTransferDialog({
         expected_completion_date: values.expected_completion_date,
         reason: values.reason,
         notes: values.notes,
+        company_id: resolvedCompanyId,
+        from_location_id: fromBin?.location_id ?? null,
+        to_location_id: toBin?.location_id ?? null,
       };
-      
+
       const transfer = await createTransfer.mutateAsync(transferData);
 
       // Create all items
