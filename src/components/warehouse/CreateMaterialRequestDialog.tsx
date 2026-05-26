@@ -406,6 +406,13 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
               onChange={(v) => setRequestData({ ...requestData, srn_number: v })}
             />
 
+            <SrnDocumentUploadField
+              companyId={selectedCompany?.id}
+              currentDocumentUrl={srnDocumentTempPath}
+              onUpload={setSrnDocumentTempPath}
+            />
+
+
             <div>
               <Label htmlFor="purpose">Purpose *</Label>
               <Textarea
