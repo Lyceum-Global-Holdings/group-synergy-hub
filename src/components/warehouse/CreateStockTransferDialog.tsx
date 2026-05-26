@@ -90,6 +90,7 @@ export function CreateStockTransferDialog({
   const { items: warehouseItems = [] } = useWarehouseItems();
   const { locations = [] } = useWarehouseLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();
+  const { selectedCompany } = useCompany();
 
   // Filter bins to only show those at locations user can edit
   const editableBins = useMemo(() => {
