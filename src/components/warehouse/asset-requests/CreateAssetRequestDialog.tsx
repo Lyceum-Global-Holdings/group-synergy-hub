@@ -14,6 +14,7 @@ import { Plus, Trash2, Upload, X } from "lucide-react";
 import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface CreateAssetRequestDialogProps {
   open: boolean;
