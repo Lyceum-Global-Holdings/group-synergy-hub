@@ -39,6 +39,11 @@ export interface AssetRequest {
   fulfilled_date: string | null;
   rejection_reason: string | null;
   notes: string | null;
+
+  // Pre-approval + MRN attachment
+  approved_by_name: string | null;
+  mrn_document_url: string | null;
+  mrn_document_path: string | null;
   
   total_estimated_cost: number | null;
   request_date: string;
