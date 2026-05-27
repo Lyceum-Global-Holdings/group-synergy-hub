@@ -139,8 +139,10 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       mrn_document_url: mrnUrl,
       mrn_document_path: mrnPath,
       status: asDraft ? "draft" as const : "pending_hod_approval" as const,
-      request_date: new Date().toISOString().split('T')[0]
+      request_date: new Date().toISOString().split('T')[0],
+      company_id: selectedCompany?.id,
     };
+
 
     const itemsWithLineNumbers = items.map((item, index) => {
       const lineItem: any = { ...item, line_number: index + 1 };
