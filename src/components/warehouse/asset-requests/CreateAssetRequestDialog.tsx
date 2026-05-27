@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAssetRequests } from "@/hooks/useAssetRequests";
 import { useAssetMaster } from "@/hooks/useAssetMaster";
+import { useAssetCategories } from "@/hooks/useAssetCategories";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Plus, Trash2, Upload, X } from "lucide-react";
@@ -27,6 +28,8 @@ interface RequestItem {
   item_description?: string;
   brand?: string;
   specifications?: string;
+  category_id?: string;
+  subcategory_id?: string;
   quantity_requested: number;
   justification?: string;
   preferred_vendor?: string;
@@ -36,7 +39,8 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
   const { toast } = useToast();
   const { createRequest, isCreating } = useAssetRequests();
   const { assetMasterItems } = useAssetMaster();
-  
+  const { mainCategories, getSubcategories } = useAssetCategories();
+
   const [requesterName, setRequesterName] = useState("");
   const [department, setDepartment] = useState("");
   const [contactNumber, setContactNumber] = useState("");
@@ -53,26 +57,20 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
   }]);
 
   const handleAddItem = () => {
-    setItems([...items, {
-      request_type: "from_master",
-      quantity_requested: 1
-    }]);
+    setItems(prev => [...prev, { request_type: "from_master", quantity_requested: 1 }]);
   };
 
   const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index: number, field: keyof RequestItem, value: any) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    // Log for debugging
-    if (field === "asset_master_id") {
-      console.log("Row", index, "set asset_master_id", value);
-    }
-    
-    setItems(newItems);
+  // Functional updater — patches multiple fields atomically to avoid stale-closure overwrites.
+  const handleItemPatch = (index: number, patch: Partial<RequestItem>) => {
+    setItems(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
   };
 
   const handleSubmit = async (asDraft: boolean = false) => {
@@ -85,9 +83,9 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       return;
     }
 
-    // Improved validation: accept asset_master_id for "from_master" type
     const hasInvalidItems = items.some(item => {
       const hasValidQuantity = item.quantity_requested > 0;
+      if (!item.category_id) return true;
       if (item.request_type === "from_master") {
         return !item.asset_master_id || !hasValidQuantity;
       }
@@ -97,7 +95,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
     if (items.length === 0 || hasInvalidItems) {
       toast({
         title: "Validation Error",
-        description: "Please add at least one valid item with quantity",
+        description: "Each item needs a category, an asset/name, and a quantity",
         variant: "destructive"
       });
       return;
@@ -142,19 +140,20 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       request_date: new Date().toISOString().split('T')[0]
     };
 
-    // Backfill item_name and brand from asset master if missing
     const itemsWithLineNumbers = items.map((item, index) => {
-      const lineItem = { ...item, line_number: index + 1 };
-      
-      // If selecting from master but name is missing, look it up
-      if (item.request_type === "from_master" && item.asset_master_id && !item.item_name) {
-        const assetMaster = assetMasterItems.find(a => a.id === item.asset_master_id);
-        if (assetMaster) {
-          lineItem.item_name = assetMaster.asset_name;
-          lineItem.brand = assetMaster.brand || undefined;
+      const lineItem: any = { ...item, line_number: index + 1 };
+      if (item.request_type === "from_master" && item.asset_master_id) {
+        const am = assetMasterItems.find(a => a.id === item.asset_master_id);
+        if (am) {
+          if (!lineItem.item_name) lineItem.item_name = am.asset_name;
+          if (!lineItem.brand) lineItem.brand = am.brand || undefined;
+          if (!lineItem.category_id) lineItem.category_id = am.category_id || undefined;
+          if (!lineItem.subcategory_id) lineItem.subcategory_id = am.subcategory_id || undefined;
         }
       }
-      
+      // Normalize empty strings to null for uuid fields
+      if (!lineItem.category_id) lineItem.category_id = null;
+      if (!lineItem.subcategory_id) lineItem.subcategory_id = null;
       return lineItem;
     });
 
@@ -167,7 +166,6 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
             description: asDraft ? "Request saved as draft" : "Request submitted for approval"
           });
           onOpenChange(false);
-          // Reset form
           setRequesterName("");
           setDepartment("");
           setContactNumber("");
@@ -185,14 +183,14 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Asset Request</DialogTitle>
           <DialogDescription className="sr-only">
             Fill in request details and add assets to create a new asset request
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Request Header */}
           <Card>
@@ -207,7 +205,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                     placeholder="Enter requester name"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="department">Department</Label>
                   <Input
@@ -217,7 +215,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                     placeholder="Enter department"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="contactNumber">Contact Number</Label>
                   <Input
@@ -227,7 +225,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                     placeholder="Enter contact number"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="requiredDate">Required Date *</Label>
                   <Input
@@ -237,7 +235,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                     onChange={(e) => setRequiredDate(e.target.value)}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority *</Label>
                   <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
@@ -263,7 +261,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="purpose">Purpose *</Label>
                 <Textarea
@@ -274,7 +272,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                   rows={2}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="justification">Justification</Label>
                 <Textarea
@@ -329,78 +327,161 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                 Add Item
               </Button>
             </div>
-            
-            <div className="border rounded-lg">
+
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[120px]">Type</TableHead>
-                    <TableHead>Asset/Item</TableHead>
+                    <TableHead className="min-w-[220px]">Asset/Item *</TableHead>
+                    <TableHead className="min-w-[160px]">Category *</TableHead>
+                    <TableHead className="min-w-[160px]">Sub-category</TableHead>
                     <TableHead className="w-[100px]">Quantity</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Select
-                          value={item.request_type}
-                          onValueChange={(value: any) => handleItemChange(index, "request_type", value)}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="from_master">From Master</SelectItem>
-                            <SelectItem value="new_item">New Item</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {item.request_type === "from_master" ? (
-                          <AssetMasterSelector
-                            value={item.asset_master_id}
-                            onValueChange={(assetMasterId) => {
-                              handleItemChange(index, "asset_master_id", assetMasterId);
-                            }}
-                            onAssetSelected={(assetMaster) => {
-                              if (assetMaster) {
-                                handleItemChange(index, "item_name", assetMaster.asset_name);
-                                handleItemChange(index, "brand", assetMaster.brand);
-                              }
-                            }}
-                          />
-                        ) : (
+                  {items.map((item, index) => {
+                    const subOptions = item.category_id ? getSubcategories(item.category_id) : [];
+                    const lockedFromMaster = item.request_type === "from_master" && !!item.asset_master_id;
+                    return (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Select
+                            value={item.request_type}
+                            onValueChange={(value: any) =>
+                              handleItemPatch(index, {
+                                request_type: value,
+                                asset_master_id: undefined,
+                                item_name: undefined,
+                                brand: undefined,
+                                category_id: undefined,
+                                subcategory_id: undefined,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="from_master">From Master</SelectItem>
+                              <SelectItem value="new_item">New Item</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          {item.request_type === "from_master" ? (
+                            <AssetMasterSelector
+                              value={item.asset_master_id}
+                              onValueChange={(assetMasterId) => {
+                                if (!assetMasterId) {
+                                  handleItemPatch(index, {
+                                    asset_master_id: undefined,
+                                    item_name: undefined,
+                                    brand: undefined,
+                                    category_id: undefined,
+                                    subcategory_id: undefined,
+                                  });
+                                }
+                              }}
+                              onAssetSelected={(assetMaster) => {
+                                if (assetMaster) {
+                                  handleItemPatch(index, {
+                                    asset_master_id: assetMaster.id,
+                                    item_name: assetMaster.asset_name,
+                                    brand: assetMaster.brand || undefined,
+                                    category_id: assetMaster.category_id || undefined,
+                                    subcategory_id: assetMaster.subcategory_id || undefined,
+                                  });
+                                }
+                              }}
+                            />
+                          ) : (
+                            <Input
+                              placeholder="Enter item name"
+                              value={item.item_name || ""}
+                              onChange={(e) => handleItemPatch(index, { item_name: e.target.value })}
+                              className="h-8"
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={item.category_id || ""}
+                            onValueChange={(value) =>
+                              handleItemPatch(index, {
+                                category_id: value || undefined,
+                                subcategory_id: undefined,
+                              })
+                            }
+                            disabled={lockedFromMaster}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {mainCategories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={item.subcategory_id || ""}
+                            onValueChange={(value) =>
+                              handleItemPatch(index, { subcategory_id: value || undefined })
+                            }
+                            disabled={lockedFromMaster || !item.category_id || subOptions.length === 0}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue
+                                placeholder={
+                                  !item.category_id
+                                    ? "Pick category first"
+                                    : subOptions.length === 0
+                                    ? "No sub-categories"
+                                    : "Select sub-category"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subOptions.map((sc) => (
+                                <SelectItem key={sc.id} value={sc.id}>
+                                  {sc.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
                           <Input
-                            placeholder="Enter item name"
-                            value={item.item_name || ""}
-                            onChange={(e) => handleItemChange(index, "item_name", e.target.value)}
+                            type="number"
+                            min="1"
+                            value={item.quantity_requested}
+                            onChange={(e) =>
+                              handleItemPatch(index, {
+                                quantity_requested: parseInt(e.target.value) || 1,
+                              })
+                            }
                             className="h-8"
                           />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity_requested}
-                          onChange={(e) => handleItemChange(index, "quantity_requested", parseInt(e.target.value) || 1)}
-                          className="h-8"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveItem(index)}
-                          disabled={items.length === 1}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveItem(index)}
+                            disabled={items.length === 1}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
