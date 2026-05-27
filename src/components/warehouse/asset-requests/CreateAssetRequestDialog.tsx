@@ -285,6 +285,38 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                   rows={2}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mrnFile">MRN Copy</Label>
+                {mrnFile ? (
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                    <span className="truncate">{mrnFile.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMrnFile(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="mrnFile"
+                    className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload MRN copy (PDF or image)
+                  </label>
+                )}
+                <Input
+                  id="mrnFile"
+                  type="file"
+                  accept=".pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => setMrnFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
             </CardContent>
           </Card>
 
