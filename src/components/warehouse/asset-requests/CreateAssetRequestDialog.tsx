@@ -103,6 +103,30 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       return;
     }
 
+    let mrnUrl: string | null = null;
+    let mrnPath: string | null = null;
+    if (mrnFile) {
+      try {
+        setUploading(true);
+        const safeName = mrnFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `mrn/${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("asset-request-documents")
+          .upload(path, mrnFile, { upsert: false, contentType: mrnFile.type });
+        if (upErr) throw upErr;
+        const { data: signed } = await supabase.storage
+          .from("asset-request-documents")
+          .createSignedUrl(path, 60 * 60 * 24 * 365);
+        mrnPath = path;
+        mrnUrl = signed?.signedUrl ?? null;
+      } catch (e: any) {
+        setUploading(false);
+        toast({ title: "MRN upload failed", description: e.message, variant: "destructive" });
+        return;
+      }
+      setUploading(false);
+    }
+
     const request = {
       requester_name: requesterName,
       department,
@@ -111,6 +135,9 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       priority,
       purpose,
       justification,
+      approved_by_name: approvedBy || null,
+      mrn_document_url: mrnUrl,
+      mrn_document_path: mrnPath,
       status: asDraft ? "draft" as const : "pending_hod_approval" as const,
       request_date: new Date().toISOString().split('T')[0]
     };
