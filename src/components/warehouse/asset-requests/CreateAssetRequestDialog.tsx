@@ -44,6 +44,9 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
   const [priority, setPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
   const [purpose, setPurpose] = useState("");
   const [justification, setJustification] = useState("");
+  const [approvedBy, setApprovedBy] = useState("");
+  const [mrnFile, setMrnFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [items, setItems] = useState<RequestItem[]>([{
     request_type: "from_master",
     quantity_requested: 1
