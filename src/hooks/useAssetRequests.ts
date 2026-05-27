@@ -260,7 +260,7 @@ export const useAssetRequests = () => {
 
       if (requestFetchError) throw requestFetchError;
 
-      // Get company's main warehouse location
+      // Resolve warehouse location: prefer company's main, else fall back to any active warehouse for the company
       const { data: company, error: companyError } = await supabase
         .from("companies")
         .select("main_warehouse_location_id")
@@ -269,8 +269,21 @@ export const useAssetRequests = () => {
 
       if (companyError) throw companyError;
 
-      if (!company.main_warehouse_location_id) {
-        throw new Error("Main warehouse not configured for this company");
+      let warehouseLocationId: string | null = company?.main_warehouse_location_id ?? null;
+      if (!warehouseLocationId) {
+        const { data: fallbackLoc } = await supabase
+          .from("warehouse_locations")
+          .select("id")
+          .eq("company_id", request.company_id)
+          .eq("status", "active")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        warehouseLocationId = fallbackLoc?.id ?? null;
+      }
+
+      if (!warehouseLocationId) {
+        throw new Error("No warehouse location found for this company. Please create a warehouse location first.");
       }
 
       // Update request status to purchased
