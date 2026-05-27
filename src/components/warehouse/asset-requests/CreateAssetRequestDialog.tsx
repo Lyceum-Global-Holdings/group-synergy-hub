@@ -39,6 +39,7 @@ interface RequestItem {
 export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequestDialogProps) => {
   const { toast } = useToast();
   const { createRequest, isCreating } = useAssetRequests();
+  const { selectedCompany } = useCompany();
   const { assetMasterItems } = useAssetMaster();
   const { mainCategories, getSubcategories } = useAssetCategories();
 
