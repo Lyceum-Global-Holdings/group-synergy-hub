@@ -371,42 +371,6 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                           </Select>
                         </TableCell>
                         <TableCell>
-                          {item.request_type === "from_master" ? (
-                            <AssetMasterSelector
-                              value={item.asset_master_id}
-                              onValueChange={(assetMasterId) => {
-                                if (!assetMasterId) {
-                                  handleItemPatch(index, {
-                                    asset_master_id: undefined,
-                                    item_name: undefined,
-                                    brand: undefined,
-                                    category_id: undefined,
-                                    subcategory_id: undefined,
-                                  });
-                                }
-                              }}
-                              onAssetSelected={(assetMaster) => {
-                                if (assetMaster) {
-                                  handleItemPatch(index, {
-                                    asset_master_id: assetMaster.id,
-                                    item_name: assetMaster.asset_name,
-                                    brand: assetMaster.brand || undefined,
-                                    category_id: assetMaster.category_id || undefined,
-                                    subcategory_id: assetMaster.subcategory_id || undefined,
-                                  });
-                                }
-                              }}
-                            />
-                          ) : (
-                            <Input
-                              placeholder="Enter item name"
-                              value={item.item_name || ""}
-                              onChange={(e) => handleItemPatch(index, { item_name: e.target.value })}
-                              className="h-8"
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
                           <Select
                             value={item.category_id || ""}
                             onValueChange={(value) =>
@@ -456,6 +420,58 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                               ))}
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          {item.request_type === "from_master" ? (
+                            <AssetMasterSelector
+                              value={item.asset_master_id}
+                              onValueChange={(assetMasterId) => {
+                                if (!assetMasterId) {
+                                  handleItemPatch(index, {
+                                    asset_master_id: undefined,
+                                    item_name: undefined,
+                                    brand: undefined,
+                                    category_id: undefined,
+                                    subcategory_id: undefined,
+                                    item_description: undefined,
+                                  });
+                                }
+                              }}
+                              onAssetSelected={(assetMaster) => {
+                                if (assetMaster) {
+                                  handleItemPatch(index, {
+                                    asset_master_id: assetMaster.id,
+                                    item_name: assetMaster.asset_name,
+                                    brand: assetMaster.brand || undefined,
+                                    category_id: assetMaster.category_id || undefined,
+                                    subcategory_id: assetMaster.subcategory_id || undefined,
+                                    item_description:
+                                      (assetMaster as any).description ||
+                                      (assetMaster as any).specifications ||
+                                      (assetMaster as any).model ||
+                                      undefined,
+                                  });
+                                }
+                              }}
+                            />
+                          ) : (
+                            <Input
+                              placeholder="Enter item name"
+                              value={item.item_name || ""}
+                              onChange={(e) => handleItemPatch(index, { item_name: e.target.value })}
+                              className="h-8"
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            placeholder="Description"
+                            value={item.item_description || ""}
+                            onChange={(e) =>
+                              handleItemPatch(index, { item_description: e.target.value })
+                            }
+                            className="h-8"
+                          />
                         </TableCell>
                         <TableCell>
                           <Input
