@@ -515,14 +515,14 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button variant="outline" onClick={() => handleSubmit(true)} disabled={isCreating || uploading}>
+            <Button variant="outline" size="sm" onClick={() => handleSubmit(true)} disabled={isCreating || uploading}>
               Save as Draft
             </Button>
-            <Button onClick={() => handleSubmit(false)} disabled={isCreating || uploading}>
+            <Button size="sm" onClick={() => handleSubmit(false)} disabled={isCreating || uploading}>
               {uploading ? "Uploading…" : "Submit for Approval"}
             </Button>
           </div>
