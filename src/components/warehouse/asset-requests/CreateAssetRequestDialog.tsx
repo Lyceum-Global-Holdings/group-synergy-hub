@@ -411,10 +411,11 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button variant="outline" onClick={() => handleSubmit(true)} disabled={isCreating}>
+            <Button variant="outline" onClick={() => handleSubmit(true)} disabled={isCreating || uploading}>
               Save as Draft
             </Button>
-            <Button onClick={() => handleSubmit(false)} disabled={isCreating}>
+            <Button onClick={() => handleSubmit(false)} disabled={isCreating || uploading}>
+              {uploading ? "Uploading…" : "Submit for Approval"}
               Submit for Approval
             </Button>
           </div>
