@@ -14,6 +14,7 @@ import { Plus, Trash2, Upload, X } from "lucide-react";
 import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface CreateAssetRequestDialogProps {
   open: boolean;
@@ -38,6 +39,7 @@ interface RequestItem {
 export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequestDialogProps) => {
   const { toast } = useToast();
   const { createRequest, isCreating } = useAssetRequests();
+  const { selectedCompany } = useCompany();
   const { assetMasterItems } = useAssetMaster();
   const { mainCategories, getSubcategories } = useAssetCategories();
 
@@ -137,8 +139,10 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       mrn_document_url: mrnUrl,
       mrn_document_path: mrnPath,
       status: asDraft ? "draft" as const : "pending_hod_approval" as const,
-      request_date: new Date().toISOString().split('T')[0]
+      request_date: new Date().toISOString().split('T')[0],
+      company_id: selectedCompany?.id,
     };
+
 
     const itemsWithLineNumbers = items.map((item, index) => {
       const lineItem: any = { ...item, line_number: index + 1 };
