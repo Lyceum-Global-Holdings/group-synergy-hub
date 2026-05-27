@@ -175,6 +175,8 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
           setPriority("medium");
           setPurpose("");
           setJustification("");
+          setApprovedBy("");
+          setMrnFile(null);
           setItems([{ request_type: "from_master", quantity_requested: 1 }]);
         }
       }
