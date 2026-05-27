@@ -183,63 +183,67 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create Asset Request</DialogTitle>
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto p-4 sm:p-5">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-base">Create Asset Request</DialogTitle>
           <DialogDescription className="sr-only">
             Fill in request details and add assets to create a new asset request
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Request Header */}
           <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="requesterName">Requester Name *</Label>
+            <CardContent className="p-3 space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="requesterName" className="text-xs">Requester Name *</Label>
                   <Input
                     id="requesterName"
                     value={requesterName}
                     onChange={(e) => setRequesterName(e.target.value)}
                     placeholder="Enter requester name"
+                    className="h-8"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="department" className="text-xs">Department</Label>
                   <Input
                     id="department"
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     placeholder="Enter department"
+                    className="h-8"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="contactNumber">Contact Number</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="contactNumber" className="text-xs">Contact Number</Label>
                   <Input
                     id="contactNumber"
                     value={contactNumber}
                     onChange={(e) => setContactNumber(e.target.value)}
                     placeholder="Enter contact number"
+                    className="h-8"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="requiredDate">Required Date *</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="requiredDate" className="text-xs">Required Date *</Label>
                   <Input
                     id="requiredDate"
                     type="date"
                     value={requiredDate}
                     onChange={(e) => setRequiredDate(e.target.value)}
+                    className="h-8"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="priority">Priority *</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="priority" className="text-xs">Priority *</Label>
                   <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -251,43 +255,48 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="approvedBy">Approved By</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="approvedBy" className="text-xs">Approved By</Label>
                   <Input
                     id="approvedBy"
                     value={approvedBy}
                     onChange={(e) => setApprovedBy(e.target.value)}
                     placeholder="Name of approver"
+                    className="h-8"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="purpose">Purpose *</Label>
-                <Textarea
-                  id="purpose"
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  placeholder="Enter purpose of request"
-                  rows={2}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="purpose" className="text-xs">Purpose *</Label>
+                  <Textarea
+                    id="purpose"
+                    value={purpose}
+                    onChange={(e) => setPurpose(e.target.value)}
+                    placeholder="Enter purpose of request"
+                    rows={2}
+                    className="resize-none text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="justification" className="text-xs">Justification</Label>
+                  <Textarea
+                    id="justification"
+                    value={justification}
+                    onChange={(e) => setJustification(e.target.value)}
+                    placeholder="Enter justification for request"
+                    rows={2}
+                    className="resize-none text-sm"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="justification">Justification</Label>
-                <Textarea
-                  id="justification"
-                  value={justification}
-                  onChange={(e) => setJustification(e.target.value)}
-                  placeholder="Enter justification for request"
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mrnFile">MRN Copy</Label>
+              <div className="space-y-1">
+                <Label htmlFor="mrnFile" className="text-xs">MRN Copy</Label>
                 {mrnFile ? (
-                  <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
                     <span className="truncate">{mrnFile.name}</span>
                     <Button
                       type="button"
@@ -301,7 +310,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                 ) : (
                   <label
                     htmlFor="mrnFile"
-                    className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50"
+                    className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/50"
                   >
                     <Upload className="h-4 w-4" />
                     Upload MRN copy (PDF or image)
@@ -317,6 +326,7 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
               </div>
             </CardContent>
           </Card>
+
 
           {/* Request Items */}
           <div className="space-y-4">
