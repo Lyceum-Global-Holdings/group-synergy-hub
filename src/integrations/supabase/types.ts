@@ -820,6 +820,7 @@ export type Database = {
       }
       asset_requests: {
         Row: {
+          approved_by_name: string | null
           company_id: string | null
           contact_number: string | null
           created_at: string
@@ -833,6 +834,8 @@ export type Database = {
           hod_comments: string | null
           id: string
           justification: string | null
+          mrn_document_path: string | null
+          mrn_document_url: string | null
           notes: string | null
           priority: Database["public"]["Enums"]["asset_request_priority"]
           procurement_approval_date: string | null
@@ -853,6 +856,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approved_by_name?: string | null
           company_id?: string | null
           contact_number?: string | null
           created_at?: string
@@ -866,6 +870,8 @@ export type Database = {
           hod_comments?: string | null
           id?: string
           justification?: string | null
+          mrn_document_path?: string | null
+          mrn_document_url?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["asset_request_priority"]
           procurement_approval_date?: string | null
@@ -886,6 +892,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approved_by_name?: string | null
           company_id?: string | null
           contact_number?: string | null
           created_at?: string
@@ -899,6 +906,8 @@ export type Database = {
           hod_comments?: string | null
           id?: string
           justification?: string | null
+          mrn_document_path?: string | null
+          mrn_document_url?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["asset_request_priority"]
           procurement_approval_date?: string | null
