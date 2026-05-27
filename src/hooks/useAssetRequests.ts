@@ -37,13 +37,13 @@ export const useAssetRequests = () => {
       if (!companyId) {
         const { data: accessRows } = await supabase
           .from("user_company_access")
-          .select("company_id, is_primary")
+          .select("company_id")
           .eq("user_id", userId)
-          .order("is_primary", { ascending: false })
           .limit(1);
         companyId = accessRows?.[0]?.company_id;
       }
       if (!companyId) throw new Error("No company assigned to your account");
+
 
       const payload = {
         ...values.request,
