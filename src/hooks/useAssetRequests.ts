@@ -336,7 +336,7 @@ export const useAssetRequests = () => {
                   specifications: item.specifications,
                   category_id: item.category_id,
                   subcategory_id: item.subcategory_id,
-                  location_id: company.main_warehouse_location_id,
+                  location_id: warehouseLocationId,
                   department_id: null, // Not assigned to department yet
                   status: "active",
                   condition: "good",
