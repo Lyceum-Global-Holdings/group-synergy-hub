@@ -9,9 +9,10 @@ import { useAssetRequests } from "@/hooks/useAssetRequests";
 import { useAssetMaster } from "@/hooks/useAssetMaster";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Upload, X } from "lucide-react";
 import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { Card, CardContent } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CreateAssetRequestDialogProps {
   open: boolean;
@@ -43,6 +44,9 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
   const [priority, setPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
   const [purpose, setPurpose] = useState("");
   const [justification, setJustification] = useState("");
+  const [approvedBy, setApprovedBy] = useState("");
+  const [mrnFile, setMrnFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [items, setItems] = useState<RequestItem[]>([{
     request_type: "from_master",
     quantity_requested: 1
@@ -99,6 +103,30 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       return;
     }
 
+    let mrnUrl: string | null = null;
+    let mrnPath: string | null = null;
+    if (mrnFile) {
+      try {
+        setUploading(true);
+        const safeName = mrnFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `mrn/${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("asset-request-documents")
+          .upload(path, mrnFile, { upsert: false, contentType: mrnFile.type });
+        if (upErr) throw upErr;
+        const { data: signed } = await supabase.storage
+          .from("asset-request-documents")
+          .createSignedUrl(path, 60 * 60 * 24 * 365);
+        mrnPath = path;
+        mrnUrl = signed?.signedUrl ?? null;
+      } catch (e: any) {
+        setUploading(false);
+        toast({ title: "MRN upload failed", description: e.message, variant: "destructive" });
+        return;
+      }
+      setUploading(false);
+    }
+
     const request = {
       requester_name: requesterName,
       department,
@@ -107,6 +135,9 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       priority,
       purpose,
       justification,
+      approved_by_name: approvedBy || null,
+      mrn_document_url: mrnUrl,
+      mrn_document_path: mrnPath,
       status: asDraft ? "draft" as const : "pending_hod_approval" as const,
       request_date: new Date().toISOString().split('T')[0]
     };
@@ -144,6 +175,8 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
           setPriority("medium");
           setPurpose("");
           setJustification("");
+          setApprovedBy("");
+          setMrnFile(null);
           setItems([{ request_type: "from_master", quantity_requested: 1 }]);
         }
       }
@@ -219,6 +252,16 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="approvedBy">Approved By</Label>
+                  <Input
+                    id="approvedBy"
+                    value={approvedBy}
+                    onChange={(e) => setApprovedBy(e.target.value)}
+                    placeholder="Name of approver"
+                  />
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -240,6 +283,38 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                   onChange={(e) => setJustification(e.target.value)}
                   placeholder="Enter justification for request"
                   rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mrnFile">MRN Copy</Label>
+                {mrnFile ? (
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                    <span className="truncate">{mrnFile.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMrnFile(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="mrnFile"
+                    className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload MRN copy (PDF or image)
+                  </label>
+                )}
+                <Input
+                  id="mrnFile"
+                  type="file"
+                  accept=".pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => setMrnFile(e.target.files?.[0] ?? null)}
                 />
               </div>
             </CardContent>
@@ -336,11 +411,11 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button variant="outline" onClick={() => handleSubmit(true)} disabled={isCreating}>
+            <Button variant="outline" onClick={() => handleSubmit(true)} disabled={isCreating || uploading}>
               Save as Draft
             </Button>
-            <Button onClick={() => handleSubmit(false)} disabled={isCreating}>
-              Submit for Approval
+            <Button onClick={() => handleSubmit(false)} disabled={isCreating || uploading}>
+              {uploading ? "Uploading…" : "Submit for Approval"}
             </Button>
           </div>
         </div>
