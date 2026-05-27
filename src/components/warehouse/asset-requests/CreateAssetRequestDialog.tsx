@@ -333,9 +333,10 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[120px]">Type</TableHead>
-                    <TableHead className="min-w-[220px]">Asset/Item *</TableHead>
                     <TableHead className="min-w-[160px]">Category *</TableHead>
                     <TableHead className="min-w-[160px]">Sub-category</TableHead>
+                    <TableHead className="min-w-[220px]">Asset/Item *</TableHead>
+                    <TableHead className="min-w-[200px]">Description</TableHead>
                     <TableHead className="w-[100px]">Quantity</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
