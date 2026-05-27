@@ -9,9 +9,10 @@ import { useAssetRequests } from "@/hooks/useAssetRequests";
 import { useAssetMaster } from "@/hooks/useAssetMaster";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Upload, X } from "lucide-react";
 import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { Card, CardContent } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CreateAssetRequestDialogProps {
   open: boolean;
