@@ -29,13 +29,36 @@ export const useAssetRequests = () => {
       request: Partial<AssetRequest>;
       items: Partial<AssetRequestItem>[];
     }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("You must be signed in to create a request");
+
+      let companyId = (values.request as any).company_id as string | undefined;
+      if (!companyId) {
+        const { data: accessRows } = await supabase
+          .from("user_company_access")
+          .select("company_id, is_primary")
+          .eq("user_id", userId)
+          .order("is_primary", { ascending: false })
+          .limit(1);
+        companyId = accessRows?.[0]?.company_id;
+      }
+      if (!companyId) throw new Error("No company assigned to your account");
+
+      const payload = {
+        ...values.request,
+        company_id: companyId,
+        created_by: userId,
+      };
+
       const { data: requestData, error: requestError } = await supabase
         .from("asset_requests")
-        .insert([values.request as any])
+        .insert([payload as any])
         .select()
         .single();
 
       if (requestError) throw requestError;
+
 
       if (values.items.length > 0) {
         const itemsWithRequestId = values.items.map((item, index) => ({
