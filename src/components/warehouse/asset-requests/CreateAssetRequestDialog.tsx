@@ -416,7 +416,6 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
             </Button>
             <Button onClick={() => handleSubmit(false)} disabled={isCreating || uploading}>
               {uploading ? "Uploading…" : "Submit for Approval"}
-              Submit for Approval
             </Button>
           </div>
         </div>
