@@ -252,6 +252,16 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="approvedBy">Approved By</Label>
+                  <Input
+                    id="approvedBy"
+                    value={approvedBy}
+                    onChange={(e) => setApprovedBy(e.target.value)}
+                    placeholder="Name of approver"
+                  />
+                </div>
               </div>
               
               <div className="space-y-2">
