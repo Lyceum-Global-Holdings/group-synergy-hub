@@ -1,51 +1,35 @@
-## Goal
-Add a "Paste items" capability to the Create Stock Transfer dialog so users can bulk-add transfer lines from a spreadsheet (Excel/Google Sheets) instead of picking + typing each row.
+# Plan: Bin-wise filter on Bin Allocations
 
-## International standards reference
-- GS1 Logistics Interoperability Model (LIM) & EDIFACT INVRPT/INSDES line structure: each transfer line is `{ item identifier, quantity, [uom] }`.
-- SAP S/4 MIGO and Oracle WMS "Mass entry" patterns: TSV/CSV paste with item code as primary key, GTIN/SKU as fallback, UoM optional (defaults to base UoM), quantity validated against source on-hand.
-- Aligns with the project's existing bulk-paste convention used in `BulkCatalogToInventoryDialog` (paste-codes dialog + direct TSV paste, resolves via `warehouse_item_catalog` by `item_code` → `barcode` → `sku`).
+Add a searchable bin selector next to the existing search/location chips on `/warehouse/bin-allocations`, so users can drill down to a single bin (or a multi-select of bins). Mirrors SAP EWM / Oracle WMS "Storage Bin" filter pattern.
 
 ## UX
-Add a `Paste items` button next to the existing `Select item / Quantity / +` row inside the "Transfer Items" section. Clicking opens a small sub-dialog:
 
-```text
-┌─ Paste transfer items ───────────────────────────┐
-│ One line per item. Tab/comma/semicolon separated:│
-│   <item_code>  <quantity>  [uom]                 │
-│                                                  │
-│ [ large monospace textarea ]                     │
-│                                                  │
-│ Source bin: <current From Bin>                   │
-│ [ Preview ]                                      │
-│                                                  │
-│ Preview table:                                    │
-│  Code  Item     Qty   UoM   On-hand  Status      │
-│  IT-01 Bolt M8  50    pcs   240      OK          │
-│  IT-09 ?        10    -     -        Not found   │
-│  IT-02 Nut M8   500   pcs   120      Over stock  │
-│                                                  │
-│ [Cancel]                       [Add 2 valid rows]│
-└──────────────────────────────────────────────────┘
-```
+- New control in the `BinAllocationsTab` header row, left of the search input:
+  - Label-less Combobox-style trigger: **"All bins"** by default; shows `bin_code` (with count) when one is selected, or `"N bins"` when multiple.
+  - Popover with:
+    - Search input (filters by `bin_code` or `name`).
+    - Multi-select checkbox list of bins.
+    - "Clear" button and "Select all (filtered)" action.
+  - When the global location filter is set, the bin list is restricted to bins inside that warehouse subtree — staying consistent with the existing `scope` logic.
+  - Selected bins also surface as removable chips next to the existing `MapPin` location chip, so the active filter is visible at a glance.
+- Empty state: if a bin filter is active and no rows match, show "No allocations in selected bin(s)" with a "Clear bin filter" button.
+- Bulk QR button + count update to reflect filtered set (already wired to `filteredAllocations`, no change needed).
 
-- Accepts TSV (Excel default), CSV, and semicolon-separated. Trims, ignores blank lines, dedupes by `item_code` (sums quantity with a "merged N duplicates" note).
-- Resolves codes against catalog in this order: `item_code` → `barcode/GTIN` → `sku` (same resolver used in bulk catalog import — reused, not duplicated).
-- Quantity validated: number > 0, ≤ on-hand at the selected From Bin (warns, does not block — matches existing single-row add behavior).
-- UoM optional; if omitted, falls back to the item's base UoM. If provided and doesn't match base UoM, row is flagged (non-blocking warning).
-- Preview surfaces three states per row: `OK`, `Warning` (over-stock / uom mismatch / duplicate-merged), `Error` (not found / qty invalid). Only `OK` + `Warning` rows are imported; `Error` rows stay in the textarea highlighted so the user can fix and re-preview.
-- "Add N valid rows" appends to the existing `transferItems` state — same shape as `handleAddItem` already produces, so downstream submit logic is unchanged.
+## Data / logic
 
-## Discoverability touches
-- Small helper text under the Transfer Items header: `Tip: paste from Excel — code, qty, uom`.
-- The paste dialog shows a one-line example and a "Download template" link emitting a 3-column CSV (`item_code,quantity,uom`).
+- Derive the bin options from the already-loaded `binAllocations` (distinct by `warehouse_bin.id`), so we don't add a network round-trip. Each option carries `{ id, bin_code, name, location_id, location_path }`.
+- Sort options natural-numerically by `bin_code` (matches `useWarehouseBins` convention from `mem://architecture/bin-uniqueness`).
+- Filter pipeline in `filteredAllocations` (in order): company scope (existing) → location scope (existing) → **bin filter (new)** → free-text search (existing).
+- State: `const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set())`. Empty set = no filter.
+- When the global location changes and the currently selected bins fall outside the new scope, prune them automatically (so stale chips don't linger).
 
-## Files (frontend only)
-- `src/components/warehouse/CreateStockTransferDialog.tsx` — add `Paste items` button, wire to new dialog, merge result into `transferItems`.
-- `src/components/warehouse/stock-transfer/PasteTransferItemsDialog.tsx` — new component: textarea, parser, preview table, validation, confirm.
-- `src/components/warehouse/stock-transfer/pasteParser.ts` — pure parser + resolver helpers (TSV/CSV/semicolon, dedupe, code→catalog lookup via existing `warehouse_item_catalog` query). Unit-testable.
+## Files
+
+- `src/components/warehouse/BinAllocationsTab.tsx` — add state, derive bin options, extend filter, render selector + chips.
+- `src/components/warehouse/bin-allocations/BinFilterPopover.tsx` *(new)* — small presentational component using existing `Popover`, `Command`, `Checkbox`, `Button` primitives from `src/components/ui`. Keeps `BinAllocationsTab` readable.
 
 ## Out of scope
-- No backend / RPC changes (existing per-item `createItem` mutation handles the appended rows).
-- No change to the single-row add, bin selectors, or submit flow.
-- No barcode scanner integration in this iteration (paste only); the resolver already accepts GTIN so a future scanner add is a one-line change.
+
+- No DB / RPC / hook changes.
+- No changes to create/move/return dialogs.
+- No URL-param persistence for the filter (can be added later if requested).
