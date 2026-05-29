@@ -165,10 +165,15 @@ export function BinAllocationsTab() {
         const locId = allocation.warehouse_bin?.warehouse_location?.id;
         if (!locId || !scope.ids.has(locId)) return false;
       }
-      // Bin filter
+      // Bin filter — match by physical address (location_id + bin_code),
+      // not by warehouse_bins row id (allocations may reference the
+      // dedupe-loser row).
       if (selectedBinIds.size > 0) {
-        const binId = (allocation.warehouse_bin as any)?.id;
-        if (!binId || !selectedBinIds.has(binId)) return false;
+        const bin = allocation.warehouse_bin as any;
+        const locId = bin?.warehouse_location?.id ?? bin?.location_id ?? '';
+        const code = (bin?.bin_code ?? '').toLowerCase();
+        const key = `${locId}::${code}`;
+        if (!key || !selectedBinIds.has(key)) return false;
       }
       // Free-text search
       const wi = allocation.warehouse_item as any;
