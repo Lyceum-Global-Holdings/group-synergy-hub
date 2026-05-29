@@ -1,19 +1,20 @@
-# Plan: Bin filter sources all bins at the selected location
+# Plan: Match bin filter by (location, bin_code) instead of bin row id
 
-Currently the popover only lists bins that already appear in `binAllocations`. In the screenshot the active scope shows allocations under bin `1-A-1-1`, but the popover says "No bins found" — likely because `warehouse_bin.warehouse_location.id` for those rows sits outside the strict scope subtree, or simply that no rows resolved through the filter.
+## Root cause
 
-Switch the source of the picker so it always loads every bin physically attached to the selected location subtree (matching WMS standards: a Storage Bin filter must list real bins, not just bins that already hold stock).
+Bin options now come from `useWarehouseBins` (the `warehouse_bins` table), but `BinAllocationWithDetails.warehouse_bin.id` is the id embedded by the allocations query. Per `mem://architecture/bin-uniqueness` the bins table can hold both a NULL-company "template" row and a company-scoped row for the same physical bin; `useWarehouseBins` dedupes to one row, while allocations may still point at the other. So the selected `bin.id` never equals `allocation.warehouse_bin.id` and the table empties out (or filters incorrectly).
 
-## Logic
+## Fix
 
-- Pull all bins via `useWarehouseBins()` (already permission-scoped and natural-sorted).
-- Filter them to the active `scope.ids` set (the warehouse + sub-locations the user picked in the header). If no global location is selected, list all bins the user can see.
-- Map each bin to a `BinFilterOption` enriched with its `location_path` resolved from the loaded `locations`. Bins with no allocations should still be listed (with no count badge needed).
-- Keep the auto-prune effect so stale selections are dropped when scope changes.
-- `filteredAllocations` keeps the bin-id filter unchanged.
+Identify bins by their **physical address** — `${location_id}::${lower(bin_code)}` — exactly the natural key the DB unique index already uses. This is row-id-agnostic and matches WMS standards.
+
+- `BinFilterOption.id` becomes that composite key.
+- `selectedBinIds` stores composite keys.
+- The allocation filter compares `${allocation.warehouse_bin.warehouse_location.id}::${lower(allocation.warehouse_bin.bin_code)}` against the set.
+- The "prune stale selections on scope change" effect keeps working — visible-keys check is unchanged.
 
 ## Files
 
-- `src/components/warehouse/BinAllocationsTab.tsx` — replace the `binOptions` memo to source from `useWarehouseBins()` + `locations`, drop the allocation-derived path.
+- `src/components/warehouse/BinAllocationsTab.tsx` — rebuild `binOptions` with composite keys; update the allocation filter to compare the same key.
 
-No new components, no DB changes.
+No DB or hook changes.
