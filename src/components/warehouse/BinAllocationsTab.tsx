@@ -428,6 +428,16 @@ export function BinAllocationsTab() {
           </CardDescription>
         </div>
         <div className="flex items-center gap-4 flex-wrap justify-end">
+          <div className="flex items-center gap-2" title="Hide allocations with 0 available stock">
+            <Switch
+              id="hide-empty-bins"
+              checked={hideEmpty}
+              onCheckedChange={setHideEmpty}
+            />
+            <Label htmlFor="hide-empty-bins" className="text-sm font-normal cursor-pointer">
+              Hide empty
+            </Label>
+          </div>
           <BinFilterPopover
             options={binOptions}
             selected={selectedBinIds}
