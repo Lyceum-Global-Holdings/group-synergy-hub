@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2, MapPin, ArrowRightLeft } from 'lucide-react';
+import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2, MapPin, ArrowRightLeft, X, Boxes } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
@@ -25,8 +25,10 @@ import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
 import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDialog';
 import { MoveBinAllocationDialog } from './MoveBinAllocationDialog';
 import { BinAllocationQRDialog } from './BinAllocationQRDialog';
+import { BinFilterPopover, type BinFilterOption } from './bin-allocations/BinFilterPopover';
 import { generateBulkBinQRCodePdf, downloadBulkBinQRCodePdf } from '@/utils/bulkBinQRCodePdf';
 import { toast } from 'sonner';
+import { useEffect } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
