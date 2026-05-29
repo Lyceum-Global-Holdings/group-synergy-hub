@@ -532,11 +532,8 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
           const splits = r.splits?.map((s) => {
             const st = e.splitStatus.get(s.splitId);
             if (!st) return s;
-            return {
-              ...s,
-              status: (st.ok ? 'imported' : 'error') as const,
-              message: st.msg,
-            };
+            const splitStatus: BulkCatalogSplit['status'] = st.ok ? 'imported' : 'error';
+            return { ...s, status: splitStatus, message: st.msg };
           });
           const status = e.err === 0 ? 'imported' : e.ok === 0 ? 'error' : 'error';
           const message = e.err === 0 ? null : e.msgs.join('; ') || `${e.err} split(s) failed`;
