@@ -17,6 +17,7 @@ import {
 import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2, MapPin, ArrowRightLeft, X, Boxes } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
+import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useCompany } from '@/contexts/CompanyContext';
