@@ -355,7 +355,7 @@ export function BinAllocationsTab() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <CardTitle>Bin Allocations</CardTitle>
             {scope && (
               <Badge variant="secondary" className="gap-1 font-normal">
@@ -363,6 +363,28 @@ export function BinAllocationsTab() {
                 {scope.label}
               </Badge>
             )}
+            {selectedBinChips.map((b) => (
+              <Badge
+                key={b.id}
+                variant="outline"
+                className="gap-1 font-normal pl-2 pr-1"
+              >
+                <Boxes className="h-3 w-3" />
+                <span className="font-mono text-xs">{b.bin_code}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = new Set(selectedBinIds);
+                    next.delete(b.id);
+                    setSelectedBinIds(next);
+                  }}
+                  className="ml-0.5 rounded-sm hover:bg-muted p-0.5"
+                  aria-label={`Remove ${b.bin_code} filter`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
           </div>
           <CardDescription>
             {scope
@@ -370,7 +392,12 @@ export function BinAllocationsTab() {
               : 'Manage item-to-bin allocations and track reserved quantities'}
           </CardDescription>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap justify-end">
+          <BinFilterPopover
+            options={binOptions}
+            selected={selectedBinIds}
+            onChange={setSelectedBinIds}
+          />
           <div className="relative w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
