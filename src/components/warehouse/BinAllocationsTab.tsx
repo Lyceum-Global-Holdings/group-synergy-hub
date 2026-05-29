@@ -40,6 +40,7 @@ export function BinAllocationsTab() {
   const [qrAllocation, setQrAllocation] = useState<BinAllocationWithDetails | null>(null);
   const [moveAllocation, setMoveAllocation] = useState<BinAllocationWithDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set());
   const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
   const { globalLocationId } = useLocationFilter();
