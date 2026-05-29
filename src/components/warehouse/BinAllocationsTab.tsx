@@ -102,27 +102,38 @@ export function BinAllocationsTab() {
     return { parent: null, child, path: child };
   };
 
-  // Bin options: distinct bins from already-loaded allocations, restricted to
-  // the active location scope so the bin picker matches the table's universe.
+  // Bin options: every bin physically attached to the active location subtree
+  // (warehouse + sub-locations). Includes empty bins, matching WMS standards —
+  // the picker should list real Storage Bins, not just bins that happen to
+  // already hold stock.
+  const { bins: allBins } = useWarehouseBins();
   const binOptions = useMemo<BinFilterOption[]>(() => {
-    const byId = new Map<string, BinFilterOption>();
-    for (const a of binAllocations || []) {
-      const bin = a.warehouse_bin as any;
-      if (!bin?.id || !bin.bin_code) continue;
-      if (scope) {
-        const locId = bin.warehouse_location?.id;
-        if (!locId || !scope.ids.has(locId)) continue;
-      }
-      if (byId.has(bin.id)) continue;
-      byId.set(bin.id, {
-        id: bin.id,
-        bin_code: bin.bin_code,
-        name: bin.name,
-        location_path: getLocationPath(a).path || null,
-      });
-    }
-    return Array.from(byId.values());
-  }, [binAllocations, scope]);
+    const locById = new Map((locations || []).map((l) => [l.id, l] as const));
+    const fmt = (n?: string | null, c?: string | null) => (c ? `${n} (${c})` : n ?? '');
+    const pathFor = (locId: string | null | undefined) => {
+      if (!locId) return null;
+      const loc = locById.get(locId);
+      if (!loc) return null;
+      const parent = loc.parent_id ? locById.get(loc.parent_id) : null;
+      const child = fmt(loc.name, loc.location_code);
+      return parent ? `${fmt(parent.name, parent.location_code)} › ${child}` : child;
+    };
+    return (allBins || [])
+      .filter((b) => {
+        if (!b?.id || !b.bin_code) return false;
+        if (scope) {
+          if (!b.location_id || !scope.ids.has(b.location_id)) return false;
+        }
+        return true;
+      })
+      .map((b) => ({
+        id: b.id,
+        bin_code: b.bin_code,
+        name: b.name,
+        location_path: pathFor(b.location_id),
+      }));
+  }, [allBins, locations, scope]);
+
 
   // Prune stale selections when the scope changes (selected bin no longer visible).
   useEffect(() => {
