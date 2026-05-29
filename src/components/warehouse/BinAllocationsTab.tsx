@@ -128,7 +128,10 @@ export function BinAllocationsTab() {
         return true;
       })
       .map((b) => ({
-        id: b.id,
+        // Use the physical bin address as id (same key as DB unique index),
+        // so it matches regardless of which warehouse_bins row the allocation
+        // happens to reference (template vs company-scoped duplicate).
+        id: `${b.location_id ?? ''}::${(b.bin_code ?? '').toLowerCase()}`,
         bin_code: b.bin_code,
         name: b.name,
         location_path: pathFor(b.location_id),
