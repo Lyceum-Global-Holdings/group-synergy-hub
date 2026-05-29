@@ -396,8 +396,35 @@ export function CreateStockTransferDialog({
             />
 
             <div className="space-y-4">
-              <h3 className="font-semibold">Transfer Items</h3>
-              
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold">Transfer Items</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Tip: paste from Excel — code, qty, uom.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const fromBinId = form.getValues("from_bin_id");
+                    const toBinId = form.getValues("to_bin_id");
+                    if (!fromBinId || !toBinId) {
+                      form.setError("root", {
+                        message: "Please select source and destination bins first",
+                      });
+                      return;
+                    }
+                    form.clearErrors("root");
+                    setPasteOpen(true);
+                  }}
+                >
+                  <ClipboardPaste className="h-4 w-4 mr-1" />
+                  Paste items
+                </Button>
+              </div>
+
               <div className="flex gap-2">
                 <div className="flex-1">
                   <ItemSelector
