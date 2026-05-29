@@ -1,5 +1,14 @@
 export type RowStatus = 'pending' | 'valid' | 'invalid' | 'imported' | 'error';
 
+export interface BulkCatalogSplit {
+  splitId: string;
+  bin_id: string | null;
+  qty: string;
+  unit_cost: string;
+  status: RowStatus;
+  message: string | null;
+}
+
 export interface BulkCatalogRow {
   rowId: string; // local uuid
   catalog_item_id: string | null;
@@ -16,6 +25,12 @@ export interface BulkCatalogRow {
   notes: string;
   status: RowStatus;
   message: string | null;
+  /**
+   * Optional multi-bin split. When non-empty, the parent's bin/opening_qty
+   * fields are ignored and one allocation per split is sent to the RPC.
+   * Standard WMS putaway-split (SAP EWM / Oracle WMS) pattern.
+   */
+  splits?: BulkCatalogSplit[];
 }
 
 export interface ImportResultRow {
@@ -32,6 +47,19 @@ export interface PasteEntry {
   unit_cost?: number | null;
   reorder_level?: number | null;
   notes?: string | null;
+  bin_code?: string | null;
+}
+
+export function newSplit(partial: Partial<BulkCatalogSplit> = {}): BulkCatalogSplit {
+  return {
+    splitId: crypto.randomUUID(),
+    bin_id: null,
+    qty: '',
+    unit_cost: '',
+    status: 'pending',
+    message: null,
+    ...partial,
+  };
 }
 
 export function newRow(partial: Partial<BulkCatalogRow> = {}): BulkCatalogRow {
