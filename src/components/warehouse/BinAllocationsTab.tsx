@@ -152,7 +152,7 @@ export function BinAllocationsTab() {
       }
       // Bin filter
       if (selectedBinIds.size > 0) {
-        const binId = allocation.warehouse_bin?.id;
+        const binId = (allocation.warehouse_bin as any)?.id;
         if (!binId || !selectedBinIds.has(binId)) return false;
       }
       // Free-text search
