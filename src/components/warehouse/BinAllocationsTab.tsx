@@ -102,6 +102,46 @@ export function BinAllocationsTab() {
     return { parent: null, child, path: child };
   };
 
+  // Bin options: distinct bins from already-loaded allocations, restricted to
+  // the active location scope so the bin picker matches the table's universe.
+  const binOptions = useMemo<BinFilterOption[]>(() => {
+    const byId = new Map<string, BinFilterOption>();
+    for (const a of binAllocations || []) {
+      const bin = a.warehouse_bin;
+      if (!bin?.id || !bin.bin_code) continue;
+      if (scope) {
+        const locId = bin.warehouse_location?.id;
+        if (!locId || !scope.ids.has(locId)) continue;
+      }
+      if (byId.has(bin.id)) continue;
+      byId.set(bin.id, {
+        id: bin.id,
+        bin_code: bin.bin_code,
+        name: bin.name,
+        location_path: getLocationPath(a).path || null,
+      });
+    }
+    return Array.from(byId.values());
+  }, [binAllocations, scope]);
+
+  // Prune stale selections when the scope changes (selected bin no longer visible).
+  useEffect(() => {
+    if (selectedBinIds.size === 0) return;
+    const visible = new Set(binOptions.map((o) => o.id));
+    let changed = false;
+    const next = new Set<string>();
+    selectedBinIds.forEach((id) => {
+      if (visible.has(id)) next.add(id);
+      else changed = true;
+    });
+    if (changed) setSelectedBinIds(next);
+  }, [binOptions, selectedBinIds]);
+
+  const selectedBinChips = useMemo(
+    () => binOptions.filter((o) => selectedBinIds.has(o.id)),
+    [binOptions, selectedBinIds],
+  );
+
   const filteredAllocations = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const base = (binAllocations || []).filter((allocation) => {
@@ -109,6 +149,11 @@ export function BinAllocationsTab() {
       if (scope) {
         const locId = allocation.warehouse_bin?.warehouse_location?.id;
         if (!locId || !scope.ids.has(locId)) return false;
+      }
+      // Bin filter
+      if (selectedBinIds.size > 0) {
+        const binId = allocation.warehouse_bin?.id;
+        if (!binId || !selectedBinIds.has(binId)) return false;
       }
       // Free-text search
       const wi = allocation.warehouse_item as any;
@@ -129,12 +174,12 @@ export function BinAllocationsTab() {
       if (pa !== pb) return pa.localeCompare(pb);
       const ba = a.warehouse_bin?.bin_code ?? '';
       const bb = b.warehouse_bin?.bin_code ?? '';
-      if (ba !== bb) return ba.localeCompare(bb);
+      if (ba !== bb) return ba.localeCompare(bb, undefined, { numeric: true });
       const ai = ((a.warehouse_item as any)?.catalog?.item_code ?? (a.warehouse_item as any)?.item_code ?? '') as string;
       const bi = ((b.warehouse_item as any)?.catalog?.item_code ?? (b.warehouse_item as any)?.item_code ?? '') as string;
       return ai.localeCompare(bi);
     });
-  }, [binAllocations, searchTerm, scope]);
+  }, [binAllocations, searchTerm, scope, selectedBinIds]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
