@@ -107,7 +107,7 @@ export function BinAllocationsTab() {
   const binOptions = useMemo<BinFilterOption[]>(() => {
     const byId = new Map<string, BinFilterOption>();
     for (const a of binAllocations || []) {
-      const bin = a.warehouse_bin;
+      const bin = a.warehouse_bin as any;
       if (!bin?.id || !bin.bin_code) continue;
       if (scope) {
         const locId = bin.warehouse_location?.id;
