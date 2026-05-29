@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +45,16 @@ export function BinAllocationsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set());
   const [bulkPrinting, setBulkPrinting] = useState(false);
+  const [hideEmpty, setHideEmpty] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const v = window.localStorage.getItem('binAllocations.hideEmpty');
+    return v === null ? true : v === '1';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('binAllocations.hideEmpty', hideEmpty ? '1' : '0');
+    }
+  }, [hideEmpty]);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
@@ -165,6 +177,11 @@ export function BinAllocationsTab() {
         const locId = allocation.warehouse_bin?.warehouse_location?.id;
         if (!locId || !scope.ids.has(locId)) return false;
       }
+      // Hide empty (available = allocated − reserved ≤ 0)
+      if (hideEmpty) {
+        const avail = Number((allocation as any).available_quantity ?? 0);
+        if (!(avail > 0)) return false;
+      }
       // Bin filter — match by physical address (location_id + bin_code),
       // not by warehouse_bins row id (allocations may reference the
       // dedupe-loser row).
@@ -199,7 +216,7 @@ export function BinAllocationsTab() {
       const bi = ((b.warehouse_item as any)?.catalog?.item_code ?? (b.warehouse_item as any)?.item_code ?? '') as string;
       return ai.localeCompare(bi);
     });
-  }, [binAllocations, searchTerm, scope, selectedBinIds]);
+  }, [binAllocations, searchTerm, scope, selectedBinIds, hideEmpty]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
@@ -413,6 +430,16 @@ export function BinAllocationsTab() {
           </CardDescription>
         </div>
         <div className="flex items-center gap-4 flex-wrap justify-end">
+          <div className="flex items-center gap-2" title="Hide allocations with 0 available stock">
+            <Switch
+              id="hide-empty-bins"
+              checked={hideEmpty}
+              onCheckedChange={setHideEmpty}
+            />
+            <Label htmlFor="hide-empty-bins" className="text-sm font-normal cursor-pointer">
+              Hide empty
+            </Label>
+          </div>
           <BinFilterPopover
             options={binOptions}
             selected={selectedBinIds}
