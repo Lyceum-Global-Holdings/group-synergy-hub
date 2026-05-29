@@ -497,6 +497,46 @@ export function CreateStockTransferDialog({
             </div>
           </form>
         </Form>
+
+        <PasteTransferItemsDialog
+          open={pasteOpen}
+          onOpenChange={setPasteOpen}
+          catalog={warehouseItems as any}
+          fromBinId={form.watch("from_bin_id")}
+          onConfirm={(items: PastedTransferItem[]) => {
+            const fromBinId = form.getValues("from_bin_id");
+            const toBinId = form.getValues("to_bin_id");
+            setTransferItems((prev) => {
+              const merged = [...prev];
+              for (const it of items) {
+                const existingIdx = merged.findIndex(
+                  (p) =>
+                    p.warehouse_item_id === it.warehouse_item_id &&
+                    p.from_bin_id === fromBinId &&
+                    p.to_bin_id === toBinId,
+                );
+                if (existingIdx >= 0) {
+                  merged[existingIdx] = {
+                    ...merged[existingIdx],
+                    quantity_requested:
+                      merged[existingIdx].quantity_requested +
+                      it.quantity_requested,
+                  };
+                } else {
+                  merged.push({
+                    warehouse_item_id: it.warehouse_item_id,
+                    item_name: it.item_name,
+                    quantity_requested: it.quantity_requested,
+                    unit_of_measure: it.unit_of_measure,
+                    from_bin_id: fromBinId,
+                    to_bin_id: toBinId,
+                  });
+                }
+              }
+              return merged;
+            });
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
