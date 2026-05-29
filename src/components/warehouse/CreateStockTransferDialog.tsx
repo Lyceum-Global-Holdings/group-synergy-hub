@@ -74,6 +74,7 @@ export function CreateStockTransferDialog({
   const [transferItems, setTransferItems] = useState<TransferItemForm[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [itemQuantity, setItemQuantity] = useState("");
+  const [pasteOpen, setPasteOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
