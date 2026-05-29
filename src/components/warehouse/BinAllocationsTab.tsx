@@ -214,7 +214,7 @@ export function BinAllocationsTab() {
       const bi = ((b.warehouse_item as any)?.catalog?.item_code ?? (b.warehouse_item as any)?.item_code ?? '') as string;
       return ai.localeCompare(bi);
     });
-  }, [binAllocations, searchTerm, scope, selectedBinIds]);
+  }, [binAllocations, searchTerm, scope, selectedBinIds, hideEmpty]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
