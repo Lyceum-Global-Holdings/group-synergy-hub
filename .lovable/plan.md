@@ -1,20 +1,30 @@
-# Plan: Match bin filter by (location, bin_code) instead of bin row id
+## Add "Hide zero-stock" toggle to Bin Allocations
 
-## Root cause
+Add a quick filter that hides bin allocations whose available quantity is 0, so users can focus on bins that actually hold pickable stock.
 
-Bin options now come from `useWarehouseBins` (the `warehouse_bins` table), but `BinAllocationWithDetails.warehouse_bin.id` is the id embedded by the allocations query. Per `mem://architecture/bin-uniqueness` the bins table can hold both a NULL-company "template" row and a company-scoped row for the same physical bin; `useWarehouseBins` dedupes to one row, while allocations may still point at the other. So the selected `bin.id` never equals `allocation.warehouse_bin.id` and the table empties out (or filters incorrectly).
+### UX
 
-## Fix
+- Add a `Switch` (shadcn) next to the search input / bin filter in `BinAllocationsTab`, labeled **"Hide empty"** with helper tooltip "Hide allocations with 0 available stock".
+- Default: **ON** (matches typical WMS behavior — operators rarely want to see empty bin rows). Persist user's choice in `localStorage` (`binAllocations.hideEmpty`) so it sticks across sessions.
+- When ON, also reflect in the empty-state copy ("No bin allocations with available stock — toggle 'Hide empty' off to see all").
 
-Identify bins by their **physical address** — `${location_id}::${lower(bin_code)}` — exactly the natural key the DB unique index already uses. This is row-id-agnostic and matches WMS standards.
+### Filter logic
 
-- `BinFilterOption.id` becomes that composite key.
-- `selectedBinIds` stores composite keys.
-- The allocation filter compares `${allocation.warehouse_bin.warehouse_location.id}::${lower(allocation.warehouse_bin.bin_code)}` against the set.
-- The "prune stale selections on scope change" effect keeps working — visible-keys check is unchanged.
+In `filteredAllocations` (src/components/warehouse/BinAllocationsTab.tsx, ~line 160), add a predicate before the search check:
 
-## Files
+```ts
+if (hideEmpty && Number(allocation.available_quantity ?? 0) <= 0) return false;
+```
 
-- `src/components/warehouse/BinAllocationsTab.tsx` — rebuild `binOptions` with composite keys; update the allocation filter to compare the same key.
+`available_quantity` is the DB generated column (allocated − reserved) — the canonical "pickable" number, consistent with the Available Quantity memory.
 
-No DB or hook changes.
+### Scope
+
+- Single file: `src/components/warehouse/BinAllocationsTab.tsx`
+- No DB / hook / type changes.
+- No change to bin filter dropdown (it still lists every physical bin in scope, per WMS standard).
+
+### Out of scope
+
+- Server-side filtering (current list is already client-filtered; row counts are small enough).
+- Hiding bins from the bin filter popover based on stock.
