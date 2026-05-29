@@ -175,6 +175,11 @@ export function BinAllocationsTab() {
         const locId = allocation.warehouse_bin?.warehouse_location?.id;
         if (!locId || !scope.ids.has(locId)) return false;
       }
+      // Hide empty (available = allocated − reserved ≤ 0)
+      if (hideEmpty) {
+        const avail = Number((allocation as any).available_quantity ?? 0);
+        if (!(avail > 0)) return false;
+      }
       // Bin filter — match by physical address (location_id + bin_code),
       // not by warehouse_bins row id (allocations may reference the
       // dedupe-loser row).
