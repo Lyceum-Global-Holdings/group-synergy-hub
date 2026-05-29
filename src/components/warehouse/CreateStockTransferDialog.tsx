@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ClipboardPaste } from "lucide-react";
+import { PasteTransferItemsDialog, type PastedTransferItem } from "./stock-transfer/PasteTransferItemsDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -73,6 +74,7 @@ export function CreateStockTransferDialog({
   const [transferItems, setTransferItems] = useState<TransferItemForm[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [itemQuantity, setItemQuantity] = useState("");
+  const [pasteOpen, setPasteOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -394,8 +396,35 @@ export function CreateStockTransferDialog({
             />
 
             <div className="space-y-4">
-              <h3 className="font-semibold">Transfer Items</h3>
-              
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold">Transfer Items</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Tip: paste from Excel — code, qty, uom.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const fromBinId = form.getValues("from_bin_id");
+                    const toBinId = form.getValues("to_bin_id");
+                    if (!fromBinId || !toBinId) {
+                      form.setError("root", {
+                        message: "Please select source and destination bins first",
+                      });
+                      return;
+                    }
+                    form.clearErrors("root");
+                    setPasteOpen(true);
+                  }}
+                >
+                  <ClipboardPaste className="h-4 w-4 mr-1" />
+                  Paste items
+                </Button>
+              </div>
+
               <div className="flex gap-2">
                 <div className="flex-1">
                   <ItemSelector
@@ -468,6 +497,46 @@ export function CreateStockTransferDialog({
             </div>
           </form>
         </Form>
+
+        <PasteTransferItemsDialog
+          open={pasteOpen}
+          onOpenChange={setPasteOpen}
+          catalog={warehouseItems as any}
+          fromBinId={form.watch("from_bin_id")}
+          onConfirm={(items: PastedTransferItem[]) => {
+            const fromBinId = form.getValues("from_bin_id");
+            const toBinId = form.getValues("to_bin_id");
+            setTransferItems((prev) => {
+              const merged = [...prev];
+              for (const it of items) {
+                const existingIdx = merged.findIndex(
+                  (p) =>
+                    p.warehouse_item_id === it.warehouse_item_id &&
+                    p.from_bin_id === fromBinId &&
+                    p.to_bin_id === toBinId,
+                );
+                if (existingIdx >= 0) {
+                  merged[existingIdx] = {
+                    ...merged[existingIdx],
+                    quantity_requested:
+                      merged[existingIdx].quantity_requested +
+                      it.quantity_requested,
+                  };
+                } else {
+                  merged.push({
+                    warehouse_item_id: it.warehouse_item_id,
+                    item_name: it.item_name,
+                    quantity_requested: it.quantity_requested,
+                    unit_of_measure: it.unit_of_measure,
+                    from_bin_id: fromBinId,
+                    to_bin_id: toBinId,
+                  });
+                }
+              }
+              return merged;
+            });
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
