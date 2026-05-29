@@ -43,6 +43,16 @@ export function BinAllocationsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBinIds, setSelectedBinIds] = useState<Set<string>>(new Set());
   const [bulkPrinting, setBulkPrinting] = useState(false);
+  const [hideEmpty, setHideEmpty] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const v = window.localStorage.getItem('binAllocations.hideEmpty');
+    return v === null ? true : v === '1';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('binAllocations.hideEmpty', hideEmpty ? '1' : '0');
+    }
+  }, [hideEmpty]);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
