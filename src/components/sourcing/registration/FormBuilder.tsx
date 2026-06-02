@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2, Eye, Pencil, ArrowUp, ArrowDown, RotateCcw, Lock } from "lucide-react";
+import { Plus, Trash2, Eye, Pencil, ArrowUp, ArrowDown, RotateCcw, Lock, FolderPlus } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -59,11 +60,15 @@ const FILE_ACCEPT_PRESETS: { label: string; mimes: string[] }[] = [
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "field";
 
+const BASELINE_SECTION_IDS = new Set(DEFAULT_SUPPLIER_FORM_SCHEMA.sections.map((s) => s.id));
+const isBaselineSection = (id: string) => BASELINE_SECTION_IDS.has(id);
+
 const sortedFields = (fields: SupplierField[]) =>
   fields
     .map((f, i) => ({ f, i, o: f.order ?? i }))
     .sort((a, b) => a.o - b.o || a.i - b.i)
     .map((x) => x.f);
+
 
 export default function FormBuilder({ companyId }: FormBuilderProps) {
   const { data: config, isLoading } = useSupplierFormConfig(companyId);
@@ -74,6 +79,9 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
   const [addOpen, setAddOpen] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<{ sectionId: string; field: SupplierField } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ sectionId: string; field: SupplierField } | null>(null);
+  const [sectionDialog, setSectionDialog] = useState<{ mode: "add" } | { mode: "edit"; section: SupplierSection } | null>(null);
+  const [deleteSectionTarget, setDeleteSectionTarget] = useState<SupplierSection | null>(null);
+
 
   const schema: SupplierFormSchema =
     draft || config?.schema || mergeWithBaseline(DEFAULT_SUPPLIER_FORM_SCHEMA);
@@ -154,6 +162,56 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
     toast.success("Section defaults restored");
   };
 
+  const addSection = (title: string, description: string) => {
+    update((s) => {
+      const base = `custom_${slugify(title)}`;
+      const existingIds = new Set(s.sections.map((x) => x.id));
+      let id = base;
+      let n = 2;
+      while (existingIds.has(id)) id = `${base}_${n++}`;
+      const maxOrder = s.sections.reduce((m, x) => Math.max(m, x.order), 0);
+      return {
+        ...s,
+        sections: [
+          ...s.sections,
+          { id, title: title.trim(), description: description.trim() || undefined, order: maxOrder + 1, fields: [] },
+        ],
+      };
+    });
+    toast.success("Section added");
+  };
+
+  const updateSection = (sectionId: string, patch: { title: string; description: string }) => {
+    update((s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id !== sectionId ? sec : { ...sec, title: patch.title.trim(), description: patch.description.trim() || undefined },
+      ),
+    }));
+  };
+
+  const removeSection = (sectionId: string) => {
+    if (isBaselineSection(sectionId)) {
+      toast.error("Baseline sections cannot be deleted");
+      return;
+    }
+    update((s) => ({ ...s, sections: s.sections.filter((sec) => sec.id !== sectionId) }));
+    toast.success("Section removed");
+  };
+
+  const moveSection = (sectionId: string, dir: -1 | 1) => {
+    update((s) => {
+      const ordered = s.sections.slice().sort((a, b) => a.order - b.order);
+      const idx = ordered.findIndex((x) => x.id === sectionId);
+      const target = idx + dir;
+      if (idx < 0 || target < 0 || target >= ordered.length) return s;
+      [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
+      return { ...s, sections: ordered.map((sec, i) => ({ ...sec, order: i + 1 })) };
+    });
+  };
+
+
+
   const handleSave = async (publish: boolean) => {
     try {
       await save.mutateAsync({ company_id: companyId, schema, publish });
@@ -183,6 +241,9 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
             </CardDescription>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSectionDialog({ mode: "add" })}>
+              <FolderPlus className="w-4 h-4 mr-2" /> Add section
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
               <Eye className="w-4 h-4 mr-2" /> Preview
             </Button>
@@ -193,24 +254,32 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
               Publish
             </Button>
           </div>
+
         </CardHeader>
       </Card>
 
-      {schema.sections
-        .slice()
-        .sort((a, b) => a.order - b.order)
-        .map((section) => (
+      {(() => {
+        const ordered = schema.sections.slice().sort((a, b) => a.order - b.order);
+        return ordered.map((section, idx) => (
           <SectionEditor
             key={section.id}
             section={section}
+            isBaseline={isBaselineSection(section.id)}
+            canMoveUp={idx > 0}
+            canMoveDown={idx < ordered.length - 1}
             onToggle={(key, prop, value) => toggleField(section.id, key, prop, value)}
             onRemove={(field) => setDeleteTarget({ sectionId: section.id, field })}
             onEdit={(field) => setEditTarget({ sectionId: section.id, field })}
             onMove={(key, dir) => moveField(section.id, key, dir)}
             onAdd={() => setAddOpen(section.id)}
             onRestore={() => restoreSectionDefaults(section.id)}
+            onEditSection={() => setSectionDialog({ mode: "edit", section })}
+            onDeleteSection={() => setDeleteSectionTarget(section)}
+            onMoveSection={(dir) => moveSection(section.id, dir)}
           />
-        ))}
+        ));
+      })()}
+
 
       <FieldDialog
         mode="add"
@@ -270,37 +339,161 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {sectionDialog && (
+        <SectionDialog
+          mode={sectionDialog.mode}
+          initial={sectionDialog.mode === "edit" ? sectionDialog.section : undefined}
+          existingTitles={schema.sections.map((s) => s.title.toLowerCase())}
+          onClose={() => setSectionDialog(null)}
+          onSubmit={({ title, description }) => {
+            if (sectionDialog.mode === "add") {
+              addSection(title, description);
+            } else {
+              updateSection(sectionDialog.section.id, { title, description });
+            }
+            setSectionDialog(null);
+          }}
+        />
+      )}
+
+      <AlertDialog open={!!deleteSectionTarget} onOpenChange={(o) => !o && setDeleteSectionTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete section?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the <strong>{deleteSectionTarget?.title}</strong> section and all
+              {" "}{deleteSectionTarget?.fields.length ?? 0} field(s) inside it. Submitted data for
+              those fields on existing draft requests will become orphaned. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteSectionTarget) removeSection(deleteSectionTarget.id);
+                setDeleteSectionTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
+function SectionDialog({
+  mode,
+  initial,
+  existingTitles,
+  onClose,
+  onSubmit,
+}: {
+  mode: "add" | "edit";
+  initial?: SupplierSection;
+  existingTitles: string[];
+  onClose: () => void;
+  onSubmit: (v: { title: string; description: string }) => void;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+
+  const submit = () => {
+    const t = title.trim();
+    if (!t) { toast.error("Section title is required"); return; }
+    if (mode === "add" && existingTitles.includes(t.toLowerCase())) {
+      toast.error("A section with this title already exists");
+      return;
+    }
+    onSubmit({ title: t, description });
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === "add" ? "Add new section" : "Rename section"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Section title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Certifications" />
+          </div>
+          <div>
+            <Label>Description (optional)</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
+              placeholder="Short helper text shown under the section title" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit}>{mode === "add" ? "Add section" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 function SectionEditor({
   section,
+  isBaseline,
+  canMoveUp,
+  canMoveDown,
   onToggle,
   onRemove,
   onEdit,
   onMove,
   onAdd,
   onRestore,
+  onEditSection,
+  onDeleteSection,
+  onMoveSection,
 }: {
   section: SupplierSection;
+  isBaseline: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onToggle: (key: string, prop: "visible" | "required", value: boolean) => void;
   onRemove: (field: SupplierField) => void;
   onEdit: (field: SupplierField) => void;
   onMove: (key: string, dir: -1 | 1) => void;
   onAdd: () => void;
   onRestore: () => void;
+  onEditSection: () => void;
+  onDeleteSection: () => void;
+  onMoveSection: (dir: -1 | 1) => void;
 }) {
   const ordered = sortedFields(section.fields);
   const hasBaseline = section.fields.some((f) => f.baseline);
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-base">{section.title}</CardTitle>
-          {section.description && <CardDescription>{section.description}</CardDescription>}
+        <div className="flex items-center gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">{section.title}</CardTitle>
+              {isBaseline ? (
+                <Badge variant="secondary" className="text-xs">baseline</Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs">custom</Badge>
+              )}
+            </div>
+            {section.description && <CardDescription>{section.description}</CardDescription>}
+          </div>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
+          <Button variant="ghost" size="icon" onClick={() => onMoveSection(-1)} disabled={!canMoveUp} title="Move section up">
+            <ArrowUp className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onMoveSection(1)} disabled={!canMoveDown} title="Move section down">
+            <ArrowDown className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onEditSection} title="Rename section">
+            <Pencil className="w-4 h-4 mr-1" /> Rename
+          </Button>
           {hasBaseline && (
             <Button variant="ghost" size="sm" onClick={onRestore} title="Restore baseline defaults for this section">
               <RotateCcw className="w-4 h-4 mr-1" /> Restore defaults
@@ -309,6 +502,16 @@ function SectionEditor({
           <Button variant="ghost" size="sm" onClick={onAdd}>
             <Plus className="w-4 h-4 mr-1" /> Add custom field
           </Button>
+          {isBaseline ? (
+            <Button variant="ghost" size="icon" disabled title="Baseline section cannot be deleted">
+              <Lock className="w-4 h-4 opacity-50" />
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={onDeleteSection} title="Delete section">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+
         </div>
       </CardHeader>
       <CardContent className="divide-y">
