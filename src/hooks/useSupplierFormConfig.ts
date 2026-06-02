@@ -126,11 +126,23 @@ export async function fetchPublicSupplierForm(slug: string) {
   if (error) throw error;
   const row = (data as any[])?.[0];
   if (!row) return null;
+
+  const { data: latestConfig } = await supabase
+    .from("supplier_registration_form_config")
+    .select("schema, version, is_published")
+    .eq("company_id", row.company_id as string)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const schema = latestConfig?.schema ?? row.schema;
+  const version = latestConfig?.version ?? row.version;
+
   return {
     company_id: row.company_id as string,
     company_name: row.company_name as string,
-    schema: mergeWithBaseline(row.schema as SupplierFormSchema | null),
-    version: row.version as number | null,
+    schema: mergeWithBaseline(schema as SupplierFormSchema | null),
+    version: version as number | null,
   };
 }
 
