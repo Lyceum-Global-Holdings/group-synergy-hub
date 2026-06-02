@@ -85,6 +85,8 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
 
   const schema: SupplierFormSchema =
     draft || config?.schema || mergeWithBaseline(DEFAULT_SUPPLIER_FORM_SCHEMA);
+  const hasUnpublishedChanges = !!draft || (!!config && !config.is_published);
+  const canPublish = hasUnpublishedChanges || !config;
 
   const update = (updater: (s: SupplierFormSchema) => SupplierFormSchema) => {
     setDraft(updater(schema));
@@ -239,7 +241,7 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
               {config?.is_published && (
                 <span className="ml-2"><Badge variant="outline">Published v{config.version}</Badge></span>
               )}
-              {draft && (
+              {hasUnpublishedChanges && (
                 <span className="ml-2"><Badge variant="destructive">Unpublished changes</Badge></span>
               )}
             </CardDescription>
@@ -254,7 +256,7 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
             <Button variant="outline" size="sm" onClick={() => handleSave(false)} disabled={save.isPending || !draft}>
               Save draft
             </Button>
-            <Button size="sm" onClick={() => handleSave(true)} disabled={save.isPending || !draft}>
+            <Button size="sm" onClick={() => handleSave(true)} disabled={save.isPending || !canPublish}>
               Publish changes
             </Button>
           </div>
