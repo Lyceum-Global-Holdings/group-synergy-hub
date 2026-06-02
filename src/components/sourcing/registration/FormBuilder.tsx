@@ -60,11 +60,15 @@ const FILE_ACCEPT_PRESETS: { label: string; mimes: string[] }[] = [
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "field";
 
+const BASELINE_SECTION_IDS = new Set(DEFAULT_SUPPLIER_FORM_SCHEMA.sections.map((s) => s.id));
+const isBaselineSection = (id: string) => BASELINE_SECTION_IDS.has(id);
+
 const sortedFields = (fields: SupplierField[]) =>
   fields
     .map((f, i) => ({ f, i, o: f.order ?? i }))
     .sort((a, b) => a.o - b.o || a.i - b.i)
     .map((x) => x.f);
+
 
 export default function FormBuilder({ companyId }: FormBuilderProps) {
   const { data: config, isLoading } = useSupplierFormConfig(companyId);
