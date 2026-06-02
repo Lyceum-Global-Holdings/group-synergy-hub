@@ -215,7 +215,7 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
   const handleSave = async (publish: boolean) => {
     try {
       await save.mutateAsync({ company_id: companyId, schema, publish });
-      toast.success(publish ? "Form published" : "Draft saved");
+      toast.success(publish ? "Form published — public link updated" : "Draft saved");
       setDraft(null);
     } catch (e: any) {
       toast.error(e.message || "Save failed");
@@ -234,9 +234,13 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
               Toggle fields on/off, edit labels, reorder, and add custom fields. Baseline fields
               follow international standards (PEPPOL, ISO 20022, GS1, ISO 17442, ISO 9362, ISO 4217)
               — they can be hidden and re-labelled but their key and type stay locked to preserve
-              compliance, and they cannot be deleted.
+              compliance, and they cannot be deleted. Click <strong>Publish changes</strong> to push
+              edits to the public registration link.
               {config?.is_published && (
                 <span className="ml-2"><Badge variant="outline">Published v{config.version}</Badge></span>
+              )}
+              {draft && (
+                <span className="ml-2"><Badge variant="destructive">Unpublished changes</Badge></span>
               )}
             </CardDescription>
           </div>
@@ -250,8 +254,8 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
             <Button variant="outline" size="sm" onClick={() => handleSave(false)} disabled={save.isPending || !draft}>
               Save draft
             </Button>
-            <Button size="sm" onClick={() => handleSave(true)} disabled={save.isPending}>
-              Publish
+            <Button size="sm" onClick={() => handleSave(true)} disabled={save.isPending || !draft}>
+              Publish changes
             </Button>
           </div>
 
