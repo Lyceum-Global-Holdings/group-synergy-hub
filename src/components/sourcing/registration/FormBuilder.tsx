@@ -258,21 +258,28 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
         </CardHeader>
       </Card>
 
-      {schema.sections
-        .slice()
-        .sort((a, b) => a.order - b.order)
-        .map((section) => (
+      {(() => {
+        const ordered = schema.sections.slice().sort((a, b) => a.order - b.order);
+        return ordered.map((section, idx) => (
           <SectionEditor
             key={section.id}
             section={section}
+            isBaseline={isBaselineSection(section.id)}
+            canMoveUp={idx > 0}
+            canMoveDown={idx < ordered.length - 1}
             onToggle={(key, prop, value) => toggleField(section.id, key, prop, value)}
             onRemove={(field) => setDeleteTarget({ sectionId: section.id, field })}
             onEdit={(field) => setEditTarget({ sectionId: section.id, field })}
             onMove={(key, dir) => moveField(section.id, key, dir)}
             onAdd={() => setAddOpen(section.id)}
             onRestore={() => restoreSectionDefaults(section.id)}
+            onEditSection={() => setSectionDialog({ mode: "edit", section })}
+            onDeleteSection={() => setDeleteSectionTarget(section)}
+            onMoveSection={(dir) => moveSection(section.id, dir)}
           />
-        ))}
+        ));
+      })()}
+
 
       <FieldDialog
         mode="add"
