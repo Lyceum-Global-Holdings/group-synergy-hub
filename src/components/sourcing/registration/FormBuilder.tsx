@@ -339,9 +339,103 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {sectionDialog && (
+        <SectionDialog
+          mode={sectionDialog.mode}
+          initial={sectionDialog.mode === "edit" ? sectionDialog.section : undefined}
+          existingTitles={schema.sections.map((s) => s.title.toLowerCase())}
+          onClose={() => setSectionDialog(null)}
+          onSubmit={({ title, description }) => {
+            if (sectionDialog.mode === "add") {
+              addSection(title, description);
+            } else {
+              updateSection(sectionDialog.section.id, { title, description });
+            }
+            setSectionDialog(null);
+          }}
+        />
+      )}
+
+      <AlertDialog open={!!deleteSectionTarget} onOpenChange={(o) => !o && setDeleteSectionTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete section?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the <strong>{deleteSectionTarget?.title}</strong> section and all
+              {" "}{deleteSectionTarget?.fields.length ?? 0} field(s) inside it. Submitted data for
+              those fields on existing draft requests will become orphaned. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteSectionTarget) removeSection(deleteSectionTarget.id);
+                setDeleteSectionTarget(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+function SectionDialog({
+  mode,
+  initial,
+  existingTitles,
+  onClose,
+  onSubmit,
+}: {
+  mode: "add" | "edit";
+  initial?: SupplierSection;
+  existingTitles: string[];
+  onClose: () => void;
+  onSubmit: (v: { title: string; description: string }) => void;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+
+  const submit = () => {
+    const t = title.trim();
+    if (!t) { toast.error("Section title is required"); return; }
+    if (mode === "add" && existingTitles.includes(t.toLowerCase())) {
+      toast.error("A section with this title already exists");
+      return;
+    }
+    onSubmit({ title: t, description });
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{mode === "add" ? "Add new section" : "Rename section"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Section title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Certifications" />
+          </div>
+          <div>
+            <Label>Description (optional)</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
+              placeholder="Short helper text shown under the section title" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit}>{mode === "add" ? "Add section" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function SectionEditor({
   section,
