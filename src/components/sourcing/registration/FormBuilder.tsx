@@ -345,31 +345,61 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
 
 function SectionEditor({
   section,
+  isBaseline,
+  canMoveUp,
+  canMoveDown,
   onToggle,
   onRemove,
   onEdit,
   onMove,
   onAdd,
   onRestore,
+  onEditSection,
+  onDeleteSection,
+  onMoveSection,
 }: {
   section: SupplierSection;
+  isBaseline: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onToggle: (key: string, prop: "visible" | "required", value: boolean) => void;
   onRemove: (field: SupplierField) => void;
   onEdit: (field: SupplierField) => void;
   onMove: (key: string, dir: -1 | 1) => void;
   onAdd: () => void;
   onRestore: () => void;
+  onEditSection: () => void;
+  onDeleteSection: () => void;
+  onMoveSection: (dir: -1 | 1) => void;
 }) {
   const ordered = sortedFields(section.fields);
   const hasBaseline = section.fields.some((f) => f.baseline);
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-base">{section.title}</CardTitle>
-          {section.description && <CardDescription>{section.description}</CardDescription>}
+        <div className="flex items-center gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">{section.title}</CardTitle>
+              {isBaseline ? (
+                <Badge variant="secondary" className="text-xs">baseline</Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs">custom</Badge>
+              )}
+            </div>
+            {section.description && <CardDescription>{section.description}</CardDescription>}
+          </div>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
+          <Button variant="ghost" size="icon" onClick={() => onMoveSection(-1)} disabled={!canMoveUp} title="Move section up">
+            <ArrowUp className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onMoveSection(1)} disabled={!canMoveDown} title="Move section down">
+            <ArrowDown className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onEditSection} title="Rename section">
+            <Pencil className="w-4 h-4 mr-1" /> Rename
+          </Button>
           {hasBaseline && (
             <Button variant="ghost" size="sm" onClick={onRestore} title="Restore baseline defaults for this section">
               <RotateCcw className="w-4 h-4 mr-1" /> Restore defaults
@@ -378,6 +408,16 @@ function SectionEditor({
           <Button variant="ghost" size="sm" onClick={onAdd}>
             <Plus className="w-4 h-4 mr-1" /> Add custom field
           </Button>
+          {isBaseline ? (
+            <Button variant="ghost" size="icon" disabled title="Baseline section cannot be deleted">
+              <Lock className="w-4 h-4 opacity-50" />
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={onDeleteSection} title="Delete section">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+
         </div>
       </CardHeader>
       <CardContent className="divide-y">
