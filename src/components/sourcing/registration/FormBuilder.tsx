@@ -241,6 +241,9 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
             </CardDescription>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSectionDialog({ mode: "add" })}>
+              <FolderPlus className="w-4 h-4 mr-2" /> Add section
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
               <Eye className="w-4 h-4 mr-2" /> Preview
             </Button>
@@ -251,6 +254,7 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
               Publish
             </Button>
           </div>
+
         </CardHeader>
       </Card>
 
