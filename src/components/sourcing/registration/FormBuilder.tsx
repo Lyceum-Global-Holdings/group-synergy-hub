@@ -79,6 +79,9 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
   const [addOpen, setAddOpen] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<{ sectionId: string; field: SupplierField } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ sectionId: string; field: SupplierField } | null>(null);
+  const [sectionDialog, setSectionDialog] = useState<{ mode: "add" } | { mode: "edit"; section: SupplierSection } | null>(null);
+  const [deleteSectionTarget, setDeleteSectionTarget] = useState<SupplierSection | null>(null);
+
 
   const schema: SupplierFormSchema =
     draft || config?.schema || mergeWithBaseline(DEFAULT_SUPPLIER_FORM_SCHEMA);
