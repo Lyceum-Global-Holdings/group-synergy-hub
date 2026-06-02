@@ -162,6 +162,56 @@ export default function FormBuilder({ companyId }: FormBuilderProps) {
     toast.success("Section defaults restored");
   };
 
+  const addSection = (title: string, description: string) => {
+    update((s) => {
+      const base = `custom_${slugify(title)}`;
+      const existingIds = new Set(s.sections.map((x) => x.id));
+      let id = base;
+      let n = 2;
+      while (existingIds.has(id)) id = `${base}_${n++}`;
+      const maxOrder = s.sections.reduce((m, x) => Math.max(m, x.order), 0);
+      return {
+        ...s,
+        sections: [
+          ...s.sections,
+          { id, title: title.trim(), description: description.trim() || undefined, order: maxOrder + 1, fields: [] },
+        ],
+      };
+    });
+    toast.success("Section added");
+  };
+
+  const updateSection = (sectionId: string, patch: { title: string; description: string }) => {
+    update((s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id !== sectionId ? sec : { ...sec, title: patch.title.trim(), description: patch.description.trim() || undefined },
+      ),
+    }));
+  };
+
+  const removeSection = (sectionId: string) => {
+    if (isBaselineSection(sectionId)) {
+      toast.error("Baseline sections cannot be deleted");
+      return;
+    }
+    update((s) => ({ ...s, sections: s.sections.filter((sec) => sec.id !== sectionId) }));
+    toast.success("Section removed");
+  };
+
+  const moveSection = (sectionId: string, dir: -1 | 1) => {
+    update((s) => {
+      const ordered = s.sections.slice().sort((a, b) => a.order - b.order);
+      const idx = ordered.findIndex((x) => x.id === sectionId);
+      const target = idx + dir;
+      if (idx < 0 || target < 0 || target >= ordered.length) return s;
+      [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
+      return { ...s, sections: ordered.map((sec, i) => ({ ...sec, order: i + 1 })) };
+    });
+  };
+
+
+
   const handleSave = async (publish: boolean) => {
     try {
       await save.mutateAsync({ company_id: companyId, schema, publish });
