@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2, Eye, Pencil, ArrowUp, ArrowDown, RotateCcw, Lock } from "lucide-react";
+import { Plus, Trash2, Eye, Pencil, ArrowUp, ArrowDown, RotateCcw, Lock, FolderPlus } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
