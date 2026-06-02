@@ -11,6 +11,7 @@ import { useSupplierRegistrations, useApproveRegistration, useRejectRegistration
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { SupplierRegistrationRequest } from "@/types/supplierRegistration";
+import { RegistrationReviewBody } from "./RegistrationReviewBody";
 
 export default function ApprovalDashboard() {
   const { selectedCompany } = useCompany();
