@@ -194,15 +194,19 @@ export function mergeWithBaseline(saved: SupplierFormSchema | null | undefined):
     fields: s.fields.map((f) => {
       const base = baselineMap.get(f.key);
       if (base) baselineMap.delete(f.key);
+      // For baseline fields, key + type are locked to preserve standards mapping,
+      // but every other admin-edited prop (label, help, placeholder, options,
+      // validation, file constraints, visibility, required, order) must survive
+      // round-trips through save/reload.
       return base
         ? {
             ...base,
-            visible: f.visible,
-            required: f.required,
+            ...f,
+            key: base.key,
+            type: base.type,
+            baseline: true,
+            group: base.group,
             label: f.label || base.label,
-            help: f.help ?? base.help,
-            placeholder: f.placeholder ?? base.placeholder,
-            order: f.order,
           }
         : f;
     }),
