@@ -184,71 +184,7 @@ export default function ApprovalDashboard() {
               <DialogDescription>Review complete registration details</DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Company Name</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.supplier_name}</p>
-                </div>
-                <div>
-                  <Label>Type</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.supplier_type}</p>
-                </div>
-                <div>
-                  <Label>Email</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.email}</p>
-                </div>
-                <div>
-                  <Label>Phone</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.phone}</p>
-                </div>
-                <div>
-                  <Label>Tax ID</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.tax_id || "-"}</p>
-                </div>
-                <div>
-                  <Label>Registration Number</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.registration_number || "-"}</p>
-                </div>
-              </div>
-
-              <div>
-                <Label>Address</Label>
-                <p className="text-sm mt-1">
-                  {[
-                    selectedRegistration.supplier_data.street_address,
-                    selectedRegistration.supplier_data.city,
-                    selectedRegistration.supplier_data.country
-                  ].filter(Boolean).join(", ") || "-"}
-                </p>
-              </div>
-
-              <div>
-                <Label>Business Description</Label>
-                <p className="text-sm mt-1">{selectedRegistration.supplier_data.business_description || "-"}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Bank Name</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.bank_name || "-"}</p>
-                </div>
-                <div>
-                  <Label>Payment Terms</Label>
-                  <p className="text-sm mt-1">{selectedRegistration.supplier_data.payment_terms || "-"}</p>
-                </div>
-              </div>
-
-              <div>
-                <Label>Primary Contact</Label>
-                <p className="text-sm mt-1">
-                  {selectedRegistration.supplier_data.primary_contact_name || "-"}
-                  {selectedRegistration.supplier_data.primary_contact_email && 
-                    ` (${selectedRegistration.supplier_data.primary_contact_email})`
-                  }
-                </p>
-              </div>
-            </div>
+            <RegistrationReviewBody registration={selectedRegistration} />
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setSelectedRegistration(null)}>
