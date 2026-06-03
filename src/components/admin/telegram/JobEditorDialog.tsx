@@ -93,9 +93,29 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
 
   const addChatId = () => {
     const t = newChatId.trim();
-    if (t && !chatIds.includes(t)) setChatIds([...chatIds, t]);
+    if (!t) return;
+    // Validate: @channelusername OR numeric (optionally negative)
+    const isUsername = /^@[A-Za-z0-9_]{4,}$/.test(t);
+    const isNumeric = /^-?\d+$/.test(t);
+    if (!isUsername && !isNumeric) {
+      // eslint-disable-next-line no-alert
+      alert("Chat ID must be a numeric ID (e.g. 123456789 or -1001234567890) or a @channelusername.");
+      return;
+    }
+    // Warn if it looks like a short group ID missing the -100 supergroup prefix.
+    if (isNumeric && t.startsWith("-") && !t.startsWith("-100") && t.length < 14) {
+      // eslint-disable-next-line no-alert
+      const ok = confirm(
+        `"${t}" looks like a group ID missing the "-100" supergroup prefix.\n\n` +
+        `Telegram supergroups/channels need the full ID (e.g. -1001234567890).\n\n` +
+        `Add it anyway? The dispatcher will auto-retry with the -100 prefix if sending fails.`
+      );
+      if (!ok) return;
+    }
+    if (!chatIds.includes(t)) setChatIds([...chatIds, t]);
     setNewChatId("");
   };
+
 
   const toggleLocation = (id: string) => {
     setLocationIds(locationIds.includes(id) ? locationIds.filter((x) => x !== id) : [...locationIds, id]);
@@ -240,6 +260,9 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
               />
               <Button type="button" size="sm" onClick={addChatId}><Plus className="h-4 w-4" /></Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              For groups/channels paste the full chat ID including the <code>-100</code> prefix (e.g. <code>-1001234567890</code>). For private chats use the numeric user ID, or use <code>@channelusername</code> for public channels.
+            </p>
             <div className="flex flex-wrap gap-2 mt-2">
               {chatIds.map((id) => (
                 <Badge key={id} variant="secondary" className="gap-1">
