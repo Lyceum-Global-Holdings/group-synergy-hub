@@ -248,10 +248,7 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
                 {TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
               </SelectContent>
             </Select>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              For groups/channels paste the full chat ID including the <code>-100</code> prefix (e.g. <code>-1001234567890</code>). For private chats use the numeric user ID, or use <code>@channelusername</code> for public channels.
-            </p>
+          </div>
           <div>
             <Label>Recipient Chat IDs (optional — falls back to company defaults)</Label>
             <div className="flex gap-2">
@@ -263,6 +260,9 @@ export function JobEditorDialog({ open, onOpenChange, job, onSave }: Props) {
               />
               <Button type="button" size="sm" onClick={addChatId}><Plus className="h-4 w-4" /></Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              For groups/channels paste the full chat ID including the <code>-100</code> prefix (e.g. <code>-1001234567890</code>). For private chats use the numeric user ID, or use <code>@channelusername</code> for public channels.
+            </p>
             <div className="flex flex-wrap gap-2 mt-2">
               {chatIds.map((id) => (
                 <Badge key={id} variant="secondary" className="gap-1">
