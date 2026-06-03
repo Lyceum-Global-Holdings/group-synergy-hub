@@ -239,10 +239,22 @@ async function renderWarehouseStockDaily(sb: SupabaseClient, job: Job): Promise<
   // Caption (always)
   const itemCount = groups.size;
   const locCount = sectionsMap.size;
+  let locationsLine: string;
+  if (locationIds.length > 0) {
+    const names = locationIds
+      .map((id) => locMap.get(id) ?? 'Unknown')
+      .sort((a, b) => a.localeCompare(b));
+    const MAX = 6;
+    const shown = names.slice(0, MAX).map(esc).join(', ');
+    const extra = names.length > MAX ? ` +${names.length - MAX} more` : '';
+    locationsLine = `Locations (filtered, ${names.length}): ${shown}${extra}`;
+  } else {
+    locationsLine = `Locations: ${locCount} (all)`;
+  }
   const caption =
     `<b>📦 Stock Movement Ledger — ${esc(label)}</b>\n` +
     `Company: ${esc(companyName)}\n` +
-    `Locations: ${locCount}${locationIds.length ? ` (filtered)` : ' (all)'}\n` +
+    `${locationsLine}\n` +
     `Items moved: ${itemCount} | Receipts: ${fmtNum(grandIn)} | Issues: ${fmtNum(grandOut)}\n` +
     `Net movement value: ${esc(currency)} ${fmtNum(grandNetValue)}`;
 
