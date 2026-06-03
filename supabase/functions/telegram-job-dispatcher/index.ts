@@ -40,6 +40,34 @@ interface RenderedReport {
 }
 
 // ---------- Telegram send ----------
+// Telegram supergroup/channel chat IDs must include the -100 prefix.
+// If a user pastes a raw negative group ID without it, retry once with the prefix added.
+function withSupergroupPrefix(chatId: string): string | null {
+  const trimmed = chatId.trim();
+  if (!/^-\d+$/.test(trimmed)) return null;
+  if (trimmed.startsWith('-100')) return null;
+  return '-100' + trimmed.slice(1);
+}
+
+async function telegramFetch(
+  url: string,
+  chatId: string,
+  buildInit: (cid: string) => RequestInit,
+): Promise<Response> {
+  let res = await fetch(url, buildInit(chatId));
+  if (!res.ok && (res.status === 400 || res.status === 404)) {
+    const body = await res.clone().text();
+    if (/chat not found/i.test(body)) {
+      const fixed = withSupergroupPrefix(chatId);
+      if (fixed) {
+        console.warn(`[telegram] retrying ${url.split('/').pop()} for ${chatId} as ${fixed}`);
+        res = await fetch(url, buildInit(fixed));
+      }
+    }
+  }
+  return res;
+}
+
 async function sendTelegram(botToken: string, chatId: string, text: string): Promise<void> {
   // Chunk to 4000 chars
   const chunks: string[] = [];
@@ -52,12 +80,13 @@ async function sendTelegram(botToken: string, chatId: string, text: string): Pro
   }
   chunks.push(remaining);
 
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
   for (const chunk of chunks) {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const res = await telegramFetch(url, chatId, (cid) => ({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: chunk, parse_mode: 'HTML', disable_web_page_preview: true }),
-    });
+      body: JSON.stringify({ chat_id: cid, text: chunk, parse_mode: 'HTML', disable_web_page_preview: true }),
+    }));
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Telegram error ${res.status}: ${body}`);
@@ -68,12 +97,15 @@ async function sendTelegram(botToken: string, chatId: string, text: string): Pro
 
 
 async function sendTelegramDocument(botToken: string, chatId: string, pdf: Uint8Array, filename: string, caption: string): Promise<void> {
-  const form = new FormData();
-  form.append('chat_id', chatId);
-  form.append('caption', caption.slice(0, 1024));
-  form.append('parse_mode', 'HTML');
-  form.append('document', new Blob([pdf], { type: 'application/pdf' }), filename);
-  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: form });
+  const url = `https://api.telegram.org/bot${botToken}/sendDocument`;
+  const res = await telegramFetch(url, chatId, (cid) => {
+    const form = new FormData();
+    form.append('chat_id', cid);
+    form.append('caption', caption.slice(0, 1024));
+    form.append('parse_mode', 'HTML');
+    form.append('document', new Blob([pdf], { type: 'application/pdf' }), filename);
+    return { method: 'POST', body: form };
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Telegram sendDocument ${res.status}: ${body}`);
