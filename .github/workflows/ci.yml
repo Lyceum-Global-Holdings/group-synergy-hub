@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nm-${{ runner.os }}-${{ hashFiles('package.json') }}
 
   # ──────────────────────────────────────────────
   # 2. Lint — ESLint (flat config)
@@ -52,7 +52,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nm-${{ runner.os }}-${{ hashFiles('package.json') }}
 
       - name: Run ESLint
         run: npm run lint
@@ -75,7 +75,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nm-${{ runner.os }}-${{ hashFiles('package.json') }}
 
       - name: Run TypeScript type check
         run: npm run typecheck
@@ -98,7 +98,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nm-${{ runner.os }}-${{ hashFiles('package.json') }}
 
       - name: Run Vitest
         run: npm run test:ci
@@ -121,7 +121,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: nm-${{ runner.os }}-${{ hashFiles('package.json') }}
 
       - name: Build production bundle
         run: npm run build
