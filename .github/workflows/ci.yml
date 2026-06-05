@@ -1,0 +1,211 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Install & cache dependencies
+  # ──────────────────────────────────────────────
+  install:
+    name: 📦 Install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache node_modules
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+  # ──────────────────────────────────────────────
+  # 2. Lint — ESLint (flat config)
+  # ──────────────────────────────────────────────
+  lint:
+    name: 🔍 Lint
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Run ESLint
+        run: npm run lint
+
+  # ──────────────────────────────────────────────
+  # 3. Type Check — tsc
+  # ──────────────────────────────────────────────
+  typecheck:
+    name: 🏗️ Type Check
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Run TypeScript type check
+        run: npm run typecheck
+
+  # ──────────────────────────────────────────────
+  # 4. Unit Tests — Vitest
+  # ──────────────────────────────────────────────
+  test:
+    name: 🧪 Unit Tests
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Run Vitest
+        run: npm run test:ci
+
+  # ──────────────────────────────────────────────
+  # 5. Build — Vite production build
+  # ──────────────────────────────────────────────
+  build:
+    name: 🏗️ Build
+    needs: [lint, typecheck, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Build production bundle
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-key' }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ──────────────────────────────────────────────
+  # 6. Migration Lint — SQL sanity checks
+  # ──────────────────────────────────────────────
+  migration-lint:
+    name: 🗄️ Migration Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check migration files
+        run: |
+          echo "=== Checking SQL migration files ==="
+          MIGRATION_DIR="supabase/migrations"
+          ERRORS=0
+
+          if [ ! -d "$MIGRATION_DIR" ]; then
+            echo "⚠️  No migrations directory found — skipping"
+            exit 0
+          fi
+
+          # Check for empty migration files
+          for f in "$MIGRATION_DIR"/*.sql; do
+            [ -f "$f" ] || continue
+            if [ ! -s "$f" ]; then
+              echo "❌ Empty migration file: $f"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          # Check for dangerous statements
+          for f in "$MIGRATION_DIR"/*.sql; do
+            [ -f "$f" ] || continue
+            if grep -iqE 'DROP\s+DATABASE|DROP\s+SCHEMA\s+public' "$f"; then
+              echo "❌ Dangerous statement found in: $f"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          # Check naming convention (should start with timestamp)
+          for f in "$MIGRATION_DIR"/*.sql; do
+            [ -f "$f" ] || continue
+            basename=$(basename "$f")
+            if ! echo "$basename" | grep -qE '^[0-9]{14}_'; then
+              echo "⚠️  Non-standard migration name: $basename"
+            fi
+          done
+
+          TOTAL=$(find "$MIGRATION_DIR" -name '*.sql' | wc -l | tr -d ' ')
+          echo ""
+          echo "✅ Checked $TOTAL migration files, $ERRORS error(s)"
+
+          if [ $ERRORS -gt 0 ]; then
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────
+  # 7. Docker Build
+  # ──────────────────────────────────────────────
+  docker:
+    name: 🐳 Docker Build
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Build Docker image
+        run: docker build . --file Dockerfile --tag group-synergy-hub:${{ github.sha }}
