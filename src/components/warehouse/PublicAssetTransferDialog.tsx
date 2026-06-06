@@ -130,13 +130,13 @@ export function PublicAssetTransferDialog({
       return locations.filter(loc => {
         if (loc.type !== type) return false;
         if (parentId && loc.parent_id !== parentId) return false;
-        if (!parentId && type !== 'location') return false;
+        if (!parentId && type !== 'warehouse') return false;
         return true;
       });
     };
   }, [locations]);
 
-  const mainLocations = getLocationsByType('location');
+  const mainLocations = getLocationsByType('warehouse');
   const sublocations = getLocationsByType('sublocation', selectedLocationId);
   const departments = getLocationsByType('department', selectedSublocationId || selectedLocationId);
 
