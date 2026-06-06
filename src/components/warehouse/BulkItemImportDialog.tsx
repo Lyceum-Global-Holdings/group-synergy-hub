@@ -192,7 +192,7 @@ export function BulkItemImportDialog() {
             case 'location':
               if (value) {
                 const location = locations.find(l =>
-                  (['location', 'sublocation', 'department'].includes(l.type ?? 'location')) && (
+                  (['warehouse', 'sublocation', 'department'].includes(l.type ?? 'warehouse')) && (
                     l.name.toLowerCase() === value.toLowerCase() ||
                     l.location_code?.toLowerCase() === value.toLowerCase()
                   )
