@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { ChevronsUpDown } from 'lucide-react';
-type LocationType = 'location' | 'sublocation' | 'department';
+type LocationType = 'warehouse' | 'sublocation' | 'department';
 
 export const LocationManagementDialog = () => {
   const [open, setOpen] = useState(false);
