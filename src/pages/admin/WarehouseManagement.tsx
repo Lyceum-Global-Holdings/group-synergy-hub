@@ -842,7 +842,6 @@ export default function WarehouseManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="warehouse">Warehouse</SelectItem>
-                    <SelectItem value="location">Location</SelectItem>
                     <SelectItem value="sublocation">Sublocation</SelectItem>
                     <SelectItem value="department">Department</SelectItem>
                   </SelectContent>
