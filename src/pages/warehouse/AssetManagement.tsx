@@ -383,8 +383,8 @@ export default function AssetManagement() {
   });
 
   const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
-    if (type === "location") {
-      return locations.filter(loc => loc.type === "location");
+    if (type === "warehouse") {
+      return locations.filter(loc => loc.type === "warehouse");
     } else if (type === "sublocation") {
       return locations.filter(loc => loc.type === "sublocation" && loc.parent_id === parentId);
     } else if (type === "department") {

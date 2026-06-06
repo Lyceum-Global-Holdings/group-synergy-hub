@@ -190,7 +190,7 @@ export function BulkAssetImportDialog() {
             asset.locationName = value;
             if (value) {
               const location = locations.find(l => 
-                l.name.toLowerCase() === value.toLowerCase() && l.type === 'location'
+                l.name.toLowerCase() === value.toLowerCase() && l.type === 'warehouse'
               );
               if (location) {
                 asset.location_id = location.id;

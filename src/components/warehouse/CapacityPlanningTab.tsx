@@ -10,7 +10,7 @@ interface CapacityPlanningTabProps {
 
 export function CapacityPlanningTab({ locations }: CapacityPlanningTabProps) {
   // Filter only main locations with capacity
-  const locationsWithCapacity = locations.filter(l => l.type === 'location' && l.capacity);
+  const locationsWithCapacity = locations.filter(l => l.type === 'warehouse' && l.capacity);
 
   // Calculate recommendations
   const getRecommendations = () => {

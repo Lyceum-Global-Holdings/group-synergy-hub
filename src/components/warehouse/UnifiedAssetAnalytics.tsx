@@ -94,7 +94,7 @@ export function UnifiedAssetAnalytics({
 
   // Filter data
   const mainLocations = useMemo(
-    () => locations.filter((loc) => loc.type === "location"),
+    () => locations.filter((loc) => loc.type === "warehouse"),
     [locations]
   );
 

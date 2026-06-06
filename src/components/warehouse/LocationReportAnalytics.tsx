@@ -185,7 +185,7 @@ export function LocationReportAnalytics({
 
   // Get locations by type
   const mainLocations = useMemo(
-    () => locations.filter((loc) => loc.type === "location"),
+    () => locations.filter((loc) => loc.type === "warehouse"),
     [locations]
   );
 

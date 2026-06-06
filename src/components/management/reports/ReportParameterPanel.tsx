@@ -79,7 +79,7 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
       } else if (p.type === "textOperator") {
         next[p.key] = { op: "contains", term: "" };
         changed = true;
-      } else if (p.type === "location" && globalLocationId) {
+      } else if (p.type === "warehouse" && globalLocationId) {
         // Seed from header global location filter only — actual scope check
         // happens in the dedicated effect below once allowedLocations resolves.
         next[p.key] = globalLocationId;

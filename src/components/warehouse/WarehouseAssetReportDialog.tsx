@@ -54,7 +54,7 @@ export function WarehouseAssetReportDialog({ open, onOpenChange }: WarehouseAsse
 
   // Filter locations by type
   const mainLocations = useMemo(() => 
-    locations.filter(loc => loc.type === 'location'),
+    locations.filter(loc => loc.type === 'warehouse'),
     [locations]
   );
 

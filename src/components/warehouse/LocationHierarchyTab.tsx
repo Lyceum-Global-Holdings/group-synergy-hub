@@ -28,7 +28,7 @@ export function LocationHierarchyTab({ locations }: LocationHierarchyTabProps) {
     locations.forEach(loc => {
       const node = locationMap.get(loc.id)!;
       
-      if (loc.type === 'location') {
+      if (loc.type === 'warehouse') {
         rootNodes.push(node);
       } else if (loc.parent_id) {
         const parent = locationMap.get(loc.parent_id);

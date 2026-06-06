@@ -64,7 +64,7 @@ export function StockAdjustmentDialog({
     if (!bin?.location_id) return null;
     const loc = (locations || []).find(l => l.id === bin.location_id);
     if (!loc) return null;
-    if (loc.type === 'location') return loc;
+    if (loc.type === 'warehouse') return loc;
     if (loc.type === 'sublocation' && loc.parent_id) {
       return (locations || []).find(l => l.id === loc.parent_id) || null;
     }

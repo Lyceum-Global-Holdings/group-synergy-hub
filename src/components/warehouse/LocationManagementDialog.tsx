@@ -141,7 +141,7 @@ export const LocationManagementDialog = () => {
   // unless the user has explicitly changed mode. Only auto-apply when not editing.
   useEffect(() => {
     if (editingLocation) return;
-    if (formData.type === 'location') {
+    if (formData.type === 'warehouse') {
       if (formData.assignment_mode !== 'explicit') {
         setFormData(prev => ({ ...prev, assignment_mode: 'explicit' }));
       }
@@ -320,7 +320,7 @@ export const LocationManagementDialog = () => {
                     <SelectContent>
                       <SelectItem value="none">None (Optional)</SelectItem>
                       {locations
-                        .filter(loc => loc.type === 'location' && loc.id && loc.id.trim() !== "")
+                        .filter(loc => loc.type === 'warehouse' && loc.id && loc.id.trim() !== "")
                         .map((location) => (
                         <SelectItem key={location.id} value={location.id}>
                           {location.name}
@@ -398,7 +398,7 @@ export const LocationManagementDialog = () => {
                 </div>
               </div>
 
-              {formData.type === 'location' && (
+              {formData.type === 'warehouse' && (
                 <div>
                   <Label htmlFor="warehouse_category">Warehouse Category</Label>
                   <Select
@@ -487,7 +487,7 @@ export const LocationManagementDialog = () => {
             <h3 className="text-lg font-medium">Location Hierarchy</h3>
             
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {locations.filter(loc => loc.type === 'location').map((location) => (
+              {locations.filter(loc => loc.type === 'warehouse').map((location) => (
                 <div key={location.id} className="space-y-2">
                   {/* Main Location */}
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
