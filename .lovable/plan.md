@@ -1,28 +1,45 @@
-## Problem
-Telegram reports fail with `400 Bad Request: chat not found` for newly added chat IDs (e.g. `-5147769217`). Telegram requires **supergroup/channel** IDs in the `-100<id>` form. Users frequently paste the raw group ID (without the `100` prefix) copied from clients like Telegram Web, which causes "chat not found".
+## Root cause
+
+The database column `warehouse_locations.type` has a CHECK constraint allowing only `warehouse`, `sublocation`, `department`. All 12 top-level rows are stored as `type = 'warehouse'`.
+
+But the UI was built around the legacy value `'location'`:
+
+- The Edit Location dialog (`src/pages/admin/WarehouseManagement.tsx`, line 839) exposes a **Type** dropdown with both **Warehouse** (`warehouse`) and **Location** (`location`). Picking "Location" sends `type='location'` to the DB → fails the CHECK constraint → save silently rolls back, so the type appears not to change.
+- Many other screens filter `locations.filter(l => l.type === 'location')`. Since rows are actually `'warehouse'`, those pickers/grids come up empty — including the location list shown in Asset Management (`src/pages/warehouse/AssetManagement.tsx`, `getLocationsByType` at line 385), Asset Analytics, Capacity Planning, Location Hierarchy/Report tabs, bulk import dialogs, etc.
 
 ## Fix
 
-Normalize chat IDs both at entry time and at send time, with a one-time auto-retry on send failure.
+Standardize the whole frontend on the DB's `warehouse` value (no schema/data changes).
 
-### 1. `src/components/admin/telegram/JobEditorDialog.tsx` — `addChatId`
-- Trim, validate as either `@channelusername` or a numeric chat id.
-- Show inline helper text: "For groups/channels paste the full ID including the `-100` prefix (e.g. `-1001234567890`). For private chats use the numeric user ID."
-- If the user pastes a negative numeric id whose absolute value has < 13 digits and does not already start with `-100`, surface a warning toast: "This looks like a short group ID — Telegram supergroups need the `-100` prefix. Save anyway?" (still allow save; do not silently mutate).
+### 1. `src/pages/admin/WarehouseManagement.tsx`
+- Remove the invalid `<SelectItem value="location">` from the Edit Type dropdown (line 845). Keep `warehouse`, `sublocation`, `department`.
+- Stats counter `totalLocations` (line 135) → count `l.type === 'warehouse'`.
+- `getParentOptions()` (lines 335–339) → drop the `'location'` branch, keep `'warehouse'`.
 
-### 2. `supabase/functions/telegram-job-dispatcher/index.ts` — `sendTelegramMessage` and `sendTelegramDocument`
-Wrap the existing fetch in a helper `postToTelegram(method, chatId, buildBody)`:
-- Send with the provided `chatId`.
-- If response is 400 and body contains `chat not found`, AND `chatId` matches `^-\d+$` and does NOT start with `-100`, retry **once** with `-100` prepended (i.e. `-5147769217` → `-1005147769217`).
-- If retry succeeds, log a console warning so admins can clean up the stored value.
-- If still failing, throw the original error message (preserve current behavior).
+### 2. `src/components/warehouse/LocationManagementDialog.tsx`
+- `LocationType` union, default `formData.type`, reset value, and every `formData.type === 'location'` / `loc.type === 'location'` check → use `'warehouse'`.
+- Same for the SelectItem value in the type dropdown and parent-of-sublocation filter.
 
-Apply to both `sendMessage` and `sendDocument` paths.
+### 3. Other consumers — replace `type === 'location'` with `type === 'warehouse'`
+- `src/pages/warehouse/AssetManagement.tsx` — `getLocationsByType` (lines 385–387) and the param type.
+- `src/components/warehouse/BulkAssetUpdateDialog.tsx` — `getLocationsByType` param type.
+- `src/components/warehouse/AssetAnalytics.tsx` (line 59).
+- `src/components/warehouse/CapacityPlanningTab.tsx` (line 13).
+- `src/components/warehouse/LocationHierarchyTab.tsx` (line 31).
+- `src/components/warehouse/LocationReportAnalytics.tsx` (lines 95, 188) and `src/utils/locationReportPdfExport.ts` (line 272) — update `ReportType` union and the warehouse filter.
+- `src/components/warehouse/BulkAssetImportDialog.tsx` (line 193), `BulkItemImportDialog.tsx` (line 195), `BulkItemImportContent.tsx` (line 161), `PublicAssetTransferDialog.tsx` (line 133) — replace `'location'` in the allowed-types list with `'warehouse'`.
+- `src/components/warehouse/LocationTemplateDialog.tsx` — every `type: 'location' as const` → `'warehouse'`, plus the `filter(l => l.type === 'location')` count.
+- `src/components/warehouse/ImportLocationsDialog.tsx` (line 86) — narrow type cast to `'warehouse' | 'sublocation' | 'department'` and reject any imported `'location'` row (treat as `'warehouse'`).
+- `src/types/warehouse.ts` (lines 6, 65) — drop `'location'` from the `type` unions.
 
-### 3. Out of scope
-- No DB migration to rewrite stored chat_ids — keeping the value as-entered + retry-on-send is safer (avoids breaking IDs that were already in `-100…` form or `@username`).
-- Other Telegram functions (`send-telegram-report`, `scheduled-telegram-reports`, `test-telegram-connection`) — only the dispatcher was named in the error. Can be extended later if needed.
+### Not changed
+- `transfer_type: 'location'` in stock-transfer dialogs/types — unrelated enum, leave alone.
+- `ReportParameterPanel.tsx` `p.type === 'location'` — that's a report-parameter kind, not a warehouse type. Leave alone.
+- DB schema and existing rows — no migration needed.
 
 ## Verification
-- Re-run the failing job from `/admin/telegram-reports` (Run now) and confirm the document is delivered.
-- Check edge function logs for the warning line when the retry path is taken.
+
+1. Open Warehouse Management → edit an existing row, change Type between Warehouse / Sublocation / Department → Save Changes succeeds and the value persists after refresh.
+2. Open Asset Management → the location dropdown lists the 12 warehouses (previously empty).
+3. Asset Analytics, Capacity Planning, Location Hierarchy, Location Report — each now shows the warehouse rows.
+4. Stats card "Warehouses/Locations" on `/admin/warehouse-management` shows 12 instead of 0.
