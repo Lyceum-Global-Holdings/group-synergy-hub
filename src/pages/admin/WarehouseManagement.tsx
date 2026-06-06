@@ -258,7 +258,7 @@ export default function WarehouseManagement() {
     setEditForm({
       name: location.name || '',
       location_code: location.location_code || '',
-      type: location.type || 'location',
+      type: location.type || 'warehouse',
       parent_id: location.parent_id || '',
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || '',
