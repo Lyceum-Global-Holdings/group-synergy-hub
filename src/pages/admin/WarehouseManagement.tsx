@@ -836,7 +836,7 @@ export default function WarehouseManagement() {
 
               <div className="space-y-2">
                 <Label>Type</Label>
-                <Select value={editForm.type || 'location'} onValueChange={(v) => handleEditFormChange('type', v)}>
+                <Select value={editForm.type || 'warehouse'} onValueChange={(v) => handleEditFormChange('type', v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
