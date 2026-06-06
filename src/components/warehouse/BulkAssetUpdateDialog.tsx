@@ -24,7 +24,7 @@ interface BulkAssetUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedAssetIds: Set<string>;
   locations: WarehouseLocation[];
-  getLocationsByType: (type: "location" | "sublocation" | "department", parentId?: string) => WarehouseLocation[];
+  getLocationsByType: (type: "warehouse" | "sublocation" | "department", parentId?: string) => WarehouseLocation[];
   onUpdate: (updateData: Partial<WarehouseAsset>) => void;
   isUpdating: boolean;
 }
@@ -71,7 +71,7 @@ export function BulkAssetUpdateDialog({
     onOpenChange(false);
   };
 
-  const mainLocations = getLocationsByType("location");
+  const mainLocations = getLocationsByType("warehouse");
   const sublocations = locationId ? getLocationsByType("sublocation", locationId) : [];
   const departments = sublocationId ? getLocationsByType("department", sublocationId) : [];
 
