@@ -336,7 +336,7 @@ function buildFilterDescriptors(
       } else if (p.type === "select") {
         const opt = p.options.find((o) => o.value === v);
         display = opt?.label ?? String(v);
-      } else if (p.type === "warehouse" || p.type === "category" || p.type === "supplier") {
+      } else if (p.type === "location" || p.type === "category" || p.type === "supplier") {
         display = String(v).slice(0, 8) + "…";
       } else if (p.type === "textOperator") {
         const tv = v as { op?: string; term?: string };
