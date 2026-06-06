@@ -3,7 +3,7 @@ export type WarehouseCategory = 'raw_materials' | 'finished_goods' | 'general' |
 export interface WarehouseLocation {
   id: string;
   name: string;
-  type: 'warehouse' | 'location' | 'sublocation' | 'department';
+  type: 'warehouse' | 'sublocation' | 'department';
   parent_id: string | null;
   description: string | null;
   company_id: string | null;
