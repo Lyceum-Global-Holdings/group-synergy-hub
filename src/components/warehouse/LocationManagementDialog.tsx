@@ -300,7 +300,7 @@ export const LocationManagementDialog = () => {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="location">Location</SelectItem>
+                    <SelectItem value="warehouse">Warehouse</SelectItem>
                     <SelectItem value="sublocation">Sublocation</SelectItem>
                     <SelectItem value="department">Department</SelectItem>
                   </SelectContent>
