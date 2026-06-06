@@ -37,7 +37,7 @@ export const LocationManagementDialog = () => {
     is_standalone_warehouse: boolean;
   }>({
     name: '',
-    type: 'location',
+    type: 'warehouse',
     parent_id: 'none',
     description: '',
     location_code: '',
@@ -68,7 +68,7 @@ export const LocationManagementDialog = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isChild = formData.type !== 'location' && formData.parent_id !== 'none';
+    const isChild = formData.type !== 'warehouse' && formData.parent_id !== 'none';
     // Standalone warehouses MUST use explicit company assignment.
     const effectiveMode = formData.is_standalone_warehouse
       ? 'explicit'
@@ -115,7 +115,7 @@ export const LocationManagementDialog = () => {
   const resetForm = () => {
     setFormData({
       name: '',
-      type: 'location',
+      type: 'warehouse',
       parent_id: 'none',
       description: '',
       location_code: '',
@@ -203,7 +203,7 @@ export const LocationManagementDialog = () => {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              {formData.type !== 'location' && formData.parent_id !== 'none' && (
+              {formData.type !== 'warehouse' && formData.parent_id !== 'none' && (
                 <div className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-muted/30">
                   <div className="space-y-1">
                     <Label htmlFor="standalone-toggle" className="font-medium">Standalone Warehouse</Label>
@@ -224,7 +224,7 @@ export const LocationManagementDialog = () => {
                 </div>
               )}
 
-              {formData.type !== 'location' && formData.parent_id !== 'none' && !formData.is_standalone_warehouse && (
+              {formData.type !== 'warehouse' && formData.parent_id !== 'none' && !formData.is_standalone_warehouse && (
                 <div>
                   <Label>Company Assignment Mode</Label>
                   <Select

@@ -96,7 +96,7 @@ function LocationTreeNode({ location, level }: LocationTreeNodeProps) {
 
   const getTypeIcon = () => {
     switch (location.type) {
-      case 'location': return Building;
+      case 'warehouse': return Building;
       case 'sublocation': return MapPin;
       case 'department': return Users;
       default: return Building;

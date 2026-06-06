@@ -83,7 +83,7 @@ Production Floor,department,WH-001-RCV,Manufacturing area,WH-001-PROD,3000,Bob J
 
           await createLocation({
             name: loc.name,
-            type: loc.type as 'location' | 'sublocation' | 'department',
+            type: loc.type as 'warehouse' | 'sublocation' | 'department',
             parent_id: loc.parent_id || undefined,
             description: loc.description || undefined,
             location_code: loc.location_code || undefined,
