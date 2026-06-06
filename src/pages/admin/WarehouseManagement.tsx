@@ -132,7 +132,7 @@ export default function WarehouseManagement() {
 
   // Calculate statistics
   const stats = {
-    totalLocations: locations.filter(l => l.type === 'location').length,
+    totalLocations: locations.filter(l => l.type === 'warehouse').length,
     totalSublocations: locations.filter(l => l.type === 'sublocation').length,
     totalDepartments: locations.filter(l => l.type === 'department').length,
     activeLocations: locations.filter(l => l.status === 'active').length,
@@ -258,7 +258,7 @@ export default function WarehouseManagement() {
     setEditForm({
       name: location.name || '',
       location_code: location.location_code || '',
-      type: location.type || 'location',
+      type: location.type || 'warehouse',
       parent_id: location.parent_id || '',
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || '',
@@ -333,10 +333,10 @@ export default function WarehouseManagement() {
   // Get potential parent locations based on selected type
   const getParentOptions = () => {
     if (editForm.type === 'sublocation') {
-      return locations.filter(l => l.type === 'warehouse' || l.type === 'location');
+      return locations.filter(l => l.type === 'warehouse');
     }
     if (editForm.type === 'department') {
-      return locations.filter(l => l.type === 'warehouse' || l.type === 'location' || l.type === 'sublocation');
+      return locations.filter(l => l.type === 'warehouse' || l.type === 'sublocation');
     }
     return [];
   };
@@ -442,7 +442,7 @@ export default function WarehouseManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="location">Location</SelectItem>
+                <SelectItem value="warehouse">Warehouse</SelectItem>
                 <SelectItem value="sublocation">Sublocation</SelectItem>
                 <SelectItem value="department">Department</SelectItem>
               </SelectContent>
@@ -836,13 +836,12 @@ export default function WarehouseManagement() {
 
               <div className="space-y-2">
                 <Label>Type</Label>
-                <Select value={editForm.type || 'location'} onValueChange={(v) => handleEditFormChange('type', v)}>
+                <Select value={editForm.type || 'warehouse'} onValueChange={(v) => handleEditFormChange('type', v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="warehouse">Warehouse</SelectItem>
-                    <SelectItem value="location">Location</SelectItem>
                     <SelectItem value="sublocation">Sublocation</SelectItem>
                     <SelectItem value="department">Department</SelectItem>
                   </SelectContent>

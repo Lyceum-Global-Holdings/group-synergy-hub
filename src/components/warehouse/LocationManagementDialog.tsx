@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { ChevronsUpDown } from 'lucide-react';
-type LocationType = 'location' | 'sublocation' | 'department';
+type LocationType = 'warehouse' | 'sublocation' | 'department';
 
 export const LocationManagementDialog = () => {
   const [open, setOpen] = useState(false);
@@ -37,7 +37,7 @@ export const LocationManagementDialog = () => {
     is_standalone_warehouse: boolean;
   }>({
     name: '',
-    type: 'location',
+    type: 'warehouse',
     parent_id: 'none',
     description: '',
     location_code: '',
@@ -68,7 +68,7 @@ export const LocationManagementDialog = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isChild = formData.type !== 'location' && formData.parent_id !== 'none';
+    const isChild = formData.type !== 'warehouse' && formData.parent_id !== 'none';
     // Standalone warehouses MUST use explicit company assignment.
     const effectiveMode = formData.is_standalone_warehouse
       ? 'explicit'
@@ -115,7 +115,7 @@ export const LocationManagementDialog = () => {
   const resetForm = () => {
     setFormData({
       name: '',
-      type: 'location',
+      type: 'warehouse',
       parent_id: 'none',
       description: '',
       location_code: '',
@@ -141,7 +141,7 @@ export const LocationManagementDialog = () => {
   // unless the user has explicitly changed mode. Only auto-apply when not editing.
   useEffect(() => {
     if (editingLocation) return;
-    if (formData.type === 'location') {
+    if (formData.type === 'warehouse') {
       if (formData.assignment_mode !== 'explicit') {
         setFormData(prev => ({ ...prev, assignment_mode: 'explicit' }));
       }
@@ -203,7 +203,7 @@ export const LocationManagementDialog = () => {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              {formData.type !== 'location' && formData.parent_id !== 'none' && (
+              {formData.type !== 'warehouse' && formData.parent_id !== 'none' && (
                 <div className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-muted/30">
                   <div className="space-y-1">
                     <Label htmlFor="standalone-toggle" className="font-medium">Standalone Warehouse</Label>
@@ -224,7 +224,7 @@ export const LocationManagementDialog = () => {
                 </div>
               )}
 
-              {formData.type !== 'location' && formData.parent_id !== 'none' && !formData.is_standalone_warehouse && (
+              {formData.type !== 'warehouse' && formData.parent_id !== 'none' && !formData.is_standalone_warehouse && (
                 <div>
                   <Label>Company Assignment Mode</Label>
                   <Select
@@ -300,7 +300,7 @@ export const LocationManagementDialog = () => {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="location">Location</SelectItem>
+                    <SelectItem value="warehouse">Warehouse</SelectItem>
                     <SelectItem value="sublocation">Sublocation</SelectItem>
                     <SelectItem value="department">Department</SelectItem>
                   </SelectContent>
@@ -320,7 +320,7 @@ export const LocationManagementDialog = () => {
                     <SelectContent>
                       <SelectItem value="none">None (Optional)</SelectItem>
                       {locations
-                        .filter(loc => loc.type === 'location' && loc.id && loc.id.trim() !== "")
+                        .filter(loc => loc.type === 'warehouse' && loc.id && loc.id.trim() !== "")
                         .map((location) => (
                         <SelectItem key={location.id} value={location.id}>
                           {location.name}
@@ -398,7 +398,7 @@ export const LocationManagementDialog = () => {
                 </div>
               </div>
 
-              {formData.type === 'location' && (
+              {formData.type === 'warehouse' && (
                 <div>
                   <Label htmlFor="warehouse_category">Warehouse Category</Label>
                   <Select
@@ -487,7 +487,7 @@ export const LocationManagementDialog = () => {
             <h3 className="text-lg font-medium">Location Hierarchy</h3>
             
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {locations.filter(loc => loc.type === 'location').map((location) => (
+              {locations.filter(loc => loc.type === 'warehouse').map((location) => (
                 <div key={location.id} className="space-y-2">
                   {/* Main Location */}
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">

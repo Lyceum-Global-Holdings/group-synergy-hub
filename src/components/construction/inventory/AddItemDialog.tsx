@@ -90,7 +90,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
     if (!locations || !permissions) return [];
 
     // Only show top-level locations (type = 'location'), not sub-locations/departments/floors
-    const topLevelLocations = locations.filter((loc) => loc.type === "location");
+    const topLevelLocations = locations.filter((loc) => loc.type === "warehouse");
 
     if (permissions.canEditAllLocations) return topLevelLocations;
     return topLevelLocations.filter((loc) => editableLocationIds.has(loc.id));

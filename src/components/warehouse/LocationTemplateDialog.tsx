@@ -14,7 +14,7 @@ const templates = [
     description: 'Basic warehouse with locations, sublocations, and departments',
     icon: Warehouse,
     locations: [
-      { name: 'Main Warehouse', type: 'location' as const, code: 'WH-001', capacity: 10000 },
+      { name: 'Main Warehouse', type: 'warehouse' as const, code: 'WH-001', capacity: 10000 },
       { name: 'Receiving Area', type: 'sublocation' as const, parent: 'Main Warehouse', code: 'WH-001-RCV', capacity: 2000 },
       { name: 'Storage Zone A', type: 'sublocation' as const, parent: 'Main Warehouse', code: 'WH-001-STA', capacity: 4000 },
       { name: 'Storage Zone B', type: 'sublocation' as const, parent: 'Main Warehouse', code: 'WH-001-STB', capacity: 4000 },
@@ -28,7 +28,7 @@ const templates = [
     description: 'Production-focused layout with raw materials and finished goods areas',
     icon: Factory,
     locations: [
-      { name: 'Production Facility', type: 'location' as const, code: 'PROD-001', capacity: 15000 },
+      { name: 'Production Facility', type: 'warehouse' as const, code: 'PROD-001', capacity: 15000 },
       { name: 'Raw Materials Storage', type: 'sublocation' as const, parent: 'Production Facility', code: 'PROD-001-RM', capacity: 5000 },
       { name: 'Production Floor', type: 'sublocation' as const, parent: 'Production Facility', code: 'PROD-001-PF', capacity: 6000 },
       { name: 'Finished Goods', type: 'sublocation' as const, parent: 'Production Facility', code: 'PROD-001-FG', capacity: 4000 },
@@ -43,7 +43,7 @@ const templates = [
     description: 'Multi-zone distribution center for retail operations',
     icon: Store,
     locations: [
-      { name: 'Distribution Center', type: 'location' as const, code: 'DC-001', capacity: 20000 },
+      { name: 'Distribution Center', type: 'warehouse' as const, code: 'DC-001', capacity: 20000 },
       { name: 'Inbound Zone', type: 'sublocation' as const, parent: 'Distribution Center', code: 'DC-001-IN', capacity: 3000 },
       { name: 'Reserve Storage', type: 'sublocation' as const, parent: 'Distribution Center', code: 'DC-001-RES', capacity: 10000 },
       { name: 'Pick & Pack Zone', type: 'sublocation' as const, parent: 'Distribution Center', code: 'DC-001-PP', capacity: 4000 },
@@ -62,7 +62,7 @@ const templates = [
     description: 'Temperature-controlled storage zones for perishables',
     icon: Building,
     locations: [
-      { name: 'Cold Storage Facility', type: 'location' as const, code: 'COLD-001', capacity: 8000 },
+      { name: 'Cold Storage Facility', type: 'warehouse' as const, code: 'COLD-001', capacity: 8000 },
       { name: 'Freezer Zone (-20°C)', type: 'sublocation' as const, parent: 'Cold Storage Facility', code: 'COLD-001-FRZ', capacity: 3000 },
       { name: 'Chiller Zone (2-8°C)', type: 'sublocation' as const, parent: 'Cold Storage Facility', code: 'COLD-001-CHL', capacity: 3000 },
       { name: 'Dry Storage', type: 'sublocation' as const, parent: 'Cold Storage Facility', code: 'COLD-001-DRY', capacity: 2000 },
@@ -159,7 +159,7 @@ export function LocationTemplateDialog() {
                       {template.locations.length} locations
                     </Badge>
                     <Badge variant="outline">
-                      {template.locations.filter(l => l.type === 'location').length} main
+                      {template.locations.filter(l => l.type === 'warehouse').length} main
                     </Badge>
                     <Badge variant="outline">
                       {template.locations.filter(l => l.type === 'sublocation').length} sub

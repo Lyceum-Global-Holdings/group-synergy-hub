@@ -382,9 +382,9 @@ export default function AssetManagement() {
     return matchesSearch && matchesLocation && matchesSublocation && matchesDepartment && matchesCategory;
   });
 
-  const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
-    if (type === "location") {
-      return locations.filter(loc => loc.type === "location");
+  const getLocationsByType = (type: "warehouse" | "sublocation" | "department", parentId?: string) => {
+    if (type === "warehouse") {
+      return locations.filter(loc => loc.type === "warehouse");
     } else if (type === "sublocation") {
       return locations.filter(loc => loc.type === "sublocation" && loc.parent_id === parentId);
     } else if (type === "department") {
@@ -726,7 +726,7 @@ export default function AssetManagement() {
                                ) : locations.length === 0 ? (
                                  <SelectItem value="" disabled>No locations available</SelectItem>
                                ) : (
-                                 getLocationsByType("location").map((location) => (
+                                 getLocationsByType("warehouse").map((location) => (
                                    <SelectItem key={location.id} value={location.id}>
                                      {location.name}
                                    </SelectItem>
@@ -982,7 +982,7 @@ export default function AssetManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
-                  {getLocationsByType("location").map((location) => (
+                  {getLocationsByType("warehouse").map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name}
                     </SelectItem>

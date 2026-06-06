@@ -82,7 +82,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
 
   // Filter locations to show only project sites - combine warehouse locations and construction sites
-  const siteLocations = locations?.filter(loc => loc.type === 'location') || [];
+  const siteLocations = locations?.filter(loc => loc.type === 'warehouse') || [];
   const updateReport = useUpdateDailySiteReport();
 
   const form = useForm<FormData>({

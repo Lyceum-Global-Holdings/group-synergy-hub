@@ -142,7 +142,7 @@ export function AssetEditDialog({
 
   const mainCategories = categories.filter(cat => !cat.parent_id);
   const subcategories = categories.filter(cat => cat.parent_id === selectedCategoryId);
-  const mainLocations = getLocationsByType('location');
+  const mainLocations = getLocationsByType('warehouse');
   const sublocations = getLocationsByType('sublocation', selectedLocationId);
   const departments = getLocationsByType('department', selectedSublocationId || selectedLocationId);
 

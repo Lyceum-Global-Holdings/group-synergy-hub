@@ -46,7 +46,7 @@ export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAll
   // Filter locations to only those the user has edit permission for
   const activeLocations = useMemo(() => {
     const allActive = warehouseLocations.filter(loc => 
-      loc.type === 'location' && loc.status === 'active'
+      loc.type === 'warehouse' && loc.status === 'active'
     );
     if (!permissions) return [];
     if (permissions.viewAllLocations) return allActive;

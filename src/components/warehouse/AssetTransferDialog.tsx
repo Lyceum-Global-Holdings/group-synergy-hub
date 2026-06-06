@@ -98,7 +98,7 @@ export function AssetTransferDialog({
   const selectedLocationId = form.watch("location_id");
   const selectedSublocationId = form.watch("sublocation_id");
 
-  const mainLocations = getLocationsByType('location');
+  const mainLocations = getLocationsByType('warehouse');
   const sublocations = getLocationsByType('sublocation', selectedLocationId);
   const departments = getLocationsByType('department', selectedSublocationId || selectedLocationId);
 

@@ -56,7 +56,7 @@ export function AssetAnalytics({ assets, locations, categories, totalCount, acti
     ].filter(item => item.count > 0);
 
     // Location distribution
-    const locationData = locations.filter(loc => loc.type === 'location').map(location => {
+    const locationData = locations.filter(loc => loc.type === 'warehouse').map(location => {
       const count = assets.filter(asset => asset.location_id === location.id).length;
       const value = assets
         .filter(asset => asset.location_id === location.id)

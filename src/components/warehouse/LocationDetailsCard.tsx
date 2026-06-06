@@ -12,7 +12,7 @@ interface LocationDetailsCardProps {
 export function LocationDetailsCard({ location, itemCount = 0, assetCount = 0 }: LocationDetailsCardProps) {
   const getTypeIcon = () => {
     switch (location.type) {
-      case 'location':
+      case 'warehouse':
         return <Building className="h-5 w-5" />;
       case 'sublocation':
         return <MapPin className="h-5 w-5" />;
