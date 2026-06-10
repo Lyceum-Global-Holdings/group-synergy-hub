@@ -90,7 +90,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   });
 
   const [items, setItems] = useState<IssueItem[]>([]);
-  const [currentItem, setCurrentItem] = useState<Partial<IssueItem>>({});
+  
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
