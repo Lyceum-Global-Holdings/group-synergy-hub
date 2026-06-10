@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CheckCircle, XCircle, FileCheck, Truck, Package, ArrowDown, ArrowUp } from 'lucide-react';
+import { CheckCircle, XCircle, FileCheck, Truck, Package, ArrowDown, ArrowUp, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueReturn';
@@ -26,6 +26,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { IssueItemsDialog } from './IssueItemsDialog';
 import { ReceiveItemsDialog } from './ReceiveItemsDialog';
 import { SrnDocumentUploadField } from './SrnDocumentUploadField';
+import { downloadMaterialIssuePdf } from '@/utils/materialIssuePdfExport';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
