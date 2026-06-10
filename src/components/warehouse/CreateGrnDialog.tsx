@@ -410,12 +410,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-[95vw] xl:max-w-7xl max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle>Create Goods Receipt Note</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
           {/* Header Information */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -490,7 +490,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
               </Button>
             </div>
 
-            <Table>
+            <div className="overflow-x-auto border rounded-md">
+            <Table className="min-w-[1100px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Item Name</TableHead>
@@ -850,6 +851,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
 
           {/* Remarks */}
@@ -857,32 +859,32 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
             <Label>Remarks</Label>
             <Textarea {...form.register('remarks')} />
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleSubmit('draft')}
-              disabled={createGrn.isPending}
-            >
-              Save as Draft
-            </Button>
-            <Button
-              type="button"
-              onClick={() => handleSubmit('submitted')}
-              disabled={createGrn.isPending}
-            >
-              Submit for Approval
-            </Button>
-          </div>
+        {/* Actions */}
+        <div className="flex justify-end gap-2 px-6 py-4 border-t shrink-0 bg-background">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleSubmit('draft')}
+            disabled={createGrn.isPending}
+          >
+            Save as Draft
+          </Button>
+          <Button
+            type="button"
+            onClick={() => handleSubmit('submitted')}
+            disabled={createGrn.isPending}
+          >
+            Submit for Approval
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
