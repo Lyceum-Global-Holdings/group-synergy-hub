@@ -1,11 +1,11 @@
-## Fix BrowseInventoryDialog
+## Simplify BrowseInventoryDialog
 
 **File:** `src/components/warehouse/BrowseInventoryDialog.tsx`
 
-1. **Auto-load all pages for the location** — add a `useEffect` that calls `fetchNextPage()` whenever `hasNextPage && !isFetchingNextPage`, so the picker keeps paging until every in-stock item at the selected location is loaded. Keep the "Load more" button as a fallback while paging.
-   - Optionally bump `PAGE_SIZE` from 50 → 200 to reduce round-trips on large locations.
-   - Add a small "Loading all items…" indicator next to the count while `hasNextPage` is true.
+1. **Remove total inventory count and "loading more…" indicator** from the footer (lines 294–316). Keep only the "{n} selected · {x} units" summary plus the invalid-qty warning.
 
-2. **Default Qty to Issue = 0** — in `toggleRow`, set `quantity: 0` (instead of `avail > 0 ? 1 : 0`). User must type the qty explicitly. Validation already rejects `quantity <= 0`, so the Add button stays disabled until a qty is entered.
+2. **Reduce table columns** to: Checkbox, Code, Name, Current Stock, Qty to Issue. Remove the UoM and Bin columns from both `<TableHeader>` and the row rendering. Update the empty-state `colSpan` from 7 → 5.
 
-No other files touched, no RPC or schema changes.
+3. **Rename "Available" header → "Current Stock"** for clarity.
+
+No changes to data fetching, auto-pagination, selection logic, or RPC params — only the visible columns and footer text are trimmed.
