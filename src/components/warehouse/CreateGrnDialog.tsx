@@ -556,9 +556,49 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                         <CommandItem
                                           key={wi.id}
                                           value={wi.name}
-                                          onSelect={() => {
-                                            handleItemChange(index, 'warehouse_item_id', wi.id);
+                                          onSelect={async () => {
                                             setItemComboboxOpen(null);
+                                            if (!selectedCompany?.id) {
+                                              toast.error('Select a company first');
+                                              return;
+                                            }
+                                            try {
+                                              const { data: warehouseItemId, error: provErr } = await supabase.rpc(
+                                                'ensure_warehouse_item_for_company' as any,
+                                                { p_company_id: selectedCompany.id, p_catalog_item_id: wi.id }
+                                              );
+                                              if (provErr) throw provErr;
+                                              const newItems = [...items];
+                                              newItems[index] = {
+                                                ...newItems[index],
+                                                warehouse_item_id: warehouseItemId as unknown as string,
+                                                item_name: wi.name,
+                                                item_code: wi.item_code,
+                                                is_batch_tracked: (wi as any).is_batch_tracked || false,
+                                                is_serialized: (wi as any).is_serialized || false,
+                                                track_secondary_quantity: (wi as any).track_secondary_quantity || false,
+                                                secondary_uom: (wi as any).secondary_uom || '',
+                                                unit_price: (wi as any).unit_cost ? Number((wi as any).unit_cost) : newItems[index].unit_price,
+                                              };
+                                              const qty = newItems[index].quantity_received || 0;
+                                              const price = newItems[index].unit_price || 0;
+                                              newItems[index].total_cost = qty * price;
+                                              setItems(newItems);
+                                              // Auto-generate batch number for batch-tracked items
+                                              if ((wi as any).is_batch_tracked && !newItems[index].batch_number) {
+                                                try {
+                                                  const code = await generateBatch.mutateAsync({
+                                                    companyId: selectedCompany.id,
+                                                    warehouseItemId: warehouseItemId as unknown as string,
+                                                  });
+                                                  handleItemChange(index, 'batch_number', code);
+                                                } catch {
+                                                  /* user can click Gen to retry */
+                                                }
+                                              }
+                                            } catch (err: any) {
+                                              toast.error(err?.message || 'Failed to add item to inventory');
+                                            }
                                           }}
                                         >
                                           <Check
