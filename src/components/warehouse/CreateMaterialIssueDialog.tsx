@@ -93,6 +93,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
+  const [browseOpen, setBrowseOpen] = useState(false);
 
   const { items: warehouseItems } = useWarehouseItems();
   
