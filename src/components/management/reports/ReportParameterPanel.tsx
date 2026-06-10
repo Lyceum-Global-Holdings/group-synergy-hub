@@ -291,6 +291,18 @@ function ParameterInput({
       const scopeId = siblingValues[param.dependsOn] as string | null | undefined;
       return <BinParamInput paramKey={param.key} locationId={scopeId ?? null} value={(value as string) ?? null} onChange={onChange} />;
     }
+    case "binMulti": {
+      const scopeId = siblingValues[param.dependsOn] as string | null | undefined;
+      return (
+        <BinMultiParamInput
+          paramKey={param.key}
+          companyId={companyId}
+          locationId={scopeId ?? null}
+          value={value}
+          onChange={onChange}
+        />
+      );
+    }
     case "category":
       return (
         <Select value={(value as string) ?? "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
