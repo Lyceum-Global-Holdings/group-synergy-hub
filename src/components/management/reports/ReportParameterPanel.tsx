@@ -551,3 +551,39 @@ function ItemParamInput({
     </Popover>
   );
 }
+
+function BinMultiParamInput({
+  paramKey,
+  companyId,
+  locationId,
+  value,
+  onChange,
+}: {
+  paramKey: string;
+  companyId: string | null;
+  locationId: string | null;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const { data: bins = [], isLoading } = useAllocatedBinsInSubtree(
+    companyId,
+    locationId,
+  );
+  const current: BinMultiFilterValue = normalizeBinMultiValue(value);
+  return (
+    <BinMultiFilterPopover
+      id={paramKey}
+      options={bins}
+      loading={isLoading}
+      disabled={!companyId}
+      disabledHint={!companyId ? "Select a company first" : undefined}
+      emptyHint={
+        locationId
+          ? "No allocated bins in this location"
+          : "No allocated bins in this company"
+      }
+      value={current}
+      onChange={onChange}
+    />
+  );
+}
