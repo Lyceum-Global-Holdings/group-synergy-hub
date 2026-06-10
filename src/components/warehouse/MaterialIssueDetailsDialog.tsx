@@ -46,6 +46,8 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const queryClient = useQueryClient();
   const { selectedCompany, companies } = useCompany();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const { data: userRoles = [] } = useCurrentUserRoles();
+  const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
 
   const handleDownloadPdf = async () => {
     if (!issue) return;
