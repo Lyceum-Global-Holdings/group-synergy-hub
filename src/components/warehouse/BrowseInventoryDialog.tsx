@@ -293,7 +293,12 @@ export function BrowseInventoryDialog({
 
             <div className="flex items-center justify-between text-sm">
               <div className="text-muted-foreground">
-                Showing {rows.length} item{rows.length === 1 ? '' : 's'}
+                <span className="font-medium text-foreground">
+                  Total available inventory: {rows.length} item{rows.length === 1 ? '' : 's'}
+                </span>
+                {hasNextPage && (
+                  <span className="ml-2 italic">(loading more…)</span>
+                )}
                 {selected.size > 0 && (
                   <>
                     {' · '}
@@ -308,16 +313,6 @@ export function BrowseInventoryDialog({
                   </span>
                 )}
               </div>
-              {hasNextPage && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                >
-                  {isFetchingNextPage ? 'Loading…' : 'Load more'}
-                </Button>
-              )}
             </div>
           </>
         )}
