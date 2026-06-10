@@ -222,16 +222,14 @@ export function BrowseInventoryDialog({
                     </TableHead>
                     <TableHead>Code</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>UoM</TableHead>
-                    <TableHead className="text-right">Available</TableHead>
-                    <TableHead>Bin</TableHead>
+                    <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead className="w-32">Qty to Issue</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.length === 0 && !isFetching && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                         No in-stock items match this search.
                       </TableCell>
                     </TableRow>
@@ -241,8 +239,6 @@ export function BrowseInventoryDialog({
                     const checked = !!sel;
                     const already = existingItemIds.includes(row.id);
                     const avail = Number(row.current_stock || 0);
-                    const firstBin =
-                      Array.isArray(row.bins) && row.bins.length > 0 ? row.bins[0] : null;
                     const qtyInvalid =
                       sel && (sel.quantity <= 0 || sel.quantity > avail);
                     return (
@@ -269,9 +265,7 @@ export function BrowseInventoryDialog({
                           </div>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">{row.name}</TableCell>
-                        <TableCell>{row.unit_abbreviation || row.unit_name || '—'}</TableCell>
                         <TableCell className="text-right tabular-nums">{avail}</TableCell>
-                        <TableCell>{firstBin?.bin_code || '—'}</TableCell>
                         <TableCell>
                           <Input
                             type="number"
@@ -293,19 +287,10 @@ export function BrowseInventoryDialog({
 
             <div className="flex items-center justify-between text-sm">
               <div className="text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  Total available inventory: {rows.length} item{rows.length === 1 ? '' : 's'}
-                </span>
-                {hasNextPage && (
-                  <span className="ml-2 italic">(loading more…)</span>
-                )}
                 {selected.size > 0 && (
-                  <>
-                    {' · '}
-                    <span className="font-medium text-foreground">
-                      {selected.size} selected · {totalUnits} units
-                    </span>
-                  </>
+                  <span className="font-medium text-foreground">
+                    {selected.size} selected · {totalUnits} units
+                  </span>
                 )}
                 {invalid.length > 0 && (
                   <span className="ml-2 text-destructive">
@@ -314,6 +299,7 @@ export function BrowseInventoryDialog({
                 )}
               </div>
             </div>
+
           </>
         )}
 
