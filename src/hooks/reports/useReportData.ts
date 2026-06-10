@@ -145,9 +145,16 @@ export async function fetchStockOnHand(
     categoryId?: string | null;
     includeZero?: boolean;
     binId?: string | null;
+    binIds?: { mode?: "include" | "exclude"; binIds?: string[] } | null;
     binWise?: boolean;
   },
 ): Promise<ReportEnvelope> {
+  const bm = params.binIds ?? null;
+  const mode = bm?.mode === "exclude" ? "exclude" : "include";
+  const ids = Array.isArray(bm?.binIds) ? bm!.binIds!.filter(Boolean) : [];
+  const p_include_bin_ids = mode === "include" && ids.length > 0 ? ids : null;
+  const p_exclude_bin_ids = mode === "exclude" && ids.length > 0 ? ids : null;
+
   const { data, error } = await supabase.rpc("report_stock_on_hand", {
     p_company_id: ctx.companyId,
     p_location_id: params.locationId || null,
@@ -155,6 +162,8 @@ export async function fetchStockOnHand(
     p_include_zero: params.includeZero ?? false,
     p_bin_id: params.binId || null,
     p_bin_wise: params.binWise ?? false,
+    p_include_bin_ids,
+    p_exclude_bin_ids,
   } as never);
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
