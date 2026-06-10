@@ -117,7 +117,7 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     hookId: "warehouse.stockOnHand",
     parameters: [
       { key: "locationId", label: "Location", type: "location" },
-      { key: "binId", label: "Bin", type: "bin", dependsOn: "locationId" },
+      { key: "binIds", label: "Bin", type: "binMulti", dependsOn: "locationId" },
       { key: "categoryId", label: "Category", type: "category" },
       { key: "binWise", label: "Show bin-wise breakdown", type: "boolean", defaultValue: false },
       { key: "includeZero", label: "Include zero-stock items", type: "boolean", defaultValue: false },
