@@ -153,6 +153,14 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
           >
             <PackageSearch className="h-4 w-4 mr-1" /> Browse inventory
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBinAddOpen(true)}
+            disabled={disabled}
+          >
+            <Boxes className="h-4 w-4 mr-1" /> Add by bin
+          </Button>
           {rows.length > 0 && (
             <Button size="sm" variant="ghost" onClick={() => setRows([])}>
               <X className="h-4 w-4 mr-1" /> Clear
