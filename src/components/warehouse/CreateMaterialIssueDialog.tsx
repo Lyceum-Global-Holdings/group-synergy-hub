@@ -615,24 +615,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-2 border rounded-lg p-3 bg-muted/30">
-              <div className="text-sm">
-                <p className="font-medium">Need many items at once?</p>
-                <p className="text-muted-foreground text-xs">
-                  Browse what's in stock at the issue location and add multiple items in one click.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="default"
-                onClick={() => setBrowseOpen(true)}
-                disabled={!formData.location_id}
-                title={!formData.location_id ? 'Select Issue Location first' : ''}
-              >
-                <PackageSearch className="h-4 w-4 mr-2" />
-                Browse Available Inventory
-              </Button>
-            </div>
 
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold">Add Item</h3>
