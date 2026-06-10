@@ -192,30 +192,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     }));
   };
 
-  const handleItemSelect = (item: any) => {
-    if (item && item.id) {
-      const wi: any = warehouseItems.find((w: any) => w.id === item.id) || {};
-      setCurrentItem({
-        item_id: item.id,
-        item_code: item.item_code,
-        description: item.description || item.item_name,
-        unit_of_measure: item.unit_of_measure,
-        quantity_required: 1,
-        purpose: '',
-        available_stock: item.current_stock || 0,
-        track_secondary_quantity: !!wi.track_secondary_quantity,
-        secondary_uom: wi.secondary_uom || null,
-        secondary_quantity_issued: undefined,
-      });
-    }
-  };
-
-  const addItem = () => {
-    if (currentItem.item_id && currentItem.quantity_required) {
-      setItems([...items, currentItem as unknown as IssueItem]);
-      setCurrentItem({});
-    }
-  };
 
   const handleAddAllReservedItems = () => {
     const newItems: IssueItem[] = reservedItems
