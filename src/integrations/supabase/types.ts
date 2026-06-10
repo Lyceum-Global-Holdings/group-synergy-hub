@@ -22163,6 +22163,21 @@ export type Database = {
         Args: { je_id: string }
         Returns: boolean
       }
+      list_allocated_bins_in_subtree: {
+        Args: {
+          p_company_id: string
+          p_item_id?: string
+          p_location_id?: string
+        }
+        Returns: {
+          allocated_qty: number
+          bin_code: string
+          id: string
+          location_id: string
+          location_path: string
+          name: string
+        }[]
+      }
       list_bins_at_location: {
         Args: { p_location_id: string }
         Returns: {
@@ -23244,6 +23259,39 @@ export type Database = {
               p_bin_wise?: boolean
               p_category_id?: string
               p_company_id: string
+              p_include_zero?: boolean
+              p_location_id?: string
+            }
+            Returns: {
+              available_quantity: number
+              bin_code: string
+              bin_id: string
+              bin_name: string
+              category_id: string
+              category_name: string
+              current_stock: number
+              item_code: string
+              item_id: string
+              item_name: string
+              location_id: string
+              location_name: string
+              min_stock_level: number
+              reorder_level: number
+              reserved_quantity: number
+              status: string
+              stock_value: number
+              unit_cost: number
+              unit_name: string
+            }[]
+          }
+        | {
+            Args: {
+              p_bin_id?: string
+              p_bin_wise?: boolean
+              p_category_id?: string
+              p_company_id: string
+              p_exclude_bin_ids?: string[]
+              p_include_bin_ids?: string[]
               p_include_zero?: boolean
               p_location_id?: string
             }

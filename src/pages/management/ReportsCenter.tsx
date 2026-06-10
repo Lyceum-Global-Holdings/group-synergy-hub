@@ -343,6 +343,12 @@ function buildFilterDescriptors(
         const term = (tv.term ?? "").trim();
         if (!term) return null;
         display = `${opLabels[tv.op ?? "contains"] ?? "contains"} “${term}”`;
+      } else if (p.type === "binMulti") {
+        const bv = v as { mode?: string; binIds?: string[] };
+        const ids = Array.isArray(bv?.binIds) ? bv.binIds : [];
+        if (ids.length === 0) return null;
+        const mode = bv.mode === "exclude" ? "excluded" : "included";
+        display = ids.length === 1 ? `1 bin ${mode}` : `${ids.length} bins ${mode}`;
       } else {
         display = String(v);
       }

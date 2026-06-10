@@ -77,3 +77,9 @@ export interface NotesFilterValue {
   op: NotesFilterOp;
   term: string;
 }
+
+/** Value shape stored under a `binMulti` parameter key. */
+export interface BinMultiValue {
+  mode: "include" | "exclude";
+  binIds: string[];
+}

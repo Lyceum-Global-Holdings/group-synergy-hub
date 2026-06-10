@@ -21,6 +21,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { LocationTreePicker } from "@/components/management/reports/LocationTreePicker";
 import { useBinsAtLocation } from "@/hooks/warehouse/useBinsAtLocation";
+import { useAllocatedBinsInSubtree } from "@/hooks/warehouse/useAllocatedBinsInSubtree";
+import {
+  BinMultiFilterPopover,
+  normalizeBinMultiValue,
+  type BinMultiFilterValue,
+} from "@/components/management/reports/BinMultiFilterPopover";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -114,21 +120,37 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
 
   const set = (key: string, v: unknown) => onChange({ ...values, [key]: v });
 
-  // Clear any "bin" param whose scoping sibling (locationId) has changed/cleared.
+  // Clear bin selections whose scoping sibling (locationId) is unset.
   useEffect(() => {
     const next: Record<string, unknown> = { ...values };
     let changed = false;
     definition.parameters.forEach((p) => {
-      if (p.type !== "bin") return;
-      const scope = next[p.dependsOn];
-      if (!scope && next[p.key]) {
-        next[p.key] = null;
-        changed = true;
+      if (p.type === "bin") {
+        const scope = next[p.dependsOn];
+        if (!scope && next[p.key]) {
+          next[p.key] = null;
+          changed = true;
+        }
+      } else if (p.type === "binMulti") {
+        const current = normalizeBinMultiValue(next[p.key]);
+        if (current.binIds.length > 0) {
+          // Always reset selected bin ids when location changes so stale ids
+          // (from a different warehouse subtree) don't survive.
+          next[p.key] = { mode: current.mode, binIds: [] };
+          changed = true;
+        }
       }
     });
     if (changed) onChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [definition.code, JSON.stringify(definition.parameters.map((p) => (p.type === "bin" ? values[p.dependsOn] : null)))]);
+  }, [
+    definition.code,
+    JSON.stringify(
+      definition.parameters.map((p) =>
+        p.type === "bin" || p.type === "binMulti" ? values[p.dependsOn] : null,
+      ),
+    ),
+  ]);
 
   return (
     <div className="grid gap-4">
@@ -142,6 +164,7 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
             locations={allowedLocations}
             locationsLoading={locationsLoading}
             companySelected={!!selectedCompany?.id}
+            companyId={selectedCompany?.id ?? null}
             categories={categories}
             siblingValues={values}
           />
@@ -161,6 +184,7 @@ function ParameterInput({
   locations,
   locationsLoading,
   companySelected,
+  companyId,
   categories,
   siblingValues,
 }: {
@@ -170,6 +194,7 @@ function ParameterInput({
   locations: { id: string; name: string; type: string; parent_id: string | null }[];
   locationsLoading: boolean;
   companySelected: boolean;
+  companyId: string | null;
   categories: { id: string; name: string }[];
   siblingValues: Record<string, unknown>;
 }) {
@@ -265,6 +290,18 @@ function ParameterInput({
     case "bin": {
       const scopeId = siblingValues[param.dependsOn] as string | null | undefined;
       return <BinParamInput paramKey={param.key} locationId={scopeId ?? null} value={(value as string) ?? null} onChange={onChange} />;
+    }
+    case "binMulti": {
+      const scopeId = siblingValues[param.dependsOn] as string | null | undefined;
+      return (
+        <BinMultiParamInput
+          paramKey={param.key}
+          companyId={companyId}
+          locationId={scopeId ?? null}
+          value={value}
+          onChange={onChange}
+        />
+      );
     }
     case "category":
       return (
@@ -512,5 +549,41 @@ function ItemParamInput({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function BinMultiParamInput({
+  paramKey,
+  companyId,
+  locationId,
+  value,
+  onChange,
+}: {
+  paramKey: string;
+  companyId: string | null;
+  locationId: string | null;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const { data: bins = [], isLoading } = useAllocatedBinsInSubtree(
+    companyId,
+    locationId,
+  );
+  const current: BinMultiFilterValue = normalizeBinMultiValue(value);
+  return (
+    <BinMultiFilterPopover
+      id={paramKey}
+      options={bins}
+      loading={isLoading}
+      disabled={!companyId}
+      disabledHint={!companyId ? "Select a company first" : undefined}
+      emptyHint={
+        locationId
+          ? "No allocated bins in this location"
+          : "No allocated bins in this company"
+      }
+      value={current}
+      onChange={onChange}
+    />
   );
 }

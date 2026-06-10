@@ -1,45 +1,63 @@
-## Root cause
+## Problem
 
-The database column `warehouse_locations.type` has a CHECK constraint allowing only `warehouse`, `sublocation`, `department`. All 12 top-level rows are stored as `type = 'warehouse'`.
+In the **Stock on Hand** report, the Bin dropdown only lists bins **physically attached to the exact location node** picked above (Lyceum Fulfilment Centre). Bins that live under sub-locations / departments under that warehouse — where the item is actually allocated — don't appear, so users can't filter to them. It's also a single-select with no way to exclude bins.
 
-But the UI was built around the legacy value `'location'`:
+(The two trailing entries in your screenshot — `LFC — Lyceum Fulfilment Center` and `NWS-STS — NWS Site Stores` — are stray bins whose `bin_code` was set to the location code; the real per-sub-location bins are missing entirely.)
 
-- The Edit Location dialog (`src/pages/admin/WarehouseManagement.tsx`, line 839) exposes a **Type** dropdown with both **Warehouse** (`warehouse`) and **Location** (`location`). Picking "Location" sends `type='location'` to the DB → fails the CHECK constraint → save silently rolls back, so the type appears not to change.
-- Many other screens filter `locations.filter(l => l.type === 'location')`. Since rows are actually `'warehouse'`, those pickers/grids come up empty — including the location list shown in Asset Management (`src/pages/warehouse/AssetManagement.tsx`, `getLocationsByType` at line 385), Asset Analytics, Capacity Planning, Location Hierarchy/Report tabs, bulk import dialogs, etc.
+## Solution
 
-## Fix
+Treat the bin filter as a **multi-select over every allocated bin in the selected location's subtree**, with both **Include** and **Exclude** modes.
 
-Standardize the whole frontend on the DB's `warehouse` value (no schema/data changes).
+### 1. New RPC: `list_allocated_bins_in_subtree`
 
-### 1. `src/pages/admin/WarehouseManagement.tsx`
-- Remove the invalid `<SelectItem value="location">` from the Edit Type dropdown (line 845). Keep `warehouse`, `sublocation`, `department`.
-- Stats counter `totalLocations` (line 135) → count `l.type === 'warehouse'`.
-- `getParentOptions()` (lines 335–339) → drop the `'location'` branch, keep `'warehouse'`.
+```text
+list_allocated_bins_in_subtree(p_company_id uuid, p_location_id uuid, p_item_id uuid default null)
+  -> id, bin_code, name, location_id, location_path, allocated_qty
+```
 
-### 2. `src/components/warehouse/LocationManagementDialog.tsx`
-- `LocationType` union, default `formData.type`, reset value, and every `formData.type === 'location'` / `loc.type === 'location'` check → use `'warehouse'`.
-- Same for the SelectItem value in the type dropdown and parent-of-sublocation filter.
+- SECURITY INVOKER, STABLE.
+- Recursive CTE down `warehouse_locations.parent_location_id` from `p_location_id` (or all company locations when null).
+- Joins `warehouse_bin_allocations` filtered by `company_id` (and `warehouse_item_id` when `p_item_id` given) so we only return **bins that actually hold stock**, sorted naturally by `bin_code`.
+- Returns `location_path` ("Warehouse › Aisle A › Rack 2") so the picker can show context for bins that share codes across sub-locations.
 
-### 3. Other consumers — replace `type === 'location'` with `type === 'warehouse'`
-- `src/pages/warehouse/AssetManagement.tsx` — `getLocationsByType` (lines 385–387) and the param type.
-- `src/components/warehouse/BulkAssetUpdateDialog.tsx` — `getLocationsByType` param type.
-- `src/components/warehouse/AssetAnalytics.tsx` (line 59).
-- `src/components/warehouse/CapacityPlanningTab.tsx` (line 13).
-- `src/components/warehouse/LocationHierarchyTab.tsx` (line 31).
-- `src/components/warehouse/LocationReportAnalytics.tsx` (lines 95, 188) and `src/utils/locationReportPdfExport.ts` (line 272) — update `ReportType` union and the warehouse filter.
-- `src/components/warehouse/BulkAssetImportDialog.tsx` (line 193), `BulkItemImportDialog.tsx` (line 195), `BulkItemImportContent.tsx` (line 161), `PublicAssetTransferDialog.tsx` (line 133) — replace `'location'` in the allowed-types list with `'warehouse'`.
-- `src/components/warehouse/LocationTemplateDialog.tsx` — every `type: 'location' as const` → `'warehouse'`, plus the `filter(l => l.type === 'location')` count.
-- `src/components/warehouse/ImportLocationsDialog.tsx` (line 86) — narrow type cast to `'warehouse' | 'sublocation' | 'department'` and reject any imported `'location'` row (treat as `'warehouse'`).
-- `src/types/warehouse.ts` (lines 6, 65) — drop `'location'` from the `type` unions.
+### 2. Report RPC: switch bin param to arrays
 
-### Not changed
-- `transfer_type: 'location'` in stock-transfer dialogs/types — unrelated enum, leave alone.
-- `ReportParameterPanel.tsx` `p.type === 'location'` — that's a report-parameter kind, not a warehouse type. Leave alone.
-- DB schema and existing rows — no migration needed.
+Replace `p_bin_id uuid` with two array params on `report_stock_on_hand`:
 
-## Verification
+- `p_include_bin_ids uuid[] default null` — when non-empty, restricts to these bins.
+- `p_exclude_bin_ids uuid[] default null` — when non-empty, removes these bins.
+- Also widen the location predicate to match the subtree (recursive CTE), so `p_location_id = warehouse root` includes sub-location bins.
 
-1. Open Warehouse Management → edit an existing row, change Type between Warehouse / Sublocation / Department → Save Changes succeeds and the value persists after refresh.
-2. Open Asset Management → the location dropdown lists the 12 warehouses (previously empty).
-3. Asset Analytics, Capacity Planning, Location Hierarchy, Location Report — each now shows the warehouse rows.
-4. Stats card "Warehouses/Locations" on `/admin/warehouse-management` shows 12 instead of 0.
+Old `p_bin_id` arg is kept as a deprecated alias (mapped into `p_include_bin_ids`) so existing dashboards/links keep working for one release.
+
+### 3. UI: replace the Bin Select with `BinMultiFilterPopover`
+
+A new component modeled on the existing `src/components/warehouse/bin-allocations/BinFilterPopover.tsx` (search, natural sort, select-all-filtered, clear) with two additions:
+
+- **Mode toggle** at the top: `Include selected` / `Exclude selected`.
+- Shows `location_path` under each `bin_code` so users can tell `1-B-7-2` in Aisle A from `1-B-7-2` in Aisle B.
+
+Trigger label rules: `All bins` (none selected) · `1 bin: 1-B-7-2` · `3 bins included` · `2 bins excluded`.
+
+### 4. Param wiring
+
+- `src/lib/reports/types.ts`: add `binMulti` param shape `{ mode: 'include' | 'exclude'; binIds: string[] }`.
+- `src/lib/reports/registry.ts` (WH-STK-OH-001): change `binId` → `binIds` with `type: "binMulti"`, still `dependsOn: "locationId"`.
+- `src/components/management/reports/ReportParameterPanel.tsx`: render the new popover for `binMulti`; data source is the new RPC via a `useAllocatedBinsInSubtree(locationId)` hook (replacing `useBinsAtLocation` here only).
+- `src/hooks/reports/useReportData.ts` → `fetchStockOnHand`: send `p_include_bin_ids` / `p_exclude_bin_ids` and drop the singular field.
+- Filter chips in the report header summarise as `Bins: 3 included` / `Bins: 2 excluded` so PDF/XLSX exports record the choice.
+
+### 5. Scope
+
+Only `WH-STK-OH-001` changes behaviour. Other reports that use `useBinsAtLocation` (write paths — putaway, transfer destination) keep the exact-node hook untouched — those still need strict bin addressing per SAP EWM discipline.
+
+### Technical notes
+
+- Subtree CTE matches the pattern already used elsewhere (`warehouse_locations.parent_location_id`).
+- Bin allocation read uses existing `(warehouse_item_id, company_id, bin_id)` index; subtree filter is a small `IN (...)` of location ids — no perf concern.
+- Realtime invalidation already covers `warehouse-bin-allocations`; the new query key `['allocated-bins-subtree', locationId]` joins that bus.
+- Grants: `GRANT EXECUTE ON FUNCTION public.list_allocated_bins_in_subtree(...) TO authenticated;` and same for the updated `report_stock_on_hand` signature.
+
+### Out of scope
+
+- Cleaning up the existing data anomaly where some bins have `bin_code` equal to a location code. Those will simply appear in the picker with their (correct) location path; a separate rename pass can fix the codes later if desired.

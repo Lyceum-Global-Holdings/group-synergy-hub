@@ -54,6 +54,18 @@ export type ReportParameter =
   | {
       key: string;
       label: string;
+      /**
+       * Multi-bin picker with include / exclude modes, sourced from every bin
+       * that holds stock under the subtree of the sibling location.
+       * Value shape: { mode: "include" | "exclude"; binIds: string[] }
+       */
+      type: "binMulti";
+      dependsOn: string;
+      required?: boolean;
+    }
+  | {
+      key: string;
+      label: string;
       /** Searchable picker over warehouse_item_catalog (global item master). */
       type: "item";
       required?: boolean;
@@ -105,7 +117,7 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     hookId: "warehouse.stockOnHand",
     parameters: [
       { key: "locationId", label: "Location", type: "location" },
-      { key: "binId", label: "Bin", type: "bin", dependsOn: "locationId" },
+      { key: "binIds", label: "Bin", type: "binMulti", dependsOn: "locationId" },
       { key: "categoryId", label: "Category", type: "category" },
       { key: "binWise", label: "Show bin-wise breakdown", type: "boolean", defaultValue: false },
       { key: "includeZero", label: "Include zero-stock items", type: "boolean", defaultValue: false },
