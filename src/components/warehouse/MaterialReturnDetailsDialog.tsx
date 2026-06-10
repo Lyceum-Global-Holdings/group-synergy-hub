@@ -32,6 +32,8 @@ const getStatusColor = (status: string): "default" | "destructive" | "secondary"
 export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: MaterialReturnDetailsDialogProps) {
   const { returnItems, isLoading } = useMaterialReturnItems(returnNote?.id);
   const { updateMaterialReturn, approveMaterialReturn, isUpdating, isApproving } = useMaterialReturns();
+  const { data: userRoles = [] } = useCurrentUserRoles();
+  const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
 
   if (!returnNote) return null;
 
