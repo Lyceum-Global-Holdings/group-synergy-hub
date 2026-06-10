@@ -213,9 +213,20 @@ export default function MaterialIssueReturn() {
     {
       id: "actions",
       cell: ({ row }) => (
-        <Button variant="ghost" size="sm" onClick={() => handleViewDetails(row.original.id)}>
-          <Eye className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => handleViewDetails(row.original.id)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Download PDF"
+            disabled={pdfLoadingId === row.original.id}
+            onClick={() => handleDownloadIssuePdf(row.original)}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
       ),
     },
   ];
