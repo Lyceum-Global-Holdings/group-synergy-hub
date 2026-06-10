@@ -1,11 +1,18 @@
-## Fix: "Add by bin" shows no stock
+## Goal
+When using "Add by bin", staged rows should default Qty to issue = 0 (not bin qty). On "Add to MIN", any row with qty 0 is silently skipped (not flagged as an issue).
 
-`AddByBinDialog` queries `warehouse_bin_allocations.quantity`, but that column doesn't exist — the table uses `allocated_quantity` (and a generated `available_quantity`). PostgREST silently returns no usable rows, so the dialog always says "No stock in this bin."
+## Changes
 
-### Change
-`src/components/warehouse/material-issue/AddByBinDialog.tsx`
-- Replace `quantity` in the select with `available_quantity, allocated_quantity`.
-- Filter by `.gt('available_quantity', 0)` instead of `.gt('quantity', 0)` so we only stage what's actually issuable (allocated minus reserved).
-- Map `bin_qty` from `r.available_quantity` (fallback to `allocated_quantity` if null).
+**`src/components/warehouse/material-issue/AddByBinDialog.tsx`**
+- In `handleConfirm`, set `quantity: 0` instead of `r.bin_qty` when mapping picked rows.
 
-No backend, RLS, or schema changes. Other entry methods are untouched.
+**`src/components/warehouse/material-issue/BulkAddItemsPanel.tsx`**
+- In `summary` memo: treat `quantity <= 0` rows as neither `valid` nor `issues` — just skip/ignore them so they don't block commit or show as errors.
+  - `valid`: `r.quantity > 0 && r.quantity <= r.current_stock && !already`
+  - `issues`: only `r.quantity > r.current_stock || already` (drop the `<= 0` clause)
+- Keep the Qty input UI as-is; zero just means "ignore this row on commit".
+
+## Result
+- Bins selected via "Add by bin" stage all linked items with qty 0.
+- User fills in qty for the rows they want to issue; untouched (qty 0) rows are ignored on "Add to MIN".
+- No false "issues" counter for zero-qty rows.

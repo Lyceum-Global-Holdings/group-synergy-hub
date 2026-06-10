@@ -108,7 +108,8 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
       (r) =>
         !r._empty &&
         r.id &&
-        (r.quantity <= 0 || r.quantity > r.current_stock || existingItemIds.includes(r.id)),
+        r.quantity > 0 &&
+        (r.quantity > r.current_stock || existingItemIds.includes(r.id)),
     );
     return { valid, issues };
   }, [rows, existingItemIds]);
@@ -191,7 +192,7 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
             <TableBody>
               {rows.map((r) => {
                 const already = !!r.id && existingItemIds.includes(r.id);
-                const qtyInvalid = !r._empty && r.id && (r.quantity <= 0 || r.quantity > r.current_stock);
+                const qtyInvalid = !r._empty && r.id && r.quantity > 0 && r.quantity > r.current_stock;
                 return (
                   <TableRow
                     key={r._key}
