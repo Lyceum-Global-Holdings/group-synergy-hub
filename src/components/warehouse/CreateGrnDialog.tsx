@@ -490,7 +490,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
               </Button>
             </div>
 
-            <Table>
+            <div className="overflow-x-auto border rounded-md">
+            <Table className="min-w-[1100px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Item Name</TableHead>
