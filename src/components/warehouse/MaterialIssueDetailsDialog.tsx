@@ -28,6 +28,7 @@ import { ReceiveItemsDialog } from './ReceiveItemsDialog';
 import { SrnDocumentUploadField } from './SrnDocumentUploadField';
 import { downloadMaterialIssuePdf } from '@/utils/materialIssuePdfExport';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
@@ -45,6 +46,8 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const queryClient = useQueryClient();
   const { selectedCompany, companies } = useCompany();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const { data: userRoles = [] } = useCurrentUserRoles();
+  const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
 
   const handleDownloadPdf = async () => {
     if (!issue) return;
@@ -436,10 +439,13 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                       )}
                     </div>
                   </div>
-                  {!issue.hod_approved_by && issue.status === 'draft' && (
+                  {!issue.hod_approved_by && issue.status === 'draft' && canApprove && (
                     <Button onClick={handleApproveHOD} size="sm">
                       Approve as HOD
                     </Button>
+                  )}
+                  {!issue.hod_approved_by && issue.status === 'draft' && !canApprove && (
+                    <span className="text-xs text-muted-foreground">Only admins can approve</span>
                   )}
                 </div>
               </div>
@@ -463,10 +469,13 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                       )}
                     </div>
                   </div>
-                  {!issue.management_approved_by && issue.hod_approved_by && (
+                  {!issue.management_approved_by && issue.hod_approved_by && canApprove && (
                     <Button onClick={handleApproveManagement} size="sm">
                       Approve as Management
                     </Button>
+                  )}
+                  {!issue.management_approved_by && issue.hod_approved_by && !canApprove && (
+                    <span className="text-xs text-muted-foreground">Only admins can approve</span>
                   )}
                 </div>
               </div>

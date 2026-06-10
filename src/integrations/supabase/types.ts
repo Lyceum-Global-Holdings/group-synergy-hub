@@ -22135,6 +22135,7 @@ export type Database = {
         Returns: Json
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_admin_or_higher: { Args: { _user: string }; Returns: boolean }
       is_company_hod: {
         Args: { p_company_id: string; p_user_id: string }
         Returns: boolean

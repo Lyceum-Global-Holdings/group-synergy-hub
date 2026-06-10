@@ -8,6 +8,7 @@ import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { format } from "date-fns";
 import { CheckCircle, XCircle } from "lucide-react";
+import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 
 interface MaterialReturnDetailsDialogProps {
   open: boolean;
@@ -31,6 +32,8 @@ const getStatusColor = (status: string): "default" | "destructive" | "secondary"
 export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: MaterialReturnDetailsDialogProps) {
   const { returnItems, isLoading } = useMaterialReturnItems(returnNote?.id);
   const { updateMaterialReturn, approveMaterialReturn, isUpdating, isApproving } = useMaterialReturns();
+  const { data: userRoles = [] } = useCurrentUserRoles();
+  const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
 
   if (!returnNote) return null;
 
@@ -173,13 +176,19 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                   <XCircle className="h-4 w-4 mr-2" />
                   Cancel Return
                 </Button>
-                <Button
-                  onClick={handleApprove}
-                  disabled={isProcessing}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {isApproving ? 'Processing...' : 'Approve Return'}
-                </Button>
+                {canApprove ? (
+                  <Button
+                    onClick={handleApprove}
+                    disabled={isProcessing}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {isApproving ? 'Processing...' : 'Approve Return'}
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground self-center">
+                    Only admins can approve
+                  </span>
+                )}
               </div>
             </>
           )}
