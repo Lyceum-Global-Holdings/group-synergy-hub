@@ -245,6 +245,43 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const handleBulkAddFromBrowse = (rows: BrowsePickedRow[]) => {
+    setItems((prev) => {
+      const byId = new Map(prev.map((it) => [it.item_id, { ...it }]));
+      let merged = 0;
+      let added = 0;
+      for (const r of rows) {
+        const wi: any = warehouseItems.find((w: any) => w.id === r.id) || {};
+        const existing = byId.get(r.id);
+        if (existing) {
+          existing.quantity_required = (existing.quantity_required || 0) + r.quantity;
+          merged++;
+        } else {
+          byId.set(r.id, {
+            item_id: r.id,
+            item_code: r.item_code,
+            description: r.description || r.name,
+            unit_of_measure: r.unit_of_measure || '',
+            quantity_required: r.quantity,
+            purpose: '',
+            available_stock: r.current_stock,
+            bin_location: r.bin_code || undefined,
+            track_secondary_quantity: !!wi.track_secondary_quantity,
+            secondary_uom: wi.secondary_uom || null,
+            secondary_quantity_issued: undefined,
+          });
+          added++;
+        }
+      }
+      toast({
+        title: 'Items added',
+        description: `${added} added${merged ? `, ${merged} merged with existing line(s)` : ''}.`,
+      });
+      return Array.from(byId.values());
+    });
+  };
+
+
   const handleSubmit = async () => {
     if (!formData.requested_by || items.length === 0) return;
     if (!formData.location_id) {
