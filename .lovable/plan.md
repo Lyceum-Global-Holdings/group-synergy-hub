@@ -1,34 +1,64 @@
-# Fix slow / frozen Item picker in Create Material Request
+# One-Click Add from Available Inventory
 
-## Root cause
+## Problem
+Today the Items step of Create MIN forces the user to add stock one row at a time: search → pick → type qty → click Add → repeat. For MINs with many lines this is slow and error-prone, and the user can't see what stock is actually available at the issuing location.
 
-`ItemSelector` (`src/components/common/ItemSelector.tsx`) — used by the **Items** step of Create Material Request and 11 other dialogs — calls `useWarehouseItems()`, which **full-fetches every row** in `warehouse_items` (14k+ rows) and then renders **all of them** inside a shadcn `Command` list. That causes:
+## Solution
+Add a second entry path on the Items step: **"Browse Available Inventory"** — a table view of everything in stock at the selected issue location, with multi-select, inline quantity editing, and a single "Add Selected to MIN" action. The existing single-item picker stays for power users who already know the code.
 
-1. A multi-second blocking fetch when the dialog opens.
-2. A massive synchronous render of thousands of `<CommandItem>` nodes, which jank-freezes the dialog.
+## UX
 
-This violates the existing memory rule `warehouse-inventory-server-pagination`: "Do NOT call `useWarehouseItems()` to render lists".
+Items step gets a new button row above the current "Add Item" card:
 
-## Fix — server-side search picker
+```text
+[ + Add Item (single) ]   [ 🗂  Browse Available Inventory ]
+```
 
-Rebuild `ItemSelector` to use the existing `list_warehouse_inventory` RPC (already used by the Inventory tab) with **debounced, server-side search** instead of full-fetch + client-side filter. The component's public API (`value`, `onSelect`, `placeholder`, `locationId`, `disabled`) stays identical so all 12 call sites keep working with zero changes.
+Clicking **Browse Available Inventory** opens a large dialog:
 
-### Behaviour
+```text
+┌─ Available Inventory @ {Issue Location}  ─────────────── x ┐
+│  [ 🔍 Search code / name / category ]   [Category ▾]       │
+│  ☐ Show only items with stock > 0   (default ON)            │
+│ ┌────────────────────────────────────────────────────────┐ │
+│ │ ☐ │ Code   │ Name           │ UoM │ Avail │ Bin │ Qty  │ │
+│ │ ☑ │ STL-01 │ Steel Rod 12mm │ KG  │ 1,250 │ A-1 │ [100]│ │
+│ │ ☑ │ CEM-04 │ Cement OPC     │ BAG │   480 │ B-2 │ [ 50]│ │
+│ │ ☐ │ ...    │                │     │       │     │      │ │
+│ └────────────────────────────────────────────────────────┘ │
+│  Showing 50 of 1,284 · [Load more]                          │
+│                                                             │
+│  3 items selected · total 230 units                         │
+│                  [ Cancel ]   [ + Add 3 Selected to MIN ]   │
+└─────────────────────────────────────────────────────────────┘
+```
 
-- Open → fetch first **50 rows** (active items, optionally scoped to `locationId`) via `list_warehouse_inventory`.
-- Typing in the search box → debounce **250 ms** → re-query the RPC with `_search` so Postgres' trigram indexes do the work (instant, regardless of catalog size).
-- Render only the returned rows (≤50). No virtualization needed at that size, so no jank.
-- Loading state shown in `CommandEmpty` while the query is in flight; "Type to search…" hint when input is empty and results are truncated.
-- Keep the existing selected-item display (badge + name) by caching the last selected `WarehouseItem` in local state so the trigger label still works even if the row isn't in the current page.
-- `locationId` filter is passed straight through as `_location_ids: [locationId]` to the RPC, removing the separate `warehouse_bin_allocations` round-trip and the in-memory filter.
+Behavior:
+- Disabled with a hint until the user picks an **Issue Location** on the Header step (stock is location-scoped).
+- Server-side search via existing `list_warehouse_inventory` RPC (`_location_ids: [locationId]`, `_stock_mode: 'in_stock'`, `_search`, `_limit: 50`, keyset pagination). No 14k-row full-fetch.
+- Debounced search (250 ms).
+- Checkbox per row; selecting a row auto-fills `Qty` with `min(available, 1)` and focuses it; user can edit.
+- Header checkbox = select all on current page.
+- "Add Selected" closes the dialog and appends each selected row to the MIN's `items[]` using the same shape `addItem` produces today (item_id, code, description, UoM, qty, available_stock, dual-qty flags). Duplicates against existing MIN lines are merged (qty summed) with a toast.
+- Validation: qty must be `> 0` and `≤ available`; invalid rows are highlighted and block submit.
+- Selection state survives pagination/search within the dialog session.
 
-### Files
+## Technical Notes
 
-- `src/components/common/ItemSelector.tsx` — rewrite internals: drop `useWarehouseItems`, drop the `locationStock` effect, add a debounced `useQuery` keyed on `['item-selector', companyId, search, locationId]` calling `supabase.rpc('list_warehouse_inventory', …)` with `_limit: 50`, `_status: 'active'`, `_stock_mode: locationId ? 'in_stock' : 'all'`.
-- No call-site changes required; behaviour for the 12 dialogs (Material Request/Issue/Return, Stock Transfer, Bulk Adjustment, PR/PO/BOM/Blanket PO, Supplier Items, Room Materials) is preserved.
+- **New file:** `src/components/warehouse/BrowseInventoryDialog.tsx`
+  - Props: `open`, `onOpenChange`, `locationId`, `companyId`, `existingItemIds: string[]`, `onConfirm(rows: PickedRow[]) => void`.
+  - Uses `useInfiniteQuery` on `list_warehouse_inventory` RPC keyed by `[company, location, search]`.
+  - Table built from shadcn `Table` + `Checkbox` + `Input` (matches existing visual language; no new deps).
+  - Internal `selected: Map<item_id, { qty: number, row: RpcRow }>` for stable selection across pages.
+- **Edit:** `src/components/warehouse/CreateMaterialIssueDialog.tsx`
+  - Add `browseOpen` state and the new button next to the existing Add Item card header.
+  - Add `handleBulkAddFromBrowse(rows)` that maps RPC rows to `IssueItem` (mirroring `handleItemSelect` + `addItem`, including `track_secondary_quantity` / `secondary_uom` from `warehouse_items_full` fields already returned by the RPC), merges duplicates by `item_id`, and calls `setItems`.
+  - Disable the Browse button when `formData.location_id` is empty; show tooltip "Select Issue Location first".
+- No DB migration. No changes to `useMaterialIssueItems` (submission path unchanged — bulk-added rows go through the same `process_material_issue_stock_update` flow).
+- No changes to the existing single-item `ItemSelector`; it remains available alongside.
+- Memory rules respected: server-side paginated RPC (per `warehouse-inventory-server-pagination`), location-scoped reads (per `stock-transactions-location-scope`), no client-side full fetch.
 
-## Out of scope
-
-- No DB migration (RPC + indexes already exist).
-- No changes to selection callback shape — `onSelect(item: WarehouseItem | null)` is unchanged.
-- No edits to the surrounding Material Request flow / wizard.
+## Out of Scope
+- Saving picker presets / favorites.
+- Editing already-added MIN lines from the browser (use the existing items table).
+- Reservation-aware filtering (CPO reservation flow already has its own "Add all reserved" button and stays unchanged).

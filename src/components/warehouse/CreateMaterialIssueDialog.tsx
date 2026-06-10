@@ -14,7 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Package, ListPlus, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Package, ListPlus, AlertTriangle, PackageSearch } from 'lucide-react';
+import { BrowseInventoryDialog, type BrowsePickedRow } from './BrowseInventoryDialog';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
@@ -92,6 +93,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
+  const [browseOpen, setBrowseOpen] = useState(false);
 
   const { items: warehouseItems } = useWarehouseItems();
   
@@ -242,6 +244,43 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
+
+  const handleBulkAddFromBrowse = (rows: BrowsePickedRow[]) => {
+    setItems((prev) => {
+      const byId = new Map(prev.map((it) => [it.item_id, { ...it }]));
+      let merged = 0;
+      let added = 0;
+      for (const r of rows) {
+        const wi: any = warehouseItems.find((w: any) => w.id === r.id) || {};
+        const existing = byId.get(r.id);
+        if (existing) {
+          existing.quantity_required = (existing.quantity_required || 0) + r.quantity;
+          merged++;
+        } else {
+          byId.set(r.id, {
+            item_id: r.id,
+            item_code: r.item_code,
+            description: r.description || r.name,
+            unit_of_measure: r.unit_of_measure || '',
+            quantity_required: r.quantity,
+            purpose: '',
+            available_stock: r.current_stock,
+            bin_location: r.bin_code || undefined,
+            track_secondary_quantity: !!wi.track_secondary_quantity,
+            secondary_uom: wi.secondary_uom || null,
+            secondary_quantity_issued: undefined,
+          });
+          added++;
+        }
+      }
+      toast({
+        title: 'Items added',
+        description: `${added} added${merged ? `, ${merged} merged with existing line(s)` : ''}.`,
+      });
+      return Array.from(byId.values());
+    });
+  };
+
 
   const handleSubmit = async () => {
     if (!formData.requested_by || items.length === 0) return;
@@ -576,8 +615,28 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               </div>
             )}
 
+            <div className="flex items-center justify-between gap-2 border rounded-lg p-3 bg-muted/30">
+              <div className="text-sm">
+                <p className="font-medium">Need many items at once?</p>
+                <p className="text-muted-foreground text-xs">
+                  Browse what's in stock at the issue location and add multiple items in one click.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => setBrowseOpen(true)}
+                disabled={!formData.location_id}
+                title={!formData.location_id ? 'Select Issue Location first' : ''}
+              >
+                <PackageSearch className="h-4 w-4 mr-2" />
+                Browse Available Inventory
+              </Button>
+            </div>
+
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold">Add Item</h3>
+              
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -818,6 +877,14 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
           </TabsContent>
         </Tabs>
       </DialogContent>
+      <BrowseInventoryDialog
+        open={browseOpen}
+        onOpenChange={setBrowseOpen}
+        companyId={selectedCompany?.id ?? null}
+        locationId={formData.location_id || null}
+        existingItemIds={items.map((it) => it.item_id)}
+        onConfirm={handleBulkAddFromBrowse}
+      />
     </Dialog>
   );
 }
