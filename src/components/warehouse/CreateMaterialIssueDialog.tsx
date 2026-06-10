@@ -14,13 +14,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Package, ListPlus, AlertTriangle, PackageSearch } from 'lucide-react';
+import { Trash2, Package, ListPlus, AlertTriangle, PackageSearch } from 'lucide-react';
 import { BrowseInventoryDialog, type BrowsePickedRow } from './BrowseInventoryDialog';
 import { BulkAddItemsPanel } from './material-issue/BulkAddItemsPanel';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
-import { ItemSelector } from '@/components/common/ItemSelector';
-import { DualQuantityInput } from '@/components/warehouse/DualQuantityInput';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { SrnDocumentUploadField } from '@/components/warehouse/SrnDocumentUploadField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
@@ -90,7 +88,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   });
 
   const [items, setItems] = useState<IssueItem[]>([]);
-  const [currentItem, setCurrentItem] = useState<Partial<IssueItem>>({});
+  
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
@@ -192,30 +190,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     }));
   };
 
-  const handleItemSelect = (item: any) => {
-    if (item && item.id) {
-      const wi: any = warehouseItems.find((w: any) => w.id === item.id) || {};
-      setCurrentItem({
-        item_id: item.id,
-        item_code: item.item_code,
-        description: item.description || item.item_name,
-        unit_of_measure: item.unit_of_measure,
-        quantity_required: 1,
-        purpose: '',
-        available_stock: item.current_stock || 0,
-        track_secondary_quantity: !!wi.track_secondary_quantity,
-        secondary_uom: wi.secondary_uom || null,
-        secondary_quantity_issued: undefined,
-      });
-    }
-  };
-
-  const addItem = () => {
-    if (currentItem.item_id && currentItem.quantity_required) {
-      setItems([...items, currentItem as unknown as IssueItem]);
-      setCurrentItem({});
-    }
-  };
 
   const handleAddAllReservedItems = () => {
     const newItems: IssueItem[] = reservedItems
@@ -624,81 +598,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               onCommit={(rows) => handleBulkAddFromBrowse(rows)}
             />
 
-            <div className="border rounded-lg p-4 space-y-4">
-              <h3 className="font-semibold">Add Item</h3>
-
-              
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Select Item *</Label>
-                  <ItemSelector
-                    value={currentItem.item_id || ''}
-                    onSelect={handleItemSelect}
-                    placeholder={formData.location_id ? "Search for item..." : "Select location first"}
-                    disabled={!formData.location_id}
-                    locationId={formData.location_id || undefined}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Quantity Required *</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={currentItem.quantity_required || ''}
-                    onChange={(e) => setCurrentItem({ ...currentItem, quantity_required: parseFloat(e.target.value) })}
-                    placeholder="Enter quantity"
-                  />
-                </div>
-              </div>
-
-              {currentItem.track_secondary_quantity && (
-                <div className="rounded-md border bg-muted/30 p-3">
-                  <DualQuantityInput
-                    baseValue={String(currentItem.quantity_required ?? '')}
-                    secondaryValue={String(currentItem.secondary_quantity_issued ?? '')}
-                    onBaseChange={(v) => setCurrentItem({ ...currentItem, quantity_required: parseFloat(v) || 0 })}
-                    onSecondaryChange={(v) => setCurrentItem({ ...currentItem, secondary_quantity_issued: parseFloat(v) || 0 })}
-                    baseUom={currentItem.unit_of_measure}
-                    secondaryUom={currentItem.secondary_uom || 'pcs'}
-                    baseLabel="Qty issued"
-                    secondaryLabel="Pieces issued"
-                    required
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Item Code</Label>
-                  <Input value={currentItem.item_code || ''} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label>Unit of Measure</Label>
-                  <Input value={currentItem.unit_of_measure || ''} disabled />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input value={currentItem.description || ''} disabled />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Purpose (for this item)</Label>
-                <Input
-                  value={currentItem.purpose || ''}
-                  onChange={(e) => setCurrentItem({ ...currentItem, purpose: e.target.value })}
-                  placeholder="Specific purpose for this item"
-                />
-              </div>
-
-              <Button onClick={addItem} disabled={!currentItem.item_id || !currentItem.quantity_required}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            </div>
 
             {items.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
