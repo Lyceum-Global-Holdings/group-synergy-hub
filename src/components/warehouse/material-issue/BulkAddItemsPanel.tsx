@@ -11,11 +11,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, ClipboardPaste, PackageSearch, Trash2, X } from 'lucide-react';
+import { Plus, ClipboardPaste, PackageSearch, Trash2, X, Boxes } from 'lucide-react';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { cn } from '@/lib/utils';
 import { BrowseInventoryDialog, type BrowsePickedRow } from '../BrowseInventoryDialog';
 import { PasteCodesDialog } from './PasteCodesDialog';
+import { AddByBinDialog } from './AddByBinDialog';
 
 interface Props {
   companyId: string | null;
@@ -43,6 +44,7 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
   const [rows, setRows] = useState<Row[]>([]);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [binAddOpen, setBinAddOpen] = useState(false);
 
   const disabled = !locationId;
 
@@ -150,6 +152,14 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
             disabled={disabled}
           >
             <PackageSearch className="h-4 w-4 mr-1" /> Browse inventory
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBinAddOpen(true)}
+            disabled={disabled}
+          >
+            <Boxes className="h-4 w-4 mr-1" /> Add by bin
           </Button>
           {rows.length > 0 && (
             <Button size="sm" variant="ghost" onClick={() => setRows([])}>
@@ -279,6 +289,15 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
         onOpenChange={setPasteOpen}
         companyId={companyId}
         locationId={locationId}
+        onResolved={(picked) => mergePicked(picked)}
+      />
+
+      <AddByBinDialog
+        open={binAddOpen}
+        onOpenChange={setBinAddOpen}
+        companyId={companyId}
+        locationId={locationId}
+        existingItemIds={[...existingItemIds, ...rows.filter((r) => r.id).map((r) => r.id)]}
         onResolved={(picked) => mergePicked(picked)}
       />
     </div>
