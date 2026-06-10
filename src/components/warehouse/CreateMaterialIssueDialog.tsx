@@ -19,8 +19,6 @@ import { BrowseInventoryDialog, type BrowsePickedRow } from './BrowseInventoryDi
 import { BulkAddItemsPanel } from './material-issue/BulkAddItemsPanel';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
-import { ItemSelector } from '@/components/common/ItemSelector';
-import { DualQuantityInput } from '@/components/warehouse/DualQuantityInput';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { SrnDocumentUploadField } from '@/components/warehouse/SrnDocumentUploadField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
