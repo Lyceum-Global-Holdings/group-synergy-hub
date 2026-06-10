@@ -11,11 +11,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, ClipboardPaste, PackageSearch, Trash2, X } from 'lucide-react';
+import { Plus, ClipboardPaste, PackageSearch, Trash2, X, Boxes } from 'lucide-react';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { cn } from '@/lib/utils';
 import { BrowseInventoryDialog, type BrowsePickedRow } from '../BrowseInventoryDialog';
 import { PasteCodesDialog } from './PasteCodesDialog';
+import { AddByBinDialog } from './AddByBinDialog';
 
 interface Props {
   companyId: string | null;
