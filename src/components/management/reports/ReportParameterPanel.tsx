@@ -21,6 +21,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { LocationTreePicker } from "@/components/management/reports/LocationTreePicker";
 import { useBinsAtLocation } from "@/hooks/warehouse/useBinsAtLocation";
+import { useAllocatedBinsInSubtree } from "@/hooks/warehouse/useAllocatedBinsInSubtree";
+import {
+  BinMultiFilterPopover,
+  normalizeBinMultiValue,
+  type BinMultiFilterValue,
+} from "@/components/management/reports/BinMultiFilterPopover";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
