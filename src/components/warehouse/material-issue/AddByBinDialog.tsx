@@ -73,7 +73,8 @@ export function AddByBinDialog({
       let q = supabase
         .from('warehouse_bin_allocations')
         .select(`
-          quantity,
+          allocated_quantity,
+          available_quantity,
           warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
             id,
             current_stock,
@@ -86,7 +87,7 @@ export function AddByBinDialog({
           warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(bin_code)
         `)
         .eq('bin_id', binId)
-        .gt('quantity', 0);
+        .gt('available_quantity', 0);
       if (companyId) q = q.eq('company_id', companyId);
       const { data, error } = await q;
       if (error) throw error;
