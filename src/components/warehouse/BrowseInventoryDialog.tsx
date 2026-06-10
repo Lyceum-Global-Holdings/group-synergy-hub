@@ -44,7 +44,7 @@ interface Props {
   onConfirm: (rows: BrowsePickedRow[]) => void;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 200;
 
 export function BrowseInventoryDialog({
   open,
@@ -108,6 +108,13 @@ export function BrowseInventoryDialog({
 
   const rows = useMemo(() => (data?.pages ?? []).flat(), [data]);
 
+  // Auto-load all pages so the full location inventory is available.
+  useEffect(() => {
+    if (open && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [open, hasNextPage, isFetchingNextPage, rows.length, fetchNextPage]);
+
   const toggleRow = (row: any, checked: boolean) => {
     setSelected((prev) => {
       const next = new Map(prev);
@@ -125,7 +132,7 @@ export function BrowseInventoryDialog({
         unit_of_measure: row.unit_abbreviation || row.unit_name || null,
         current_stock: avail,
         bin_code: firstBin?.bin_code || null,
-        quantity: avail > 0 ? 1 : 0,
+        quantity: 0,
       });
       return next;
     });
