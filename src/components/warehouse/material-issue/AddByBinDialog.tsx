@@ -120,8 +120,8 @@ export function AddByBinDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[calc(100dvh-2rem)] sm:max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Boxes className="h-5 w-5" /> Add items by bin
           </DialogTitle>
@@ -132,7 +132,7 @@ export function AddByBinDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1 min-h-0 overflow-hidden flex flex-col">
           <div>
             <label className="text-sm font-medium mb-1 block">Bin</label>
             <Select value={binId} onValueChange={setBinId} disabled={binsLoading || !locationId}>
@@ -156,7 +156,7 @@ export function AddByBinDialog({
           </div>
 
           {binId && (
-            <div className="border rounded-md overflow-hidden">
+            <div className="border rounded-md overflow-auto flex-1 min-h-0 bg-background">
               {rowsLoading ? (
                 <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading allocations…
@@ -206,7 +206,7 @@ export function AddByBinDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 pt-3 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleConfirm} disabled={eligible.length === 0}>
             Add {eligible.length || ''} item{eligible.length === 1 ? '' : 's'}
