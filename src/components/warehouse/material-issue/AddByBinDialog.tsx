@@ -112,7 +112,7 @@ export function AddByBinDialog({
       unit_of_measure: r.unit_of_measure,
       current_stock: r.current_stock,
       bin_code: r.bin_code,
-      quantity: r.bin_qty,
+      quantity: 0,
     }));
     onResolved(picked);
     onOpenChange(false);
