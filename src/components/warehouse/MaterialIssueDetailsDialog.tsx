@@ -283,7 +283,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                   <div><span className="font-medium">Name:</span> {issue.requested_by || '-'}</div>
                   <div><span className="font-medium">Department:</span> {issue.department || '-'}</div>
                   <div><span className="font-medium">Contact:</span> {issue.contact_number || '-'}</div>
-                  <div><span className="font-medium">EPF Number:</span> {issue.epf_number || '-'}</div>
+                  <div><span className="font-medium">Gate Pass No:</span> {issue.epf_number || '-'}</div>
                 </div>
               </div>
 

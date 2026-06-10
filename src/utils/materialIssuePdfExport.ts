@@ -126,10 +126,10 @@ export async function downloadMaterialIssuePdf(opts: GenerateOptions): Promise<v
   const fields: Array<[string, string]> = [
     ['Issued To', issue.issued_to || issue.requested_by || '—'],
     ['Department', issue.department || '—'],
-    ['EPF Number', (issue as any).epf_number || '—'],
+    ['Gate Pass No', (issue as any).epf_number || '—'],
     ['Contact', (issue as any).contact_number || '—'],
     ['Location', locationName],
-    ['Gate Pass No', (issue as any).job_number || '—'],
+    ['Job Number', (issue as any).job_number || '—'],
     ['PR Number', (issue as any).pr_number || '—'],
     ['Required Date', ISO_DATE((issue as any).items_required_date)],
   ];

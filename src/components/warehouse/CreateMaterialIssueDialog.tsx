@@ -487,24 +487,24 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="epf_number">EPF Number</Label>
+                <Label htmlFor="epf_number">Gate Pass No</Label>
                 <Input
                   id="epf_number"
                   value={formData.epf_number}
                   onChange={(e) => handleInputChange('epf_number', e.target.value)}
-                  placeholder="Employee EPF number"
+                  placeholder="Gate pass / reference number"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="job_number">Gate Pass No</Label>
+                <Label htmlFor="job_number">Job Number</Label>
                 <Input
                   id="job_number"
                   value={formData.job_number}
                   onChange={(e) => handleInputChange('job_number', e.target.value)}
-                  placeholder="Gate pass / reference number"
+                  placeholder="Job/Project reference"
                 />
               </div>
               <div className="space-y-2">

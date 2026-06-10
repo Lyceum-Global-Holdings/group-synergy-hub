@@ -1,17 +1,20 @@
-### Rename "Job Number" to "Gate Pass No" in MIN workflow
+### Label Swap in Material Issue Note (MIN) Workflow
 
-The selected "Job Number" label in `CreateMaterialIssueDialog.tsx` will be renamed to "Gate Pass No". The underlying data stays in the existing `job_number` DB column; only UI labels and the PDF display label change.
+Swap the display labels for two fields in the MIN create dialog, details view, and PDF export. The underlying database columns (`epf_number` and `job_number`) remain unchanged.
 
 #### Changes
-1. **`src/components/warehouse/CreateMaterialIssueDialog.tsx`**  
-   - Change the `<Label>` text from `"Job Number"` to `"Gate Pass No"` (line ~502).  
-   - Update the input placeholder from `"Job/Project reference"` to `"Gate pass / reference number"`.
 
-2. **`src/utils/materialIssuePdfExport.ts`**  
-   - Change the PDF field label from `"Job Number"` to `"Gate Pass No"` in the issue-details grid (line ~132), so it reads correctly when the MIN is downloaded.
+1. **`src/components/warehouse/CreateMaterialIssueDialog.tsx`**
+   - Change `<Label>` text from `"EPF Number"` to `"Gate Pass No"` (line ~490). Update placeholder to `"Gate pass / reference number"`.
+   - Change `<Label>` text from `"Gate Pass No"` back to `"Job Number"` (line ~502). Update placeholder to `"Job/Project reference"`.
 
-No database migration is needed because the `job_number` column already exists and is already being saved and rendered in the PDF.
+2. **`src/utils/materialIssuePdfExport.ts`**
+   - In the issue-details grid (line ~129), change `"EPF Number"` to `"Gate Pass No"`.
+   - In the same grid (line ~132), change `"Gate Pass No"` back to `"Job Number"`.
+
+3. **`src/components/warehouse/MaterialIssueDetailsDialog.tsx`**
+   - Change the details-row label from `"EPF Number:"` to `"Gate Pass No:"` (line ~286).
 
 #### Verification
-- Open Create Material Issue dialog → confirm the field now reads "Gate Pass No".  
-- Create or open an existing MIN with a value in that field, click Download PDF → confirm the PDF header grid shows "Gate Pass No" and the value.
+- Open Create Material Issue dialog → confirm the two fields now read **Gate Pass No** and **Job Number**.
+- Open an existing MIN with values in both fields, click Download PDF → confirm the PDF header grid shows **Gate Pass No** and **Job Number** with the correct values.
