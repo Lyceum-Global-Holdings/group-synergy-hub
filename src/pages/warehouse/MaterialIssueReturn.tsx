@@ -54,6 +54,60 @@ export default function MaterialIssueReturn() {
   const { materialIssues, isLoading: isLoadingIssues } = useMaterialIssues();
   const { materialReturns, isLoading: isLoadingReturns } = useMaterialReturns();
   const { materialRequests, isLoading: isLoadingRequests } = useMaterialRequests();
+  const { selectedCompany, companies } = useCompany();
+  const { toast } = useToast();
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
+
+  const handleDownloadIssuePdf = async (issue: MaterialIssueNote) => {
+    setPdfLoadingId(issue.id);
+    try {
+      const { data: items } = await supabase
+        .from('material_issue_items')
+        .select('*')
+        .eq('min_id', issue.id)
+        .order('line_number', { ascending: true });
+
+      const company =
+        companies?.find((c) => c.id === issue.company_id) ?? selectedCompany ?? null;
+
+      const approverIds = [
+        issue.hod_approved_by,
+        issue.management_approved_by,
+        (issue as any).issued_by,
+        (issue as any).received_by,
+      ].filter(Boolean) as string[];
+      let nameById: Record<string, string> = {};
+      if (approverIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', approverIds);
+        nameById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.full_name ?? '']));
+      }
+
+      await downloadMaterialIssuePdf({
+        issue: issue as any,
+        items: (items ?? []) as any,
+        company,
+        approverNames: {
+          hod: issue.hod_approved_by ? nameById[issue.hod_approved_by] : null,
+          management: issue.management_approved_by
+            ? nameById[issue.management_approved_by]
+            : null,
+          received: (issue as any).received_by ? nameById[(issue as any).received_by] : null,
+        },
+      });
+    } catch (err) {
+      console.error('PDF download failed', err);
+      toast({
+        title: 'PDF download failed',
+        description: 'Could not generate the Material Issue Note PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPdfLoadingId(null);
+    }
+  };
 
   const handleViewDetails = (issueId: string) => {
     setSelectedIssueId(issueId);
