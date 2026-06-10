@@ -250,9 +250,20 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                 Created on {format(new Date(issue.created_at), 'MMM dd, yyyy')}
               </DialogDescription>
             </div>
-            <Badge variant={getStatusColor(issue.status)}>
-              {issue.status.toUpperCase()}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+              >
+                <Download className="h-4 w-4 mr-1.5" />
+                {downloadingPdf ? 'Generating…' : 'Download PDF'}
+              </Button>
+              <Badge variant={getStatusColor(issue.status)}>
+                {issue.status.toUpperCase()}
+              </Badge>
+            </div>
           </div>
         </DialogHeader>
 
