@@ -44,6 +44,7 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
   const [rows, setRows] = useState<Row[]>([]);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [binAddOpen, setBinAddOpen] = useState(false);
 
   const disabled = !locationId;
 
