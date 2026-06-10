@@ -101,7 +101,7 @@ export function AddByBinDialog({
             name: item.catalog?.name ?? '',
             unit_of_measure: item.catalog?.unit_of_measure ?? null,
             bin_code: r.warehouse_bin?.bin_code ?? null,
-            bin_qty: Number(r.quantity || 0),
+            bin_qty: Number(r.available_quantity ?? r.allocated_quantity ?? 0),
             current_stock: Number(item.current_stock || 0),
           } as BinAllocRow;
         })
