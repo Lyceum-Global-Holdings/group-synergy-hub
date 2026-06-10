@@ -66,43 +66,34 @@ export function AddByBinDialog({
   const { data: bins = [], isLoading: binsLoading } = useBinsAtLocation(locationId);
 
   const { data: rows = [], isLoading: rowsLoading } = useQuery({
-    queryKey: ['min-add-by-bin', binId, companyId],
-    enabled: !!binId && !!companyId && open,
+    queryKey: ['min-add-by-bin', binId, companyId, locationId],
+    enabled: !!binId && !!companyId && !!locationId && open,
     staleTime: 0,
     queryFn: async (): Promise<BinAllocRow[]> => {
-      let q = supabase
-        .from('warehouse_bin_allocations')
-        .select(`
-          allocated_quantity,
-          available_quantity,
-          warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
-            id,
-            current_stock,
-            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(
-              item_code,
-              name,
-              unit_of_measure
-            )
-          ),
-          warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(bin_code)
-        `)
-        .eq('bin_id', binId)
-        .gt('available_quantity', 0);
-      if (companyId) q = q.eq('company_id', companyId);
-      const { data, error } = await q;
+      const { data, error } = await supabase.rpc('report_stock_on_hand' as any, {
+        p_company_id: companyId,
+        p_location_id: locationId,
+        p_category_id: null,
+        p_include_zero: false,
+        p_bin_id: binId,
+        p_bin_wise: true,
+        p_include_bin_ids: null,
+        p_exclude_bin_ids: null,
+      } as any);
       if (error) throw error;
       return (data ?? [])
         .map((r: any) => {
-          const item = r.warehouse_item;
-          if (!item?.id) return null;
+          if (!r.item_id) return null;
+          const binQty = Number(r.available_quantity ?? r.current_stock ?? 0);
+          if (binQty <= 0) return null;
           return {
-            item_id: item.id,
-            item_code: item.catalog?.item_code ?? '',
-            name: item.catalog?.name ?? '',
-            unit_of_measure: item.catalog?.unit_of_measure ?? null,
-            bin_code: r.warehouse_bin?.bin_code ?? null,
-            bin_qty: Number(r.available_quantity ?? r.allocated_quantity ?? 0),
-            current_stock: Number(item.current_stock || 0),
+            item_id: r.item_id,
+            item_code: r.item_code ?? '',
+            name: r.item_name ?? '',
+            unit_of_measure: r.unit_name ?? null,
+            bin_code: r.bin_code ?? null,
+            bin_qty: binQty,
+            current_stock: binQty,
           } as BinAllocRow;
         })
         .filter(Boolean) as BinAllocRow[];
