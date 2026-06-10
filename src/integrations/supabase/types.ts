@@ -21510,6 +21510,10 @@ export type Database = {
         Args: { p_catalog_item_id: string; p_company_id: string }
         Returns: string
       }
+      ensure_warehouse_item_for_company: {
+        Args: { p_catalog_item_id: string; p_company_id: string }
+        Returns: string
+      }
       escalate_pending_approvals: { Args: never; Returns: undefined }
       find_catalog_item_by_code: {
         Args: { p_code: string; p_target_company_id?: string }
