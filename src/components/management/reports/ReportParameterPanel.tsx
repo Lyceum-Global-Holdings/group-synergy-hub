@@ -184,6 +184,7 @@ function ParameterInput({
   locations,
   locationsLoading,
   companySelected,
+  companyId,
   categories,
   siblingValues,
 }: {
@@ -193,6 +194,7 @@ function ParameterInput({
   locations: { id: string; name: string; type: string; parent_id: string | null }[];
   locationsLoading: boolean;
   companySelected: boolean;
+  companyId: string | null;
   categories: { id: string; name: string }[];
   siblingValues: Record<string, unknown>;
 }) {
