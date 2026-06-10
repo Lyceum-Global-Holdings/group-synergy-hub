@@ -851,6 +851,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
 
           {/* Remarks */}
@@ -858,32 +859,32 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
             <Label>Remarks</Label>
             <Textarea {...form.register('remarks')} />
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleSubmit('draft')}
-              disabled={createGrn.isPending}
-            >
-              Save as Draft
-            </Button>
-            <Button
-              type="button"
-              onClick={() => handleSubmit('submitted')}
-              disabled={createGrn.isPending}
-            >
-              Submit for Approval
-            </Button>
-          </div>
+        {/* Actions */}
+        <div className="flex justify-end gap-2 px-6 py-4 border-t shrink-0 bg-background">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleSubmit('draft')}
+            disabled={createGrn.isPending}
+          >
+            Save as Draft
+          </Button>
+          <Button
+            type="button"
+            onClick={() => handleSubmit('submitted')}
+            disabled={createGrn.isPending}
+          >
+            Submit for Approval
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
