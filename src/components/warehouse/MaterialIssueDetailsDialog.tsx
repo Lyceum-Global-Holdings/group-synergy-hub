@@ -28,6 +28,7 @@ import { ReceiveItemsDialog } from './ReceiveItemsDialog';
 import { SrnDocumentUploadField } from './SrnDocumentUploadField';
 import { downloadMaterialIssuePdf } from '@/utils/materialIssuePdfExport';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
