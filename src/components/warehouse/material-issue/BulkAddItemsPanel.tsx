@@ -291,6 +291,15 @@ export function BulkAddItemsPanel({ companyId, locationId, existingItemIds, onCo
         locationId={locationId}
         onResolved={(picked) => mergePicked(picked)}
       />
+
+      <AddByBinDialog
+        open={binAddOpen}
+        onOpenChange={setBinAddOpen}
+        companyId={companyId}
+        locationId={locationId}
+        existingItemIds={[...existingItemIds, ...rows.filter((r) => r.id).map((r) => r.id)]}
+        onResolved={(picked) => mergePicked(picked)}
+      />
     </div>
   );
 }
