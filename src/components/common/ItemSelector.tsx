@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronsUpDown, Package } from 'lucide-react';
+import { Check, ChevronsUpDown, Package, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Command,
@@ -16,9 +16,10 @@ import {
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface ItemSelectorProps {
   value?: string;
@@ -28,11 +29,18 @@ interface ItemSelectorProps {
   disabled?: boolean;
   /**
    * When provided, items are filtered to only those with stock at this location,
-   * and quantities shown reflect per-location availability (international stores standard).
+   * and quantities shown reflect per-location availability.
    */
   locationId?: string;
 }
 
+const PAGE_SIZE = 50;
+
+/**
+ * Server-side searched item picker. Uses the `list_warehouse_inventory` RPC
+ * with a debounced search term — never full-fetches the catalog, so it stays
+ * snappy with 14k+ items. See mem://performance/warehouse-inventory-server-pagination.
+ */
 export function ItemSelector({
   value,
   onSelect,
@@ -42,55 +50,103 @@ export function ItemSelector({
   locationId,
 }: ItemSelectorProps) {
   const [open, setOpen] = useState(false);
-  const { items, isLoading } = useWarehouseItems();
-  const [locationStock, setLocationStock] = useState<Record<string, number> | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [cachedSelected, setCachedSelected] = useState<WarehouseItem | null>(null);
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
 
+  // Debounce search input → 250ms
   useEffect(() => {
-    let cancelled = false;
-    if (!locationId) {
-      setLocationStock(null);
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const companyId = isViewingAllCompanies ? null : selectedCompany?.id ?? null;
+
+  const { data: rows = [], isFetching } = useQuery({
+    queryKey: ['item-selector', companyId, debouncedSearch, locationId ?? null],
+    enabled: open,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_warehouse_inventory' as any, {
+        _company_id: companyId,
+        _search: debouncedSearch || null,
+        _category_id: null,
+        _status: 'active',
+        _location_ids: locationId ? [locationId] : null,
+        _cursor_created_at: null,
+        _cursor_id: null,
+        _limit: PAGE_SIZE,
+        _stock_mode: locationId ? 'in_stock' : 'all',
+      } as any);
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+  });
+
+  const items: WarehouseItem[] = useMemo(
+    () =>
+      rows.map((row: any) => ({
+        ...row,
+        supplier:
+          row.supplier_id && row.supplier_name
+            ? { id: row.supplier_id, name: row.supplier_name }
+            : null,
+        bins: Array.isArray(row.bins) && row.bins.length > 0 ? row.bins : null,
+      })) as WarehouseItem[],
+    [rows],
+  );
+
+  // Cache the selected item so the trigger label stays correct even
+  // when the active row isn't in the current search page.
+  useEffect(() => {
+    if (!value) {
+      setCachedSelected(null);
       return;
     }
+    const inList = items.find((i) => i.id === value);
+    if (inList) {
+      setCachedSelected(inList);
+      return;
+    }
+    if (cachedSelected?.id === value) return;
+    // Fetch the single row so we can render its code/name.
+    let cancelled = false;
     (async () => {
       const { data, error } = await supabase
-        .from('warehouse_bin_allocations')
-        .select('warehouse_item_id, allocated_quantity, warehouse_bins!inner(location_id)')
-        .eq('warehouse_bins.location_id', locationId);
-      if (cancelled || error) return;
-      const map: Record<string, number> = {};
-      (data || []).forEach((row: any) => {
-        const id = row.warehouse_item_id;
-        map[id] = (map[id] || 0) + Number(row.allocated_quantity || 0);
-      });
-      setLocationStock(map);
+        .from('warehouse_items_full' as any)
+        .select('id, item_code, name, current_stock')
+        .eq('id', value)
+        .maybeSingle();
+      if (!cancelled && !error && data) {
+        setCachedSelected(data as unknown as WarehouseItem);
+      }
     })();
-    return () => { cancelled = true; };
-  }, [locationId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [value, items, cachedSelected?.id]);
 
-  const activeItems = useMemo(() => {
-    const base = items.filter(item => item.status === 'active');
-    if (!locationId || !locationStock) return base;
-    return base.filter(item => (locationStock[item.id] || 0) > 0);
-  }, [items, locationId, locationStock]);
-
-  const selectedItem = activeItems.find(item => item.id === value)
-    ?? items.find(item => item.id === value);
+  const selectedItem = cachedSelected;
 
   const handleSelect = (item: WarehouseItem) => {
+    setCachedSelected(item);
     onSelect(item);
     setOpen(false);
   };
 
   const handleClear = () => {
+    setCachedSelected(null);
     onSelect(null);
     setOpen(false);
   };
 
   const stockLabel = (item: WarehouseItem) => {
-    if (locationId && locationStock) {
-      return `Stock @ location: ${locationStock[item.id] || 0}`;
+    if (locationId) {
+      return `Stock @ location: ${item.current_stock ?? 0}`;
     }
-    return `Stock: ${item.current_stock || 0}`;
+    return `Stock: ${item.current_stock ?? 0}`;
   };
 
   return (
@@ -120,15 +176,26 @@ export function ItemSelector({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search items by code or name..." />
+        <Command shouldFilter={false}>
+          <div className="relative">
+            <CommandInput
+              placeholder="Search items by code or name..."
+              value={search}
+              onValueChange={setSearch}
+            />
+            {isFetching && (
+              <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+          </div>
           <CommandList>
             <CommandEmpty>
-              {isLoading
-                ? "Loading items..."
+              {isFetching
+                ? "Searching..."
                 : locationId
                   ? "No items with stock at this location."
-                  : "No items found."}
+                  : debouncedSearch
+                    ? "No items match your search."
+                    : "Type to search items..."}
             </CommandEmpty>
             <CommandGroup>
               {selectedItem && (
@@ -139,10 +206,10 @@ export function ItemSelector({
                   </div>
                 </CommandItem>
               )}
-              {activeItems.map((item) => (
+              {items.map((item) => (
                 <CommandItem
                   key={item.id}
-                  value={`${item.item_code} ${item.name}`}
+                  value={item.id}
                   onSelect={() => handleSelect(item)}
                 >
                   <Check
@@ -169,6 +236,11 @@ export function ItemSelector({
                   </div>
                 </CommandItem>
               ))}
+              {items.length === PAGE_SIZE && (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground text-center">
+                  Showing first {PAGE_SIZE} results — refine search to narrow.
+                </div>
+              )}
             </CommandGroup>
           </CommandList>
         </Command>
