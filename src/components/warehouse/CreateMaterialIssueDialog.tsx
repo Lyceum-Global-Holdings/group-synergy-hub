@@ -121,6 +121,34 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     }
   }, [open, locationTouched, selectedCompany?.id, globalLocationId, filteredLocations]);
 
+  // Reset all form state whenever the dialog closes so reopening starts fresh
+  useEffect(() => {
+    if (open) return;
+    setFormData({
+      requested_by: '',
+      contact_number: '',
+      epf_number: '',
+      department: '',
+      job_number: '',
+      issue_date: new Date().toISOString().split('T')[0],
+      items_required_date: new Date().toISOString().split('T')[0],
+      purpose: '',
+      pr_number: '',
+      po_number: '',
+      notes: '',
+      cpo_id: '',
+      cpo_number: '',
+      srn_number: '',
+      location_id: '',
+    });
+    setItems([]);
+    setReservedItems([]);
+    setLocationTouched(false);
+    setSrnDocumentTempPath('');
+    setBrowseOpen(false);
+    setCurrentTab('header');
+  }, [open]);
+
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs = [] } = useQuery({
