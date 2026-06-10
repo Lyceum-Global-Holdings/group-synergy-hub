@@ -877,6 +877,14 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
           </TabsContent>
         </Tabs>
       </DialogContent>
+      <BrowseInventoryDialog
+        open={browseOpen}
+        onOpenChange={setBrowseOpen}
+        companyId={selectedCompany?.id ?? null}
+        locationId={formData.location_id || null}
+        existingItemIds={items.map((it) => it.item_id)}
+        onConfirm={handleBulkAddFromBrowse}
+      />
     </Dialog>
   );
 }
