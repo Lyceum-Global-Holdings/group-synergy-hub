@@ -176,13 +176,19 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                   <XCircle className="h-4 w-4 mr-2" />
                   Cancel Return
                 </Button>
-                <Button
-                  onClick={handleApprove}
-                  disabled={isProcessing}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {isApproving ? 'Processing...' : 'Approve Return'}
-                </Button>
+                {canApprove ? (
+                  <Button
+                    onClick={handleApprove}
+                    disabled={isProcessing}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {isApproving ? 'Processing...' : 'Approve Return'}
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground self-center">
+                    Only admins can approve
+                  </span>
+                )}
               </div>
             </>
           )}
