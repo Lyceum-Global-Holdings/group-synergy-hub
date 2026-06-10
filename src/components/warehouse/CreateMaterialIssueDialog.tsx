@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Package, ListPlus, AlertTriangle, PackageSearch } from 'lucide-react';
 import { BrowseInventoryDialog, type BrowsePickedRow } from './BrowseInventoryDialog';
+import { BulkAddItemsPanel } from './material-issue/BulkAddItemsPanel';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
@@ -616,8 +617,16 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
             )}
 
 
+            <BulkAddItemsPanel
+              companyId={selectedCompany?.id ?? null}
+              locationId={formData.location_id || null}
+              existingItemIds={items.map((it) => it.item_id)}
+              onCommit={(rows) => handleBulkAddFromBrowse(rows)}
+            />
+
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold">Add Item</h3>
+
               
               
               <div className="grid grid-cols-2 gap-4">
