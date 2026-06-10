@@ -617,8 +617,16 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
             )}
 
 
+            <BulkAddItemsPanel
+              companyId={selectedCompany?.id ?? null}
+              locationId={formData.location_id || null}
+              existingItemIds={items.map((it) => it.item_id)}
+              onCommit={(rows) => handleBulkAddFromBrowse(rows)}
+            />
+
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold">Add Item</h3>
+
               
               
               <div className="grid grid-cols-2 gap-4">
