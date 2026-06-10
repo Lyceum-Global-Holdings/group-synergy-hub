@@ -549,33 +549,45 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[280px] p-0" align="start">
-                              <Command>
-                                <CommandInput 
-                                  placeholder="Search or type new item..." 
-                                  value={item.item_name}
+                            <PopoverContent className="w-[320px] p-0" align="start">
+                              <Command shouldFilter={false}>
+                                <CommandInput
+                                  placeholder="Search or type new item..."
+                                  value={itemSearch}
                                   onValueChange={(value) => {
+                                    setItemSearch(value);
                                     handleItemChange(index, 'item_name', value);
                                   }}
                                 />
-                                <CommandList>
+                                <CommandList
+                                  onScroll={(e) => {
+                                    const el = e.currentTarget;
+                                    if (
+                                      hasNextPage &&
+                                      !isFetchingNextPage &&
+                                      el.scrollHeight - el.scrollTop - el.clientHeight < 80
+                                    ) {
+                                      fetchNextPage();
+                                    }
+                                  }}
+                                >
                                   <CommandEmpty>
                                     <div className="py-2 px-3 text-sm">
-                                      <span className="text-muted-foreground">Press Enter to use: </span>
-                                      <span className="font-medium">{item.item_name}</span>
+                                      {isFetchingCatalog ? (
+                                        <span className="text-muted-foreground">Searching…</span>
+                                      ) : (
+                                        <>
+                                          <span className="text-muted-foreground">Press Enter to use: </span>
+                                          <span className="font-medium">{item.item_name}</span>
+                                        </>
+                                      )}
                                     </div>
                                   </CommandEmpty>
                                   <CommandGroup heading="Item Master">
-                                    {warehouseItems
-                                      .filter(wi => 
-                                        wi.name.toLowerCase().includes((item.item_name || '').toLowerCase()) ||
-                                        wi.item_code.toLowerCase().includes((item.item_name || '').toLowerCase())
-                                      )
-                                      .slice(0, 10)
-                                      .map((wi) => (
+                                    {warehouseItems.map((wi) => (
                                         <CommandItem
                                           key={wi.id}
-                                          value={wi.name}
+                                          value={wi.id}
                                           onSelect={async () => {
                                             setItemComboboxOpen(null);
                                             if (!selectedCompany?.id) {
@@ -604,6 +616,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                               const price = newItems[index].unit_price || 0;
                                               newItems[index].total_cost = qty * price;
                                               setItems(newItems);
+                                              setItemSearch('');
                                               // Auto-generate batch number for batch-tracked items
                                               if ((wi as any).is_batch_tracked && !newItems[index].batch_number) {
                                                 try {
@@ -633,6 +646,9 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                           </div>
                                         </CommandItem>
                                       ))}
+                                    {(isFetchingCatalog || isFetchingNextPage) && (
+                                      <div className="py-2 px-3 text-xs text-muted-foreground">Loading…</div>
+                                    )}
                                   </CommandGroup>
                                 </CommandList>
                               </Command>
