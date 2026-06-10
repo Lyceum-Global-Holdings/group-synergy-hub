@@ -43,6 +43,63 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedCompany, companies } = useCompany();
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!issue) return;
+    setDownloadingPdf(true);
+    try {
+      const company =
+        companies?.find((c) => c.id === issue.company_id) ?? selectedCompany ?? null;
+
+      const approverIds = [
+        issue.hod_approved_by,
+        issue.management_approved_by,
+        (issue as any).issued_by,
+        (issue as any).received_by,
+      ].filter(Boolean) as string[];
+
+      let nameById: Record<string, string> = {};
+      if (approverIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', approverIds);
+        nameById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.full_name ?? '']));
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const generatedBy = user
+        ? (await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()).data
+            ?.full_name ?? user.email
+        : null;
+
+      await downloadMaterialIssuePdf({
+        issue,
+        items,
+        company,
+        generatedByName: generatedBy ?? undefined,
+        approverNames: {
+          hod: issue.hod_approved_by ? nameById[issue.hod_approved_by] : null,
+          management: issue.management_approved_by
+            ? nameById[issue.management_approved_by]
+            : null,
+          issued: (issue as any).issued_by ? nameById[(issue as any).issued_by] : null,
+          received: (issue as any).received_by ? nameById[(issue as any).received_by] : null,
+        },
+      });
+    } catch (err) {
+      console.error('PDF generation failed', err);
+      toast({
+        title: 'PDF download failed',
+        description: 'Could not generate the Material Issue Note PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const invalidateLists = () => {
     queryClient.invalidateQueries({ queryKey: ['material-issues'] });
