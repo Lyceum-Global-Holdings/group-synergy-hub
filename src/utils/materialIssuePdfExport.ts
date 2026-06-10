@@ -129,7 +129,7 @@ export async function downloadMaterialIssuePdf(opts: GenerateOptions): Promise<v
     ['EPF Number', (issue as any).epf_number || '—'],
     ['Contact', (issue as any).contact_number || '—'],
     ['Location', locationName],
-    ['Job Number', (issue as any).job_number || '—'],
+    ['Gate Pass No', (issue as any).job_number || '—'],
     ['PR Number', (issue as any).pr_number || '—'],
     ['Required Date', ISO_DATE((issue as any).items_required_date)],
   ];
