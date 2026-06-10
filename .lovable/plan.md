@@ -1,37 +1,93 @@
-# Fix: GRN items not visible in details dialog
+# GRN: Show full Item Master + Fix Batch Code Generation
 
 ## Root cause
-The parent `goods_receipt_notes` SELECT policy allows anyone with company access (`can_access_company(company_id)`) to view a GRN, but the child `grn_items` SELECT policy only allows the GRN's creator or an admin to view the line items:
 
-```
-USING (EXISTS (SELECT 1 FROM goods_receipt_notes grn
-               WHERE grn.id = grn_items.grn_id
-                 AND (grn.created_by = auth.uid() OR is_admin(auth.uid()))))
-```
+**Items not loading**
 
-So a "user" (or any non-creator/non-admin) opening a GRN sees the header but an empty items table — exactly the reported symptom.
+`CreateGrnDialog` populates the "Add item" combobox from `useWarehouseItems()`, which queries `warehouse_items_full` filtered by the active `company_id`. That table only contains items that have already been *provisioned* to the selected company (via `upsert_warehouse_inventory`). Anything that exists in the global item master (`warehouse_item_catalog`) but hasn't been provisioned to this company is invisible — so most companies see a near-empty picker even though the master has thousands of items.
+
+Receiving goods is exactly the moment a catalog item should *enter* a company's inventory, so the picker must offer the full global master.
+
+**Batch code generation error**
+
+`generate_batch_number(_company_id, _warehouse_item_id)` resolves `item_code` by looking up `warehouse_items WHERE id = ? AND company_id = ?`. As soon as the picker offers catalog items that aren't yet in `warehouse_items` for the company, the lookup misses and (combined with no per-company row) the helper can also fail downstream when `item_batches` is inserted referencing a non-existent `warehouse_item_id`. The user sees a toast: *"Failed to generate batch number"*.
 
 ## Fix
-Single SQL migration to relax the SELECT policy on `grn_items` to match the parent table (company-scoped), while keeping write policies untouched.
+
+Switch the GRN picker to read the **global catalog** and auto-provision the per-company inventory row the moment an item is chosen. Batch generation then has a guaranteed `warehouse_items` row to anchor to.
+
+### 1. CreateGrnDialog — source items from the catalog
+
+- Replace `useWarehouseItems()` with `useWarehouseItemCatalog()` (already authenticated-readable, RLS-clean, returns all master items).
+- The combobox renders catalog rows (`item_code`, `name`, `is_batch_tracked`, `is_serialized`, `unit_cost`, `secondary_uom`, `track_secondary_quantity` come from catalog).
+- Search/filter logic stays the same — just over catalog rows.
+
+### 2. Provision-on-select
+
+When a user picks a catalog item:
+
+1. Call new RPC `ensure_warehouse_item_for_company(p_company_id, p_catalog_item_id)`  
+   - Wraps the existing `upsert_warehouse_inventory` logic.
+   - Returns the `warehouse_items.id` (existing or newly inserted with `status='active'`, zero stock, no location/bin).
+2. Store that id in `grn_items.warehouse_item_id` as today.
+3. Continue with the existing batch-number auto-generation call — it now finds the row.
+
+This keeps `grn_items`, the approval flow, and `GrnBinAllocationDialog` unchanged (they already key on `warehouse_item_id`).
+
+### 3. Harden `generate_batch_number`
+
+Make the function tolerant of the legacy case (called before provisioning completes) by falling back to the catalog:
 
 ```sql
-DROP POLICY "Users can view GRN items they have access to" ON public.grn_items;
-
-CREATE POLICY "Users can view GRN items in their company"
-  ON public.grn_items
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.goods_receipt_notes grn
-      WHERE grn.id = grn_items.grn_id
-        AND can_access_company(grn.company_id)
-    )
-  );
+CREATE OR REPLACE FUNCTION public.generate_batch_number(
+  _company_id uuid, _warehouse_item_id uuid
+) ...
+-- Resolve item_code from warehouse_items first; if NULL, fall back to
+-- warehouse_item_catalog via warehouse_items.catalog_item_id, then to 'ITEM'.
 ```
 
-No frontend changes. No changes to INSERT/UPDATE/DELETE policies — only the creator (on draft) or admins can still modify items.
+Everything else in the function (advisory lock, sequence, GS1 AI(10) format) stays.
 
-## Verification
-- As a "user"-role account with company access, open any submitted/approved GRN → Items tab now populates.
-- As the same user, confirm they still cannot edit/delete items on a GRN they don't own.
+### 4. New RPC
+
+```sql
+CREATE OR REPLACE FUNCTION public.ensure_warehouse_item_for_company(
+  p_company_id uuid,
+  p_catalog_item_id uuid
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_id uuid;
+BEGIN
+  SELECT id INTO v_id FROM warehouse_items
+   WHERE company_id = p_company_id AND catalog_item_id = p_catalog_item_id;
+  IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+
+  v_id := upsert_warehouse_inventory(
+    p_company_id      => p_company_id,
+    p_catalog_item_id => p_catalog_item_id,
+    p_location_id     => NULL,
+    p_base_uom        => NULL, p_secondary_uom => NULL,
+    p_track_secondary => false,
+    p_reorder_level   => NULL, p_min_stock_level => NULL, p_max_stock_level => NULL,
+    p_unit_cost       => NULL, p_selling_price  => NULL,
+    p_status          => 'active', p_notes => NULL
+  );
+  RETURN v_id;
+END $$;
+
+GRANT EXECUTE ON FUNCTION public.ensure_warehouse_item_for_company(uuid, uuid)
+  TO authenticated;
+```
+
+## Files touched
+
+- `supabase/migrations/<new>.sql` — `ensure_warehouse_item_for_company` + hardened `generate_batch_number`.
+- `src/components/warehouse/CreateGrnDialog.tsx` — swap data source, add provision-on-select, keep batch-gen call.
+
+No changes to `grn_items` schema, `GrnDetailsDialog`, approval/allocation flow, or stock movement logic.
+
+## Result
+
+- Every item in the global item master appears in the GRN "Add item" picker for every authenticated user.
+- Selecting an unprovisioned item silently creates the company's inventory row, so the GRN proceeds normally and batch numbers generate without errors.
+- Batch generation is also defensively safe if ever called before provisioning.
