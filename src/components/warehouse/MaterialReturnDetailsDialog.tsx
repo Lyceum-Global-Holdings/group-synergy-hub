@@ -8,6 +8,7 @@ import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { format } from "date-fns";
 import { CheckCircle, XCircle } from "lucide-react";
+import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 
 interface MaterialReturnDetailsDialogProps {
   open: boolean;
