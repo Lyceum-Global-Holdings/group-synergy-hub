@@ -54,6 +54,18 @@ export type ReportParameter =
   | {
       key: string;
       label: string;
+      /**
+       * Multi-bin picker with include / exclude modes, sourced from every bin
+       * that holds stock under the subtree of the sibling location.
+       * Value shape: { mode: "include" | "exclude"; binIds: string[] }
+       */
+      type: "binMulti";
+      dependsOn: string;
+      required?: boolean;
+    }
+  | {
+      key: string;
+      label: string;
       /** Searchable picker over warehouse_item_catalog (global item master). */
       type: "item";
       required?: boolean;
