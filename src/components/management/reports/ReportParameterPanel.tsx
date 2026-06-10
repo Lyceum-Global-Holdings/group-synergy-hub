@@ -120,21 +120,37 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
 
   const set = (key: string, v: unknown) => onChange({ ...values, [key]: v });
 
-  // Clear any "bin" param whose scoping sibling (locationId) has changed/cleared.
+  // Clear bin selections whose scoping sibling (locationId) is unset.
   useEffect(() => {
     const next: Record<string, unknown> = { ...values };
     let changed = false;
     definition.parameters.forEach((p) => {
-      if (p.type !== "bin") return;
-      const scope = next[p.dependsOn];
-      if (!scope && next[p.key]) {
-        next[p.key] = null;
-        changed = true;
+      if (p.type === "bin") {
+        const scope = next[p.dependsOn];
+        if (!scope && next[p.key]) {
+          next[p.key] = null;
+          changed = true;
+        }
+      } else if (p.type === "binMulti") {
+        const current = normalizeBinMultiValue(next[p.key]);
+        if (current.binIds.length > 0) {
+          // Always reset selected bin ids when location changes so stale ids
+          // (from a different warehouse subtree) don't survive.
+          next[p.key] = { mode: current.mode, binIds: [] };
+          changed = true;
+        }
       }
     });
     if (changed) onChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [definition.code, JSON.stringify(definition.parameters.map((p) => (p.type === "bin" ? values[p.dependsOn] : null)))]);
+  }, [
+    definition.code,
+    JSON.stringify(
+      definition.parameters.map((p) =>
+        p.type === "bin" || p.type === "binMulti" ? values[p.dependsOn] : null,
+      ),
+    ),
+  ]);
 
   return (
     <div className="grid gap-4">
@@ -148,6 +164,7 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
             locations={allowedLocations}
             locationsLoading={locationsLoading}
             companySelected={!!selectedCompany?.id}
+            companyId={selectedCompany?.id ?? null}
             categories={categories}
             siblingValues={values}
           />
