@@ -75,13 +75,33 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
   const { selectedCompany } = useCompany();
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
-  const { items: warehouseItems = [] } = useWarehouseItemCatalog();
   const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
   const [selectedPoId, setSelectedPoId] = useState<string>(poId || '');
   const [invoiceDocumentUrl, setInvoiceDocumentUrl] = useState<string>('');
   const [itemComboboxOpen, setItemComboboxOpen] = useState<number | null>(null);
+  const [itemSearch, setItemSearch] = useState('');
+  const [debouncedItemSearch, setDebouncedItemSearch] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedItemSearch(itemSearch.trim()), 250);
+    return () => clearTimeout(t);
+  }, [itemSearch]);
+
+  const {
+    data: catalogPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetching: isFetchingCatalog,
+    isFetchingNextPage,
+  } = useWarehouseCatalogPage({
+    search: debouncedItemSearch || undefined,
+    status: 'active',
+    pageSize: 50,
+    enabled: open,
+  });
+  const warehouseItems = (catalogPages?.pages ?? []).flat();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
