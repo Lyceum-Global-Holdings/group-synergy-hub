@@ -439,10 +439,13 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                       )}
                     </div>
                   </div>
-                  {!issue.hod_approved_by && issue.status === 'draft' && (
+                  {!issue.hod_approved_by && issue.status === 'draft' && canApprove && (
                     <Button onClick={handleApproveHOD} size="sm">
                       Approve as HOD
                     </Button>
+                  )}
+                  {!issue.hod_approved_by && issue.status === 'draft' && !canApprove && (
+                    <span className="text-xs text-muted-foreground">Only admins can approve</span>
                   )}
                 </div>
               </div>
