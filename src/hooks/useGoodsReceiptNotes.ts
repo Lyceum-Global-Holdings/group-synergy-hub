@@ -317,9 +317,29 @@ export const useApproveGoodsReceiptNote = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, binAllocations }: { id: string; binAllocations: GrnBinAllocationInput[] }) => {
+    mutationFn: async ({
+      id,
+      binAllocations,
+      itemLinks,
+    }: {
+      id: string;
+      binAllocations: GrnBinAllocationInput[];
+      itemLinks?: Record<string, string>;
+    }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+
+      // Persist newly-linked warehouse_item_id back to grn_items before approval
+      // triggers fire, so stock movements and downstream reports are consistent.
+      if (itemLinks && Object.keys(itemLinks).length > 0) {
+        for (const [grnItemId, warehouseItemId] of Object.entries(itemLinks)) {
+          const { error: linkError } = await supabase
+            .from('grn_items')
+            .update({ warehouse_item_id: warehouseItemId })
+            .eq('id', grnItemId);
+          if (linkError) throw linkError;
+        }
+      }
 
       // Get the GRN with items and grn_number
       const { data: grn, error: grnFetchError } = await supabase
