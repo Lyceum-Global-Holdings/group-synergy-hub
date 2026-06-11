@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { GoodsReceiptNote, CreateGrnData, GrnSummary } from '@/types/grn';
+import { GoodsReceiptNote, CreateGrnData, GrnSummary, GrnRejectionReason } from '@/types/grn';
 import { useToast } from '@/hooks/use-toast';
 
 export const useGoodsReceiptNotes = (companyId?: string) => {
