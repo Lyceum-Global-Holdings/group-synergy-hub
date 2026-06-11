@@ -1,31 +1,37 @@
 ## Root cause
 
-`stock_transactions` has a BEFORE-INSERT trigger `set_stock_transaction_balances` that reads the **live** `warehouse_bin_allocations` sum and sets:
+The GRN item picker is powered by the `list_warehouse_catalog` SECURITY DEFINER RPC. Its access gate hard-codes module checks:
 
-- `qty_before = current allocation`
-- `qty_after  = current allocation + quantity_change`
+```
+has_warehouse_access OR has_procurement_access OR has_finance_access OR has_manager_access
+```
 
-So callers must insert the ledger row **before** updating the bin allocation. Two RPCs do it in the wrong order, double-counting the new quantity:
+Users in the `user` role can reach the GRN screen (the front-end module config grants them GRN access) but fail every one of those helper checks, so the RPC short-circuits and returns no rows — empty item dropdown.
 
-1. **`bulk_provision_inventory_from_catalog`** (source of the "Opening Stock via bulk catalog import" row in the screenshot) writes `warehouse_bin_allocations` first, then `stock_transactions`. With bin NGN truly going 0 → 1000, the ledger gets `before=1000, after=2000`.
-2. **`approve_grn_with_allocations`** (added last turn) has the same swapped order — every approved GRN will record inflated before/after.
+This contradicts the table's own RLS, which already allows any authenticated user to read the catalog:
 
-`warehouse_items.current_stock` and `warehouse_bin_allocations.allocated_quantity` are correct (the picker still shows Qty 1000). Only `stock_transactions.quantity_before/after` (and their secondary counterparts) are wrong.
+```
+Policy "Authenticated users can view catalog"  USING (auth.uid() IS NOT NULL)
+```
+
+Item-master visibility for receiving/issuing is the SAP MM / Oracle EBS / NetSuite convention: master data is broadly readable by any operational user; only transactional/stock data is permission-gated.
 
 ## Fix
 
-### 1. Swap write order in `bulk_provision_inventory_from_catalog`
-Insert the `stock_transactions` row **first**, then upsert `warehouse_bin_allocations`. No other logic changes.
+Replace the access gate in `list_warehouse_catalog` so it mirrors the table's RLS — accept any authenticated user. Module/role checks stay where they belong: on the screens that *write* catalog data and on the stock/transactional tables.
 
-### 2. Swap write order in `approve_grn_with_allocations`
-Reorder STEP A (allocations) and STEP B (ledger) so ledger inserts run first per line, then allocations are upserted. Validation block, status flip, and guard trigger stay as-is.
+Concretely, the migration `CREATE OR REPLACE`s the function and changes only the gate block:
 
-### 3. One-time backfill of historical ledger rows
-Add a `recompute_stock_ledger_balances()` SECURITY DEFINER RPC (admin-only) that, per `(company_id, item_id, location_id, bin_id)`, walks `stock_transactions` ordered by `(created_at, id)` and rewrites `quantity_before`, `quantity_after`, `secondary_quantity_before`, `secondary_quantity_after` as a running sum starting from 0. Execute it once inside the migration so the existing inflated row in the screenshot becomes `before=0, after=1000`. Future inserts continue to flow through the BEFORE trigger.
+```sql
+IF v_uid IS NULL THEN
+  RETURN;
+END IF;
+```
 
-The backfill is safe to re-run; it never touches actual stock or allocations, only the audit columns. Other write paths (issue notes, returns, transfers, scanned adjustments) already insert the ledger row first via `set_stock_transaction_balances`, so they aren't affected — and the backfill leaves their correctly-recorded values unchanged because the running sum matches.
+Body, ordering, paging, search ranking, and return columns are unchanged. No client changes — the picker already calls this RPC.
 
 ## Out of scope
 
-- UI changes — the bin scan dialog, ledger table, and KPI cards already render whatever the DB stores.
-- Trigger redesign — keeping the current "ledger-first" contract is the SAP/Oracle EBS convention; only the two offending RPCs need to follow it.
+- Catalog *write* paths (create/edit/delete) keep their existing role checks.
+- Per-company `warehouse_items` quantities and `warehouse_bin_allocations` continue to be gated by `can_access_company` / company RLS — non-admin users will only see stock for companies they belong to. Only the global item master becomes visible.
+- No change to GRN approval / bin-allocation flow.
