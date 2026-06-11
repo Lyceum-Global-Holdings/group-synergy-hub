@@ -62,8 +62,10 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const approveGrn = useApproveGoodsReceiptNote();
   const submitGrn = useSubmitGoodsReceiptNote();
   const deleteGrn = useDeleteGoodsReceiptNote();
+  const rejectGrn = useRejectGoodsReceiptNote();
   const [showDocument, setShowDocument] = useState(false);
   const [showBinAllocation, setShowBinAllocation] = useState(false);
+  const [showReject, setShowReject] = useState(false);
 
   if (!grn) return null;
 
