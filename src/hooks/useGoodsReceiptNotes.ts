@@ -184,6 +184,7 @@ export const useCreateGoodsReceiptNote = () => {
             grn_id: grn.id,
             po_item_id: item.po_item_id,
             warehouse_item_id: warehouseItemId,
+            catalog_item_id: item.catalog_item_id ?? null,
             item_code: item.item_code,
             item_name: item.item_name,
             description: item.description,
@@ -203,6 +204,7 @@ export const useCreateGoodsReceiptNote = () => {
             secondary_uom: item.secondary_uom || null,
             conversion_note: item.conversion_note || null,
           };
+
         })
       );
 
