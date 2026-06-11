@@ -83,12 +83,39 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
       {/* Document content - styled for printing */}
       <div className="bg-background p-8 print:p-0">
         <Card className="print:shadow-none print:border-0">
-          <CardHeader className="text-center space-y-4">
-            <div>
-              <h1 className="text-3xl font-bold">GOODS RECEIPT NOTE</h1>
-              <p className="text-muted-foreground mt-2">Material Receipt Document</p>
+          <CardHeader className="space-y-4">
+            {/* Company header band */}
+            <div className="flex items-start justify-between gap-4 pb-3 border-b">
+              <div className="flex items-start gap-3">
+                {selectedCompany?.logo_url ? (
+                  <img
+                    src={selectedCompany.logo_url}
+                    alt={`${selectedCompany.name} logo`}
+                    className="h-14 w-14 object-contain rounded"
+                  />
+                ) : null}
+                <div>
+                  <p className="text-lg font-bold leading-tight">
+                    {selectedCompany?.name ?? 'Company'}
+                  </p>
+                  {selectedCompany?.address && (
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap max-w-xs">
+                      {selectedCompany.address}
+                    </p>
+                  )}
+                  {selectedCompany?.code && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Company Code: {selectedCompany.code}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <h1 className="text-2xl font-bold">GOODS RECEIPT NOTE</h1>
+                <p className="text-xs text-muted-foreground mt-1">Material Receipt Document</p>
+              </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 text-left text-sm">
               <div>
                 <p className="font-semibold">GRN Number:</p>
@@ -112,6 +139,7 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
               )}
             </div>
           </CardHeader>
+
 
           <CardContent className="space-y-6">
             {/* Supplier Information */}
