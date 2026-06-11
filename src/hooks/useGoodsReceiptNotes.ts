@@ -326,11 +326,9 @@ export const useApproveGoodsReceiptNote = () => {
       binAllocations: GrnBinAllocationInput[];
       itemLinks?: Record<string, string>;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Persist newly-linked warehouse_item_id back to grn_items before approval
-      // triggers fire, so stock movements and downstream reports are consistent.
+      // Persist any newly-linked warehouse_item_id back to grn_items first so
+      // the RPC sees the resolved links. New per-company inventory rows are
+      // created INSIDE the RPC — never here.
       if (itemLinks && Object.keys(itemLinks).length > 0) {
         for (const [grnItemId, warehouseItemId] of Object.entries(itemLinks)) {
           const { error: linkError } = await supabase
@@ -341,178 +339,21 @@ export const useApproveGoodsReceiptNote = () => {
         }
       }
 
-      // Get the GRN with items and grn_number
-      const { data: grn, error: grnFetchError } = await supabase
-        .from('goods_receipt_notes')
-        .select('company_id, grn_number, grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name, secondary_quantity_received, secondary_uom)')
-        .eq('id', id)
-        .single();
+      const payload = binAllocations
+        .filter((a) => a.warehouse_item_id && a.bin_id && a.quantity > 0)
+        .map((a) => ({
+          warehouse_item_id: a.warehouse_item_id,
+          bin_id: a.bin_id,
+          location_id: a.location_id ?? null,
+          quantity: a.quantity,
+        }));
 
-      if (grnFetchError) throw grnFetchError;
-
-      // Fetch current stock levels BEFORE the approval trigger fires
-      const itemsWithStock: Array<{
-        warehouse_item_id: string;
-        quantity_received: number;
-        unit_price: number;
-        total_cost: number;
-        item_name: string;
-        quantity_before: number;
-        secondary_quantity_received: number | null;
-        secondary_uom: string | null;
-      }> = [];
-
-      const grnItems = (grn as any).grn_items || [];
-      for (const item of grnItems) {
-        if (!item.warehouse_item_id) continue;
-        const { data: whItem } = await supabase
-          .from('warehouse_items_full')
-          .select('current_stock')
-          .eq('id', item.warehouse_item_id)
-          .single();
-
-        itemsWithStock.push({
-          warehouse_item_id: item.warehouse_item_id,
-          quantity_received: item.quantity_received || 0,
-          unit_price: item.unit_price || 0,
-          total_cost: item.total_cost || 0,
-          item_name: item.item_name || '',
-          quantity_before: whItem?.current_stock || 0,
-          secondary_quantity_received: item.secondary_quantity_received ?? null,
-          secondary_uom: item.secondary_uom ?? null,
-        });
-      }
-
-      // Update GRN status to approved
-      // The database trigger 'update_stock_on_grn_approval' handles updating warehouse_items.current_stock
-      const { error: approveError } = await supabase
-        .from('goods_receipt_notes')
-        .update({
-          status: 'approved',
-          approved_by: user.id,
-          approved_date: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (approveError) throw approveError;
-
-      // Insert stock transaction records for movement history
-      if (itemsWithStock.length > 0) {
-        const stockTransactions = itemsWithStock.map((item) => {
-          const allocation = binAllocations.find((a) => a.warehouse_item_id === item.warehouse_item_id);
-          return {
-            item_id: item.warehouse_item_id,
-            transaction_type: 'goods_receipt' as const,
-            reference_type: 'grn' as const,
-            reference_id: id,
-            quantity_change: item.quantity_received,
-            quantity_before: item.quantity_before,
-            quantity_after: item.quantity_before + item.quantity_received,
-            unit_cost: item.unit_price,
-            total_value: item.total_cost,
-            notes: `GRN ${(grn as any).grn_number} - ${item.item_name}`,
-            company_id: grn.company_id,
-            created_by: user.id,
-            bin_id: allocation?.bin_id ?? null,
-            location_id: allocation?.location_id ?? null,
-            secondary_quantity_change: item.secondary_quantity_received,
-            secondary_uom: item.secondary_uom,
-          };
-        });
-
-        const { error: txError } = await supabase
-          .from('stock_transactions')
-          .insert(stockTransactions);
-
-        if (txError) throw txError;
-      }
-
-      // Process bin allocations using upsert (unique constraint on item+bin+company)
-      // Pre-compute totals per item so we can prorate secondary qty across bins.
-      const totalsByItem = binAllocations.reduce((acc, a) => {
-        acc[a.warehouse_item_id] = (acc[a.warehouse_item_id] || 0) + (a.quantity || 0);
-        return acc;
-      }, {} as Record<string, number>);
-      const secondaryByItem = itemsWithStock.reduce((acc, it) => {
-        if (it.secondary_quantity_received != null) {
-          acc[it.warehouse_item_id] = it.secondary_quantity_received;
-        }
-        return acc;
-      }, {} as Record<string, number>);
-
-      for (const alloc of binAllocations) {
-        const totalForItem = totalsByItem[alloc.warehouse_item_id] || 0;
-        const totalSec = secondaryByItem[alloc.warehouse_item_id];
-        const secondaryDelta = totalSec != null && totalForItem > 0
-          ? (totalSec * (alloc.quantity || 0)) / totalForItem
-          : null;
-        let allocationLocationId = alloc.location_id ?? null;
-        if (!allocationLocationId) {
-          const { data: binScope } = await supabase
-            .from('warehouse_bins')
-            .select('root_location_id, location_id')
-            .eq('id', alloc.bin_id)
-            .maybeSingle();
-          allocationLocationId = (binScope as any)?.root_location_id ?? (binScope as any)?.location_id ?? null;
-        }
-
-        let existingQuery = supabase
-          .from('warehouse_bin_allocations')
-          .select('id, allocated_quantity, secondary_quantity')
-          .eq('warehouse_item_id', alloc.warehouse_item_id)
-          .eq('bin_id', alloc.bin_id)
-          .eq('company_id', grn.company_id);
-        existingQuery = allocationLocationId
-          ? existingQuery.eq('location_id', allocationLocationId)
-          : existingQuery.is('location_id', null);
-        const { data: existing } = await existingQuery.maybeSingle();
-
-        if (existing) {
-          const updates: any = {
-            allocated_quantity: (existing.allocated_quantity || 0) + alloc.quantity,
-            updated_at: new Date().toISOString(),
-          };
-          if (secondaryDelta != null) {
-            updates.secondary_quantity = ((existing as any).secondary_quantity || 0) + secondaryDelta;
-          }
-          const { error: updateError } = await supabase
-            .from('warehouse_bin_allocations')
-            .update(updates)
-            .eq('id', existing.id);
-          if (updateError) throw updateError;
-        } else {
-          const insertPayload: any = {
-            warehouse_item_id: alloc.warehouse_item_id,
-            bin_id: alloc.bin_id,
-            location_id: allocationLocationId,
-            allocated_quantity: alloc.quantity,
-            company_id: grn.company_id,
-            created_by: user.id,
-          };
-          if (secondaryDelta != null) insertPayload.secondary_quantity = secondaryDelta;
-          const { error: insertError } = await supabase
-            .from('warehouse_bin_allocations')
-            .insert(insertPayload);
-          if (insertError) throw insertError;
-        }
-
-        // Increment bin's current_quantity
-        const { data: binData } = await supabase
-          .from('warehouse_bins')
-          .select('current_quantity')
-          .eq('id', alloc.bin_id)
-          .single();
-
-        if (binData) {
-          const { error: binUpdateError } = await supabase
-            .from('warehouse_bins')
-            .update({
-              current_quantity: (binData.current_quantity || 0) + alloc.quantity,
-            })
-            .eq('id', alloc.bin_id);
-          if (binUpdateError) throw binUpdateError;
-        }
-      }
+      const { data, error } = await supabase.rpc(
+        'approve_grn_with_allocations' as any,
+        { p_grn_id: id, p_allocations: payload as any }
+      );
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
@@ -536,6 +377,7 @@ export const useApproveGoodsReceiptNote = () => {
     },
   });
 };
+
 
 export const useDeleteGoodsReceiptNote = () => {
   const queryClient = useQueryClient();
