@@ -35,6 +35,7 @@ const statusColors: Record<GrnStatus, string> = {
   approved: 'bg-green-500',
   completed: 'bg-blue-500',
   cancelled: 'bg-red-500',
+  rejected: 'bg-red-600',
 };
 
 const statusLabels: Record<GrnStatus, string> = {
@@ -43,6 +44,7 @@ const statusLabels: Record<GrnStatus, string> = {
   approved: 'Approved',
   completed: 'Completed',
   cancelled: 'Cancelled',
+  rejected: 'Rejected',
 };
 
 interface GrnDetailsDialogProps {
