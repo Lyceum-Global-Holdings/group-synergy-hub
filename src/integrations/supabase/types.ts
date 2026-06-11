@@ -9456,6 +9456,7 @@ export type Database = {
       grn_items: {
         Row: {
           batch_number: string | null
+          catalog_item_id: string | null
           conversion_note: string | null
           created_at: string
           description: string | null
@@ -9480,6 +9481,7 @@ export type Database = {
         }
         Insert: {
           batch_number?: string | null
+          catalog_item_id?: string | null
           conversion_note?: string | null
           created_at?: string
           description?: string | null
@@ -9504,6 +9506,7 @@ export type Database = {
         }
         Update: {
           batch_number?: string | null
+          catalog_item_id?: string | null
           conversion_note?: string | null
           created_at?: string
           description?: string | null
@@ -9527,6 +9530,13 @@ export type Database = {
           warehouse_item_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "grn_items_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_item_catalog"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grn_items_grn_id_fkey"
             columns: ["grn_id"]
@@ -21301,6 +21311,10 @@ export type Database = {
           p_notes?: string
           p_reason_code: string
         }
+        Returns: Json
+      }
+      approve_grn_with_allocations: {
+        Args: { p_allocations: Json; p_grn_id: string }
         Returns: Json
       }
       bootstrap_admin: {
