@@ -553,11 +553,10 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                             <PopoverContent className="w-[320px] p-0" align="start">
                               <Command shouldFilter={false}>
                                 <CommandInput
-                                  placeholder="Search or type new item..."
+                                  placeholder="Search by name or code..."
                                   value={itemSearch}
                                   onValueChange={(value) => {
                                     setItemSearch(value);
-                                    handleItemChange(index, 'item_name', value);
                                   }}
                                 />
                                 <CommandList
@@ -573,15 +572,10 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                   }}
                                 >
                                   <CommandEmpty>
-                                    <div className="py-2 px-3 text-sm">
-                                      {isFetchingCatalog ? (
-                                        <span className="text-muted-foreground">Searching…</span>
-                                      ) : (
-                                        <>
-                                          <span className="text-muted-foreground">Press Enter to use: </span>
-                                          <span className="font-medium">{item.item_name}</span>
-                                        </>
-                                      )}
+                                    <div className="py-2 px-3 text-sm text-muted-foreground">
+                                      {isFetchingCatalog
+                                        ? 'Searching…'
+                                        : 'No items found. Refine your search or add the item in the catalog first.'}
                                     </div>
                                   </CommandEmpty>
                                   <CommandGroup heading="Item Master">
