@@ -307,6 +307,17 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
         onConfirm={handleBinAllocationConfirm}
         isLoading={approveGrn.isPending}
       />
+
+      <RejectGrnDialog
+        open={showReject}
+        onOpenChange={setShowReject}
+        grnNumber={grn.grn_number}
+        isLoading={rejectGrn.isPending}
+        onConfirm={async (reason, notes) => {
+          await rejectGrn.mutateAsync({ id: grn.id, reason, notes });
+          setShowReject(false);
+        }}
+      />
     </Dialog>
   );
 }
