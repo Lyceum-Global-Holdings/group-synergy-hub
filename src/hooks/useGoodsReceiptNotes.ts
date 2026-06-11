@@ -577,3 +577,29 @@ export const useDeleteGoodsReceiptNote = () => {
     },
   });
 };
+
+export const useRejectGoodsReceiptNote = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; reason: GrnRejectionReason; notes?: string }) => {
+      const { data, error } = await supabase.rpc('reject_goods_receipt_note' as any, {
+        _grn_id: input.id,
+        _reason: input.reason,
+        _notes: input.notes ?? null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['grn'] });
+      queryClient.invalidateQueries({ queryKey: ['grn-summary'] });
+      toast({ title: 'GRN rejected', description: 'The GRN has been rejected and recorded.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Rejection failed', description: error.message, variant: 'destructive' });
+    },
+  });
+};
