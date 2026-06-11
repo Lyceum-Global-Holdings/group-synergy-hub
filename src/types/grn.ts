@@ -1,5 +1,40 @@
-export type GrnStatus = 'draft' | 'submitted' | 'approved' | 'completed' | 'cancelled';
+export type GrnStatus = 'draft' | 'submitted' | 'approved' | 'completed' | 'cancelled' | 'rejected';
 export type QualityStatus = 'good' | 'damaged' | 'rejected';
+
+export type GrnRejectionReason =
+  | 'damaged_in_transit'
+  | 'quantity_short'
+  | 'quantity_over'
+  | 'wrong_item'
+  | 'quality_failure'
+  | 'expired_or_near_expiry'
+  | 'missing_documentation'
+  | 'late_delivery'
+  | 'packaging_non_conformance'
+  | 'supplier_non_conformance'
+  | 'other';
+
+export const GRN_REJECTION_REASONS: { value: GrnRejectionReason; label: string; description: string }[] = [
+  { value: 'damaged_in_transit', label: 'Damaged in transit', description: 'GS1 CBV: damaged' },
+  { value: 'quantity_short', label: 'Short quantity received', description: 'ISO 9001 §8.7 / SAP MIGO short delivery' },
+  { value: 'quantity_over', label: 'Over-delivered quantity', description: 'SAP MIGO over-delivery' },
+  { value: 'wrong_item', label: 'Wrong item / spec mismatch', description: 'ISO 9001 nonconformity' },
+  { value: 'quality_failure', label: 'Failed quality inspection', description: 'ISO 9001 §8.7' },
+  { value: 'expired_or_near_expiry', label: 'Expired / shelf-life breach', description: 'GS1 CBV: expired' },
+  { value: 'missing_documentation', label: 'Missing invoice / COA / packing list', description: 'INCOTERMS 2020 doc compliance' },
+  { value: 'late_delivery', label: 'Outside agreed delivery window', description: 'OTIF KPI' },
+  { value: 'packaging_non_conformance', label: 'Packaging non-conformance', description: 'GS1 packaging guidelines' },
+  { value: 'supplier_non_conformance', label: 'Supplier non-conformance (other)', description: 'ISO 9001 §8.4' },
+  { value: 'other', label: 'Other (notes required)', description: '' },
+];
+
+export const GRN_REJECTION_REASON_LABELS: Record<GrnRejectionReason, string> = GRN_REJECTION_REASONS.reduce(
+  (acc, r) => {
+    acc[r.value] = r.label;
+    return acc;
+  },
+  {} as Record<GrnRejectionReason, string>,
+);
 
 export interface GoodsReceiptNote {
   id: string;
