@@ -22517,6 +22517,7 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
+      recompute_stock_ledger_balances: { Args: never; Returns: Json }
       reconcile_bin_allocations: {
         Args: { p_company_id?: string; p_location_id?: string }
         Returns: {
