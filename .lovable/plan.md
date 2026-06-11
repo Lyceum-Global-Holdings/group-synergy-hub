@@ -1,41 +1,27 @@
-# Restrict GRN / MRN / MIN approval to Admin and above
+# Fix: Admins can't approve GRN — allocation dialog shows "No items"
 
-Goal: Only users with role `admin` or `super_admin` can approve Goods Receipt Notes (GRN), Material Return Notes (MRN), and Material Issue Notes (MIN — both HOD and Management approval steps). Enforcement must be both UI-level (hide/disable buttons) and server-side (DB) so it can't be bypassed by API calls.
+## Root cause
 
-## 1. Shared role helper (frontend)
+The GRN in the screenshot (`GRN-20260611-001`) has `grn_items.warehouse_item_id = NULL` (confirmed in DB). `GrnBinAllocationDialog` filters items to `warehouse_item_id && quantity_received > 0`, so the table is empty and "Confirm & Approve" stays disabled. This happens whenever a GRN was created without picking an item from the warehouse catalog (or the lookup-by-`item_code` at create time found no match — here `item_code` is null and the catalog code lives in `item_name`).
 
-Reuse `useIsAdminOrHigher()` (already exists at `src/hooks/useIsAdminOrHigher.ts`, returns `{ canDelete, isLoading }` based on `admin`/`super_admin`/`moderator`).
+Existing UI gating (admin-only buttons) and triggers are working — the blocker is purely data: unlinked items.
 
-Add a new tighter helper `useCanApprove()` that returns true **only** for `admin` and `super_admin` (exclude `moderator` per request "admins and above"). Keep `useIsAdminOrHigher` untouched to avoid regressions elsewhere.
+## Plan
 
-## 2. UI gating
+1. **`GrnBinAllocationDialog.tsx`** — instead of hiding unlinked rows, render every received row. For rows missing `warehouse_item_id`, replace the "Destination Bin" cell with a two-step picker:
+   - Warehouse Item combobox (reuse the same item-search pattern used in `CreateGrnDialog.tsx` lines ~600-640, scoped to the GRN's company).
+   - Once an item is chosen, show the bin select.
+   - Track per-row `{ warehouseItemId, binId }` in local state.
+   - "Confirm & Approve" enabled only when every row has both selected.
 
-- **`src/components/warehouse/GrnDetailsDialog.tsx`** — wrap the "Approve GRN" button (line ~252) so it only renders when `canApprove` is true. Same treatment for any "Submit for Approval → Approve" path on that dialog.
-- **`src/components/warehouse/MaterialReturnDetailsDialog.tsx`** — hide the "Approve Return" button (line ~177) for non-admins. Keep "Cancel Return" visible to the original creator/admin as today.
-- **`src/components/warehouse/MaterialIssueDetailsDialog.tsx`** — hide both "Approve as HOD" (line ~440) and "Approve as Management" (line ~467) buttons for non-admins.
+2. **On confirm**, build allocations using the chosen `warehouseItemId` (existing or newly selected) and pass them through to `useApproveGoodsReceiptNote` as before.
 
-Non-admins still see the dialogs and statuses; only the approve actions disappear. Add a small muted note "Only admins can approve" where the button used to be so it's discoverable.
+3. **`useGoodsReceiptNotes.ts` `approveGrnMutation`** — before the existing allocation/stock work, persist any newly-linked `warehouse_item_id` back to `grn_items` (`update grn_items set warehouse_item_id = ... where id = ...`) so the GRN, ledger, and downstream reports stay consistent.
 
-## 3. Server-side enforcement (source of truth)
+4. **No DB migration needed.** Triggers/RPCs already accept the linked item; the change is purely client-side data completion.
 
-UI hiding is not enough — the same checks must exist server-side. Add a single SQL migration that:
+## Verification
 
-1. Creates a SECURITY DEFINER helper `public.is_admin_or_higher(_user uuid)` that returns true when the user has role `admin` or `super_admin` in `user_roles` (reuses existing `has_role` pattern).
-2. Tightens UPDATE RLS policies on the three tables so transitions into approved states are restricted:
-   - `goods_receipt_notes` — UPDATE allowed only when `is_admin_or_higher(auth.uid())` is true OR the row's status is not changing to `approved`/`completed`.
-   - `material_return_notes` — UPDATE allowed only when `is_admin_or_higher(auth.uid())` is true OR new status is not `returned`/`approved`.
-   - `material_issue_notes` — UPDATE allowed only when `is_admin_or_higher(auth.uid())` is true OR `hod_approved_by` / `management_approved_by` / `status='approved'` are not being set.
-3. Same guard added to any existing approval RPCs (`approve_grn`, `approve_material_return`, etc.) by checking `is_admin_or_higher(auth.uid())` at the top and raising `permission denied` otherwise.
-
-Exact policy SQL will be written when the migration is created (uses `OLD`/`NEW` comparison in a row-level trigger because RLS UPDATE policies can't compare to `OLD` directly — implemented as a `BEFORE UPDATE` trigger that raises an exception on unauthorized status transitions, leaving existing RLS in place).
-
-## 4. Verification
-
-- Log in as a non-admin → open a draft GRN/MRN/MIN → approve buttons absent; direct supabase call to flip status to `approved` returns permission error.
-- Log in as admin → buttons visible; approval flow works end-to-end as before.
-
-## Technical notes
-
-- "Admins and above" = `admin` + `super_admin`. `moderator` is excluded (confirm if you want moderators included).
-- No changes to `useIsAdminOrHigher` so existing delete-permission behavior is unaffected.
-- DB trigger approach is preferred over OLD-aware RLS because Postgres RLS `WITH CHECK` clauses can reference `NEW` but not `OLD`; trigger gives clear error messages and centralizes the rule.
+- Open `GRN-20260611-001` as admin → click Approve → dialog now lists the row with item + bin pickers → pick both → Confirm & Approve succeeds, GRN flips to approved/completed, stock lands in the chosen bin.
+- Open a GRN whose items already have `warehouse_item_id` (e.g. `GRN-20260606-001`) → dialog behaves exactly as today (no picker, just bin select).
+- Non-admin still sees no Approve button.
