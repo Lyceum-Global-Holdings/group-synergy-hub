@@ -123,7 +123,9 @@ export interface CreateGrnData {
 export interface CreateGrnItemData {
   po_item_id?: string;
   warehouse_item_id?: string;
+  catalog_item_id?: string;
   item_code?: string;
+
   item_name: string;
   description?: string;
   unit_of_measure: string;
