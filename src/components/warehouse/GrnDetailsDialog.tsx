@@ -20,14 +20,16 @@ import {
   useApproveGoodsReceiptNote,
   useSubmitGoodsReceiptNote,
   useDeleteGoodsReceiptNote,
+  useRejectGoodsReceiptNote,
 } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
-import { GrnStatus } from '@/types/grn';
+import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS } from '@/types/grn';
 import { format } from 'date-fns';
 import { useState } from 'react';
 import { FileText } from 'lucide-react';
 import { GrnDocument } from './GrnDocument';
 import { GrnBinAllocationDialog, BinAllocation } from './GrnBinAllocationDialog';
+import { RejectGrnDialog } from './RejectGrnDialog';
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
@@ -35,6 +37,7 @@ const statusColors: Record<GrnStatus, string> = {
   approved: 'bg-green-500',
   completed: 'bg-blue-500',
   cancelled: 'bg-red-500',
+  rejected: 'bg-red-600',
 };
 
 const statusLabels: Record<GrnStatus, string> = {
@@ -43,6 +46,7 @@ const statusLabels: Record<GrnStatus, string> = {
   approved: 'Approved',
   completed: 'Completed',
   cancelled: 'Cancelled',
+  rejected: 'Rejected',
 };
 
 interface GrnDetailsDialogProps {
@@ -58,8 +62,10 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const approveGrn = useApproveGoodsReceiptNote();
   const submitGrn = useSubmitGoodsReceiptNote();
   const deleteGrn = useDeleteGoodsReceiptNote();
+  const rejectGrn = useRejectGoodsReceiptNote();
   const [showDocument, setShowDocument] = useState(false);
   const [showBinAllocation, setShowBinAllocation] = useState(false);
+  const [showReject, setShowReject] = useState(false);
 
   if (!grn) return null;
 
@@ -175,6 +181,31 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                 {grn.remarks || 'No remarks added'}
               </p>
             </div>
+
+            {grn.status === 'rejected' && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+                <h3 className="font-semibold text-destructive mb-2">Rejection</h3>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    <strong>Reason:</strong>{' '}
+                    {(grn as any).rejection_reason
+                      ? GRN_REJECTION_REASON_LABELS[
+                          (grn as any).rejection_reason as GrnRejectionReason
+                        ] ?? (grn as any).rejection_reason
+                      : '—'}
+                  </p>
+                  {(grn as any).rejection_notes && (
+                    <p><strong>Notes:</strong> {(grn as any).rejection_notes}</p>
+                  )}
+                  {(grn as any).rejected_date && (
+                    <p>
+                      <strong>Rejected On:</strong>{' '}
+                      {format(new Date((grn as any).rejected_date), 'PPpp')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="items">
@@ -253,9 +284,14 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
               </>
             )}
             {grn.status === 'submitted' && isAdmin && (
-              <Button onClick={handleApprove}>
-                Approve GRN
-              </Button>
+              <>
+                <Button variant="destructive" onClick={() => setShowReject(true)}>
+                  Reject GRN
+                </Button>
+                <Button onClick={handleApprove}>
+                  Approve GRN
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -270,6 +306,17 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
         companyId={grn.company_id}
         onConfirm={handleBinAllocationConfirm}
         isLoading={approveGrn.isPending}
+      />
+
+      <RejectGrnDialog
+        open={showReject}
+        onOpenChange={setShowReject}
+        grnNumber={grn.grn_number}
+        isLoading={rejectGrn.isPending}
+        onConfirm={async (reason, notes) => {
+          await rejectGrn.mutateAsync({ id: grn.id, reason, notes });
+          setShowReject(false);
+        }}
       />
     </Dialog>
   );

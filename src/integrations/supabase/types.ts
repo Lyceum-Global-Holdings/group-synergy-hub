@@ -9316,6 +9316,12 @@ export type Database = {
           po_number: string | null
           pr_number: string | null
           received_by: string | null
+          rejected_by: string | null
+          rejected_date: string | null
+          rejection_notes: string | null
+          rejection_reason:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
           remarks: string | null
           status: string
           supplier_address: string | null
@@ -9342,6 +9348,12 @@ export type Database = {
           po_number?: string | null
           pr_number?: string | null
           received_by?: string | null
+          rejected_by?: string | null
+          rejected_date?: string | null
+          rejection_notes?: string | null
+          rejection_reason?:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
           remarks?: string | null
           status?: string
           supplier_address?: string | null
@@ -9368,6 +9380,12 @@ export type Database = {
           po_number?: string | null
           pr_number?: string | null
           received_by?: string | null
+          rejected_by?: string | null
+          rejected_date?: string | null
+          rejection_notes?: string | null
+          rejection_reason?:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
           remarks?: string | null
           status?: string
           supplier_address?: string | null
@@ -22531,6 +22549,51 @@ export type Database = {
         }
         Returns: undefined
       }
+      reject_goods_receipt_note: {
+        Args: {
+          _grn_id: string
+          _notes?: string
+          _reason: Database["public"]["Enums"]["grn_rejection_reason"]
+        }
+        Returns: {
+          approved_by: string | null
+          approved_date: string | null
+          branch: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          grn_date: string
+          grn_number: string
+          id: string
+          invoice_date: string | null
+          invoice_document_url: string | null
+          invoice_number: string | null
+          mr_number: string | null
+          po_id: string | null
+          po_number: string | null
+          pr_number: string | null
+          received_by: string | null
+          rejected_by: string | null
+          rejected_date: string | null
+          rejection_notes: string | null
+          rejection_reason:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
+          remarks: string | null
+          status: string
+          supplier_address: string | null
+          supplier_id: string | null
+          supplier_name: string
+          total_value: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "goods_receipt_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       relocate_warehouse_bin: {
         Args: {
           _bin_id: string
@@ -23872,6 +23935,18 @@ export type Database = {
         | "neutral"
         | "not_recommend"
         | "reject"
+      grn_rejection_reason:
+        | "damaged_in_transit"
+        | "quantity_short"
+        | "quantity_over"
+        | "wrong_item"
+        | "quality_failure"
+        | "expired_or_near_expiry"
+        | "missing_documentation"
+        | "late_delivery"
+        | "packaging_non_conformance"
+        | "supplier_non_conformance"
+        | "other"
       invitation_status: "invited" | "viewed" | "declined" | "submitted"
       journal_status: "draft" | "posted" | "void" | "reversed"
       journal_type:
@@ -24375,6 +24450,19 @@ export const Constants = {
         "neutral",
         "not_recommend",
         "reject",
+      ],
+      grn_rejection_reason: [
+        "damaged_in_transit",
+        "quantity_short",
+        "quantity_over",
+        "wrong_item",
+        "quality_failure",
+        "expired_or_near_expiry",
+        "missing_documentation",
+        "late_delivery",
+        "packaging_non_conformance",
+        "supplier_non_conformance",
+        "other",
       ],
       invitation_status: ["invited", "viewed", "declined", "submitted"],
       journal_status: ["draft", "posted", "void", "reversed"],
