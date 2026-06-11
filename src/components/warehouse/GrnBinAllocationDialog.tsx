@@ -235,8 +235,10 @@ export function GrnBinAllocationDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, allocatableItems, companyId, selectedRootLocationId]);
 
+  const anyResolving = Object.keys(resolving).length > 0;
   const allComplete =
     allocatableItems.length > 0 &&
+    !anyResolving &&
     allocatableItems.every((i) => {
       const r = rows[i.id];
       return r?.warehouseItemId && r?.binId;
