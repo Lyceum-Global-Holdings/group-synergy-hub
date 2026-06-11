@@ -13,6 +13,7 @@ import { format, parseISO, startOfDay } from "date-fns";
 import { Package, DollarSign, Info, Grid3X3, CheckCircle, XCircle, TrendingUp, History } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
+import { PurchasePriceHistory } from "./PurchasePriceHistory";
 
 interface ItemDetailsDialogProps {
   item: WarehouseItem | null;
@@ -302,6 +303,13 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
               </div>
             </CardContent>
           </Card>
+
+          {/* Purchase Price History */}
+          <PurchasePriceHistory
+            catalogItemId={(item as any).catalog_item_id ?? null}
+            warehouseItemId={item.id}
+          />
+
 
           {/* Additional Details */}
           <Card>

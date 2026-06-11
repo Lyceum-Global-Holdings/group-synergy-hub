@@ -19949,6 +19949,122 @@ export type Database = {
           },
         ]
       }
+      warehouse_item_price_history: {
+        Row: {
+          catalog_item_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          grn_date: string | null
+          grn_id: string | null
+          grn_item_id: string | null
+          grn_number: string | null
+          id: string
+          po_id: string | null
+          po_number: string | null
+          quantity_received: number
+          received_at: string
+          supplier_id: string | null
+          supplier_name: string | null
+          total_cost: number
+          unit_price: number
+          warehouse_item_id: string | null
+        }
+        Insert: {
+          catalog_item_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          grn_date?: string | null
+          grn_id?: string | null
+          grn_item_id?: string | null
+          grn_number?: string | null
+          id?: string
+          po_id?: string | null
+          po_number?: string | null
+          quantity_received?: number
+          received_at?: string
+          supplier_id?: string | null
+          supplier_name?: string | null
+          total_cost?: number
+          unit_price?: number
+          warehouse_item_id?: string | null
+        }
+        Update: {
+          catalog_item_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          grn_date?: string | null
+          grn_id?: string | null
+          grn_item_id?: string | null
+          grn_number?: string | null
+          id?: string
+          po_id?: string | null
+          po_number?: string | null
+          quantity_received?: number
+          received_at?: string
+          supplier_id?: string | null
+          supplier_name?: string | null
+          total_cost?: number
+          unit_price?: number
+          warehouse_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_item_price_history_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_item_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_price_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_price_history_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_price_history_grn_item_id_fkey"
+            columns: ["grn_item_id"]
+            isOneToOne: true
+            referencedRelation: "grn_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_price_history_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_price_history_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_price_history_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_item_reservations: {
         Row: {
           bin_allocation_id: string | null
