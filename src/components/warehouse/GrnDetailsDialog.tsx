@@ -67,7 +67,10 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
     setShowBinAllocation(true);
   };
 
-  const handleBinAllocationConfirm = async (allocations: BinAllocation[]) => {
+  const handleBinAllocationConfirm = async (
+    allocations: BinAllocation[],
+    itemLinks: Record<string, string>,
+  ) => {
     await approveGrn.mutateAsync({
       id: grn.id,
       binAllocations: allocations.map((a) => ({
@@ -76,6 +79,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
         location_id: a.location_id,
         quantity: a.quantity,
       })),
+      itemLinks,
     });
     setShowBinAllocation(false);
   };
@@ -263,6 +267,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
         open={showBinAllocation}
         onOpenChange={setShowBinAllocation}
         items={grn.grn_items || []}
+        companyId={grn.company_id}
         onConfirm={handleBinAllocationConfirm}
         isLoading={approveGrn.isPending}
       />
