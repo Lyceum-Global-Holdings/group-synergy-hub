@@ -1,36 +1,45 @@
 ## Goal
-In `GrnBinAllocationDialog`, eliminate the manual "Select item…" and "Select bin…" steps whenever we have enough information to resolve them automatically. Only fall back to manual pickers when auto-resolve can't find a unique answer.
+Let an admin reject a submitted GRN with a structured, internationally-recognised reason (ISO 9001 §8.7 *Control of nonconforming outputs* + GS1 CBV `Disposition` vocabulary + SAP MIGO MVT 122 rationale). Rejection is a terminal status — it stops stock from being received, leaves an audit trail, and is enforced server-side just like approval.
 
-## Behaviour after the change
+## Reason code catalogue
+Stored as a Postgres enum `grn_rejection_reason`. Names map to widely-used international codes so the data is portable.
 
-When the dialog opens, for each received GRN line:
+| Code | Label | International basis |
+| --- | --- | --- |
+| `damaged_in_transit` | Damaged in transit | GS1 CBV `damaged` |
+| `quantity_short` | Short quantity received | ISO 9001 §8.7; SAP MIGO short delivery |
+| `quantity_over` | Over-delivered quantity | SAP MIGO over delivery |
+| `wrong_item` | Wrong item / spec mismatch | ISO 9001 NCR |
+| `quality_failure` | Failed quality inspection | ISO 9001 §8.7; GS1 `non_sellable_other` |
+| `expired_or_near_expiry` | Expired / shelf-life breach | GS1 `expired` |
+| `missing_documentation` | Missing invoice/COA/packing list | INCOTERMS 2020 doc compliance |
+| `late_delivery` | Outside agreed delivery window | OTIF KPI |
+| `packaging_non_conformance` | Packaging non-conformance | GS1 packaging guidelines |
+| `supplier_non_conformance` | Supplier non-conformance (other) | ISO 9001 §8.4 |
+| `other` | Other (free text required) | — |
 
-1. **Auto-link the Warehouse Item**
-   - If `warehouse_item_id` is already set → use it (current behaviour).
-   - Else if `item_code` is set → look it up in `warehouse_item_catalog` (active, exact `item_code` match) and call `ensure_warehouse_item_for_company(company_id, catalog_id)` to provision/get the per-company `warehouse_items.id`. Store it on the row.
-   - Else → leave the inline catalog picker visible (unchanged fallback).
+## Database changes (single migration)
+1. `CREATE TYPE public.grn_rejection_reason AS ENUM (...)` with the codes above.
+2. `ALTER TABLE public.goods_receipt_notes`
+   - add `rejection_reason grn_rejection_reason`
+   - add `rejection_notes text`
+   - add `rejected_by uuid REFERENCES auth.users(id)`
+   - add `rejected_date timestamptz`
+3. Extend the GRN status text values to include `'rejected'` (the column is already free-text; no enum change needed) and add a CHECK or trigger guard: `status = 'rejected'` ⇒ `rejection_reason IS NOT NULL`; `other` ⇒ `rejection_notes IS NOT NULL AND length(trim(rejection_notes)) > 0`.
+4. New trigger `enforce_grn_admin_rejection()` mirroring `enforce_grn_admin_approval()` — only `admin`/`super_admin` (via existing `is_admin_or_higher`) may transition into `rejected`, and only from `submitted`. Re-approval after rejection is blocked.
+5. New SECURITY DEFINER RPC `reject_goods_receipt_note(_grn_id uuid, _reason grn_rejection_reason, _notes text)` that performs the update atomically, sets `rejected_by = auth.uid()`, `rejected_date = now()`, and returns the updated row. Grant `EXECUTE` to `authenticated`.
 
-2. **Auto-load the Destination Bin** (based on the location currently selected in the global header — same `selectedRootLocationId` we already compute)
-   - Look up existing `warehouse_bin_allocations` for `(warehouse_item_id, company_id)` scoped to the selected location → if a row exists, pre-select that bin (preferred: the one with the largest `allocated_quantity`, so we top up an existing pile rather than scatter).
-   - Else if the item's `warehouse_items.location_id` matches the selected location and has a default bin in `activeBins` → pre-select it.
-   - Else if exactly one `activeBins` row exists in the selected location → pre-select it.
-   - Else → leave the bin Select empty so the user picks (current fallback).
-
-3. The user can still override either field via the existing picker/Select.
-
-4. "Confirm & Approve" enables as soon as every row has both a warehouse item and a bin — which, for the common case, will be immediately after the dialog opens.
-
-5. Loading state: show a small "Resolving…" indicator on the row while auto-link/auto-bin is in flight; disable Confirm until all rows finish resolving.
-
-## Files to change
-
-- `src/components/warehouse/GrnBinAllocationDialog.tsx` — only file edited.
-  - Add `autoResolveItem(rowId, itemCode)` helper that queries `warehouse_item_catalog` by `item_code` (use the existing supabase client, single-row `.maybeSingle()`) and reuses `handlePickCatalogItem` logic for linking.
-  - Add `autoPickBin(rowId, warehouseItemId)` helper that queries `warehouse_bin_allocations` filtered by `warehouse_item_id`, `company_id`, and (when known) the selected root location, ordered by `allocated_quantity desc`, then falls back to the single-active-bin rule.
-  - Wire both into the existing `useEffect` that initialises `rows` when `open` flips true. Track a per-row `resolving` flag.
+## Frontend changes
+- `src/types/grn.ts` — add `'rejected'` to `GrnStatus`; add `GrnRejectionReason` union matching the enum; add `REJECTION_REASON_LABELS` map.
+- `src/hooks/useGoodsReceiptNotes.ts` — new `useRejectGoodsReceiptNote` mutation calling the RPC; invalidates the GRN list + detail caches.
+- `src/components/warehouse/GrnDetailsDialog.tsx`
+  - Add red bg badge for `rejected` in `statusColors`/`statusLabels`.
+  - When `status === 'submitted'` and `isAdmin`, render a destructive **Reject GRN** button alongside **Approve GRN**.
+  - Clicking opens a new lightweight `RejectGrnDialog` (created in the same folder) with: a Select bound to the reason catalogue, a Textarea for notes (required when `other`, optional otherwise), Cancel / Confirm Rejection (destructive variant). Confirm calls the mutation; on success closes both dialogs and toasts.
+  - When a GRN is already `rejected`, show the reason + notes + who/when in the Details tab (read-only panel).
+- `src/pages/warehouse/GoodsReceiptNote.tsx` — make sure the status filter dropdown and any badge colour map include `rejected` so the list view reflects the new state.
 
 ## Out of scope
-
-- No DB migration.
-- No change to `GrnDetailsDialog`, `useGoodsReceiptNotes`, or the approval RPC — the auto-resolved values flow through the existing `onConfirm({ allocations, itemLinks })` path.
-- No change to the create-GRN flow (already correct after the previous fix).
+- No changes to the bin-allocation dialog or stock movement code paths — rejection deliberately bypasses inventory side-effects.
+- No notification/email plumbing in this change (can be added later via the existing `send-approval-notification` edge function).
+- No bulk-reject UI; one GRN at a time.
