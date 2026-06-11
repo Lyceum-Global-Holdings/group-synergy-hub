@@ -303,6 +303,12 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
             </CardContent>
           </Card>
 
+          {/* Purchase Price History */}
+          <PurchasePriceHistory
+            catalogItemId={item.catalog_item_id ?? null}
+            warehouseItemId={item.id}
+          />
+
           {/* Additional Details */}
           <Card>
             <CardHeader className="pb-3">
