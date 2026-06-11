@@ -20,14 +20,16 @@ import {
   useApproveGoodsReceiptNote,
   useSubmitGoodsReceiptNote,
   useDeleteGoodsReceiptNote,
+  useRejectGoodsReceiptNote,
 } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
-import { GrnStatus } from '@/types/grn';
+import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS } from '@/types/grn';
 import { format } from 'date-fns';
 import { useState } from 'react';
 import { FileText } from 'lucide-react';
 import { GrnDocument } from './GrnDocument';
 import { GrnBinAllocationDialog, BinAllocation } from './GrnBinAllocationDialog';
+import { RejectGrnDialog } from './RejectGrnDialog';
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
