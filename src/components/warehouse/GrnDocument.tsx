@@ -153,7 +153,28 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
               </div>
             </div>
 
+            {grn.status === 'rejected' && rejection.rejection_reason && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 space-y-1">
+                <p className="font-semibold text-destructive text-sm uppercase">GRN Rejected</p>
+                <p className="text-sm">
+                  <span className="font-medium">Reason:</span>{' '}
+                  {GRN_REJECTION_REASON_LABELS[rejection.rejection_reason as keyof typeof GRN_REJECTION_REASON_LABELS] ?? rejection.rejection_reason}
+                </p>
+                {rejection.rejection_notes && (
+                  <p className="text-sm whitespace-pre-wrap">
+                    <span className="font-medium">Notes:</span> {rejection.rejection_notes}
+                  </p>
+                )}
+                {rejection.rejected_date && (
+                  <p className="text-xs text-muted-foreground">
+                    Rejected on {format(new Date(rejection.rejected_date), 'PPP p')}
+                  </p>
+                )}
+              </div>
+            )}
+
             <Separator />
+
 
             {/* Invoice Information */}
             {(grn.invoice_number || grn.invoice_date) && (
