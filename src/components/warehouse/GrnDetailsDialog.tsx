@@ -267,6 +267,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
         open={showBinAllocation}
         onOpenChange={setShowBinAllocation}
         items={grn.grn_items || []}
+        companyId={grn.company_id}
         onConfirm={handleBinAllocationConfirm}
         isLoading={approveGrn.isPending}
       />
