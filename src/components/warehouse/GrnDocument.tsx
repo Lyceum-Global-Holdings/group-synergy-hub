@@ -5,7 +5,12 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Printer, Download, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
-import { GoodsReceiptNote } from "@/types/grn";
+import { GoodsReceiptNote, GRN_REJECTION_REASON_LABELS } from "@/types/grn";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { downloadGrnPdf } from "@/utils/goodsReceiptPdfExport";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface GrnDocumentProps {
   grn: GoodsReceiptNote;
@@ -25,12 +30,34 @@ const qualityStatusLabels = {
 };
 
 export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
+  const { selectedCompany } = useCompany();
+  const auth = useAuth() as any;
+  const [downloading, setDownloading] = useState(false);
+
   const handlePrint = () => {
     window.print();
   };
 
-  const handleDownloadPDF = () => {
-    window.print();
+  const handleDownloadPDF = async () => {
+    try {
+      setDownloading(true);
+      await downloadGrnPdf({
+        grn,
+        company: selectedCompany ?? null,
+        generatedByName: auth?.profile?.full_name ?? auth?.user?.email ?? null,
+      });
+    } catch (e) {
+      console.error("[GRN PDF]", e);
+      toast.error("Failed to generate GRN PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const rejection = grn as unknown as {
+    rejection_reason?: string | null;
+    rejection_notes?: string | null;
+    rejected_date?: string | null;
   };
 
   return (
