@@ -109,6 +109,7 @@ export function GrnBinAllocationDialog({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [linking, setLinking] = useState<string | null>(null);
+  const [resolving, setResolving] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -124,22 +125,115 @@ export function GrnBinAllocationDialog({
     });
   const catalogItems = (catalogPages?.pages ?? []).flat();
 
+  // Initialise rows when the dialog opens, then auto-resolve item + bin per row.
   useEffect(() => {
-    if (open) {
-      const initial: Record<string, RowState> = {};
-      for (const it of allocatableItems) {
-        initial[it.id] = {
-          warehouseItemId: it.warehouse_item_id || '',
-          binId: '',
-          itemLabel: it.item_name,
-          itemCode: it.item_code || '',
+    if (!open) return;
+
+    const initial: Record<string, RowState> = {};
+    for (const it of allocatableItems) {
+      initial[it.id] = {
+        warehouseItemId: it.warehouse_item_id || '',
+        binId: '',
+        itemLabel: it.item_name,
+        itemCode: it.item_code || '',
+      };
+    }
+    setRows(initial);
+    setSearch('');
+    setOpenPicker(null);
+
+    let cancelled = false;
+
+    const pickBinForItem = async (
+      warehouseItemId: string,
+    ): Promise<{ binId: string; locationId: string | null } | null> => {
+      if (!companyId || !warehouseItemId) return null;
+      let q = supabase
+        .from('warehouse_bin_allocations')
+        .select('bin_id, location_id, allocated_quantity')
+        .eq('warehouse_item_id', warehouseItemId)
+        .eq('company_id', companyId)
+        .order('allocated_quantity', { ascending: false })
+        .limit(1);
+      if (selectedRootLocationId) q = q.eq('location_id', selectedRootLocationId);
+      const { data } = await q;
+      const hit = data?.[0];
+      if (hit?.bin_id) {
+        return {
+          binId: hit.bin_id as string,
+          locationId: (hit.location_id as string | null) ?? null,
         };
       }
-      setRows(initial);
-      setSearch('');
-      setOpenPicker(null);
-    }
-  }, [open, allocatableItems]);
+      // Fall back: single active bin available in the selected location.
+      if (activeBins.length === 1) {
+        return { binId: activeBins[0].id, locationId: activeBins[0].location_id ?? null };
+      }
+      return null;
+    };
+
+    const resolveRow = async (it: GrnItem) => {
+      setResolving((prev) => ({ ...prev, [it.id]: true }));
+      try {
+        let warehouseItemId = it.warehouse_item_id || '';
+        let itemLabel = it.item_name;
+        let itemCode = it.item_code || '';
+
+        // 1. Auto-link warehouse item via exact item_code lookup in the catalog.
+        if (!warehouseItemId && it.item_code && companyId) {
+          const { data: catalogRow } = await supabase
+            .from('warehouse_item_catalog')
+            .select('id, item_code, name')
+            .eq('item_code', it.item_code)
+            .eq('status', 'active')
+            .maybeSingle();
+          if (catalogRow?.id) {
+            const { data: ensuredId, error } = await supabase.rpc(
+              'ensure_warehouse_item_for_company' as any,
+              { p_company_id: companyId, p_catalog_item_id: catalogRow.id },
+            );
+            if (!error && ensuredId) {
+              warehouseItemId = ensuredId as unknown as string;
+              itemLabel = catalogRow.name as string;
+              itemCode = catalogRow.item_code as string;
+            }
+          }
+        }
+
+        // 2. Auto-pick the destination bin once we have a warehouse item.
+        let binPick: { binId: string; locationId: string | null } | null = null;
+        if (warehouseItemId) {
+          binPick = await pickBinForItem(warehouseItemId);
+        }
+
+        if (cancelled) return;
+        setRows((prev) => ({
+          ...prev,
+          [it.id]: {
+            ...prev[it.id],
+            warehouseItemId,
+            itemLabel,
+            itemCode,
+            binId: binPick?.binId || prev[it.id]?.binId || '',
+          },
+        }));
+      } finally {
+        if (!cancelled) {
+          setResolving((prev) => {
+            const next = { ...prev };
+            delete next[it.id];
+            return next;
+          });
+        }
+      }
+    };
+
+    for (const it of allocatableItems) void resolveRow(it);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, allocatableItems, companyId, selectedRootLocationId]);
 
   const allComplete =
     allocatableItems.length > 0 &&
