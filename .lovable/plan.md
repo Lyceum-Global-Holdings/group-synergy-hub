@@ -1,37 +1,51 @@
-## Root cause
+# Last GRN Unit Price & Price History
 
-The GRN item picker is powered by the `list_warehouse_catalog` SECURITY DEFINER RPC. Its access gate hard-codes module checks:
+Align with international ERP standards (SAP MM "Last Purchase Price" / Oracle Cost Mgmt PO history) — when a GRN is approved/completed, the receiving item's last purchase price is auto-updated, and a full per-receipt price history is preserved and viewable from item details.
 
-```
-has_warehouse_access OR has_procurement_access OR has_finance_access OR has_manager_access
-```
+## What we'll build
 
-Users in the `user` role can reach the GRN screen (the front-end module config grants them GRN access) but fail every one of those helper checks, so the RPC short-circuits and returns no rows — empty item dropdown.
+### 1. Price history table (new)
+`warehouse_item_price_history` — one immutable row per accepted GRN line:
+- item refs: `catalog_item_id`, `warehouse_item_id`, `company_id`
+- source: `grn_id`, `grn_item_id`, `grn_number`, `grn_date`
+- supplier: `supplier_id`, `supplier_name`
+- pricing: `unit_price`, `quantity_received`, `total_cost`, `currency` (default company)
+- po linkage: `po_id`, `po_number`
+- `received_at`, `created_by`
 
-This contradicts the table's own RLS, which already allows any authenticated user to read the catalog:
+RLS: company-scoped read for `authenticated`; writes only via the trigger (SECURITY DEFINER). GRANTs follow project standard.
 
-```
-Policy "Authenticated users can view catalog"  USING (auth.uid() IS NOT NULL)
-```
+Indexes: `(catalog_item_id, received_at DESC)` and `(warehouse_item_id, received_at DESC)` for fast "latest first" lookups.
 
-Item-master visibility for receiving/issuing is the SAP MM / Oracle EBS / NetSuite convention: master data is broadly readable by any operational user; only transactional/stock data is permission-gated.
+### 2. Auto-update trigger
+`sync_item_price_on_grn_approval()` — `AFTER UPDATE` on `goods_receipt_notes` when `status` transitions to `approved` or `completed`:
 
-## Fix
+For each `grn_items` row (with quality_status in 'good','damaged' — exclude 'rejected'):
+1. Insert a row into `warehouse_item_price_history`.
+2. Update `warehouse_item_catalog.unit_cost = NEW unit_price` (master "last purchase price").
+3. Update `warehouse_items.unit_cost` for the same `catalog_item_id` scoped to the GRN's `company_id` (per-company last cost).
 
-Replace the access gate in `list_warehouse_catalog` so it mirrors the table's RLS — accept any authenticated user. Module/role checks stay where they belong: on the screens that *write* catalog data and on the stock/transactional tables.
+Idempotent: skip if a price-history row for `(grn_item_id)` already exists, so re-approvals don't double-insert.
 
-Concretely, the migration `CREATE OR REPLACE`s the function and changes only the gate block:
+Standards note: this matches SAP MM moving "Last PO Price" semantics; valuation/FIFO layers in `cost_layers` remain untouched — we only refresh the master "last price" pointer, never rewrite historical valuation.
 
-```sql
-IF v_uid IS NULL THEN
-  RETURN;
-END IF;
-```
+### 3. UI — Price history in item details
+`src/components/warehouse/ItemDetailsDialog.tsx` (or the catalog item details panel) gains a new "Purchase Price History" section:
+- New hook `useItemPriceHistory(catalogItemId)` reads from `warehouse_item_price_history` ordered by `received_at DESC`, limited to 50 with "View more".
+- Table columns: GRN Date · GRN # · Supplier · Qty · Unit Price · Total · PO #.
+- Header strip shows: **Last Price** (most recent), **Avg (last 12 mo)**, **Min / Max (last 12 mo)** — standard procurement KPIs.
+- Empty state: "No purchase history yet."
 
-Body, ordering, paging, search ranking, and return columns are unchanged. No client changes — the picker already calls this RPC.
+### 4. Backfill
+One-time backfill insert into `warehouse_item_price_history` from existing `grn_items` joined to `goods_receipt_notes` where status in ('approved','completed'), then refresh `unit_cost` on catalog + per-company items from the latest row per item.
+
+## Technical details
+
+- All schema work in one migration; data backfill via the insert tool after migration approval.
+- Trigger uses `SECURITY DEFINER` + `SET search_path = public`.
+- No client-side cost recalc — DB is source of truth (matches `stock-ledger-immutable-balances` memory rule).
+- Realtime: add `warehouse_item_price_history` to publication so open item dialogs refresh after new GRN approvals.
 
 ## Out of scope
-
-- Catalog *write* paths (create/edit/delete) keep their existing role checks.
-- Per-company `warehouse_items` quantities and `warehouse_bin_allocations` continue to be gated by `can_access_company` / company RLS — non-admin users will only see stock for companies they belong to. Only the global item master becomes visible.
-- No change to GRN approval / bin-allocation flow.
+- Moving average cost / weighted-avg revaluation (separate effort; would touch `cost_layers` and journal entries).
+- Currency conversion for multi-currency GRNs (use raw GRN currency for now; flagged for follow-up).
