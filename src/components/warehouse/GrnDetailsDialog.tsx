@@ -284,9 +284,14 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
               </>
             )}
             {grn.status === 'submitted' && isAdmin && (
-              <Button onClick={handleApprove}>
-                Approve GRN
-              </Button>
+              <>
+                <Button variant="destructive" onClick={() => setShowReject(true)}>
+                  Reject GRN
+                </Button>
+                <Button onClick={handleApprove}>
+                  Approve GRN
+                </Button>
+              </>
             )}
           </div>
         </div>
