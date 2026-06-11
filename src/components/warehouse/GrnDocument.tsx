@@ -5,7 +5,12 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Printer, Download, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
-import { GoodsReceiptNote } from "@/types/grn";
+import { GoodsReceiptNote, GRN_REJECTION_REASON_LABELS } from "@/types/grn";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { downloadGrnPdf } from "@/utils/goodsReceiptPdfExport";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface GrnDocumentProps {
   grn: GoodsReceiptNote;
@@ -25,12 +30,34 @@ const qualityStatusLabels = {
 };
 
 export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
+  const { selectedCompany } = useCompany();
+  const auth = useAuth() as any;
+  const [downloading, setDownloading] = useState(false);
+
   const handlePrint = () => {
     window.print();
   };
 
-  const handleDownloadPDF = () => {
-    window.print();
+  const handleDownloadPDF = async () => {
+    try {
+      setDownloading(true);
+      await downloadGrnPdf({
+        grn,
+        company: selectedCompany ?? null,
+        generatedByName: auth?.profile?.full_name ?? auth?.user?.email ?? null,
+      });
+    } catch (e) {
+      console.error("[GRN PDF]", e);
+      toast.error("Failed to generate GRN PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const rejection = grn as unknown as {
+    rejection_reason?: string | null;
+    rejection_notes?: string | null;
+    rejected_date?: string | null;
   };
 
   return (
@@ -47,21 +74,48 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
           <Printer className="h-4 w-4 mr-2" />
           Print GRN
         </Button>
-        <Button onClick={handleDownloadPDF} variant="outline" className="flex-1">
+        <Button onClick={handleDownloadPDF} variant="outline" className="flex-1" disabled={downloading}>
           <Download className="h-4 w-4 mr-2" />
-          Download PDF
+          {downloading ? 'Generating…' : 'Download PDF'}
         </Button>
       </div>
 
       {/* Document content - styled for printing */}
       <div className="bg-background p-8 print:p-0">
         <Card className="print:shadow-none print:border-0">
-          <CardHeader className="text-center space-y-4">
-            <div>
-              <h1 className="text-3xl font-bold">GOODS RECEIPT NOTE</h1>
-              <p className="text-muted-foreground mt-2">Material Receipt Document</p>
+          <CardHeader className="space-y-4">
+            {/* Company header band */}
+            <div className="flex items-start justify-between gap-4 pb-3 border-b">
+              <div className="flex items-start gap-3">
+                {selectedCompany?.logo_url ? (
+                  <img
+                    src={selectedCompany.logo_url}
+                    alt={`${selectedCompany.name} logo`}
+                    className="h-14 w-14 object-contain rounded"
+                  />
+                ) : null}
+                <div>
+                  <p className="text-lg font-bold leading-tight">
+                    {selectedCompany?.name ?? 'Company'}
+                  </p>
+                  {selectedCompany?.address && (
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap max-w-xs">
+                      {selectedCompany.address}
+                    </p>
+                  )}
+                  {selectedCompany?.code && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Company Code: {selectedCompany.code}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <h1 className="text-2xl font-bold">GOODS RECEIPT NOTE</h1>
+                <p className="text-xs text-muted-foreground mt-1">Material Receipt Document</p>
+              </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 text-left text-sm">
               <div>
                 <p className="font-semibold">GRN Number:</p>
@@ -86,6 +140,7 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
             </div>
           </CardHeader>
 
+
           <CardContent className="space-y-6">
             {/* Supplier Information */}
             <div className="space-y-2">
@@ -98,7 +153,28 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
               </div>
             </div>
 
+            {grn.status === 'rejected' && rejection.rejection_reason && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 space-y-1">
+                <p className="font-semibold text-destructive text-sm uppercase">GRN Rejected</p>
+                <p className="text-sm">
+                  <span className="font-medium">Reason:</span>{' '}
+                  {GRN_REJECTION_REASON_LABELS[rejection.rejection_reason as keyof typeof GRN_REJECTION_REASON_LABELS] ?? rejection.rejection_reason}
+                </p>
+                {rejection.rejection_notes && (
+                  <p className="text-sm whitespace-pre-wrap">
+                    <span className="font-medium">Notes:</span> {rejection.rejection_notes}
+                  </p>
+                )}
+                {rejection.rejected_date && (
+                  <p className="text-xs text-muted-foreground">
+                    Rejected on {format(new Date(rejection.rejected_date), 'PPP p')}
+                  </p>
+                )}
+              </div>
+            )}
+
             <Separator />
+
 
             {/* Invoice Information */}
             {(grn.invoice_number || grn.invoice_date) && (
