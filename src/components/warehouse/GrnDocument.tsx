@@ -74,9 +74,9 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
           <Printer className="h-4 w-4 mr-2" />
           Print GRN
         </Button>
-        <Button onClick={handleDownloadPDF} variant="outline" className="flex-1">
+        <Button onClick={handleDownloadPDF} variant="outline" className="flex-1" disabled={downloading}>
           <Download className="h-4 w-4 mr-2" />
-          Download PDF
+          {downloading ? 'Generating…' : 'Download PDF'}
         </Button>
       </div>
 
