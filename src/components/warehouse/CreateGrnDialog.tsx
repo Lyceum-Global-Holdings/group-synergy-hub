@@ -590,15 +590,23 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                               return;
                                             }
                                             try {
-                                              const { data: warehouseItemId, error: provErr } = await supabase.rpc(
-                                                'ensure_warehouse_item_for_company' as any,
-                                                { p_company_id: selectedCompany.id, p_catalog_item_id: wi.id }
-                                              );
-                                              if (provErr) throw provErr;
+                                              // ISO 9001 §8.6 GR-blocked stock: do NOT provision a
+                                              // per-company warehouse_items row here. Just link the
+                                              // catalog item. Inventory rows are created atomically
+                                              // inside approve_grn_with_allocations on approval.
+                                              const { data: existing } = await supabase
+                                                .from('warehouse_items')
+                                                .select('id')
+                                                .eq('company_id', selectedCompany.id)
+                                                .eq('catalog_item_id', wi.id)
+                                                .maybeSingle();
+                                              const warehouseItemId = existing?.id ?? undefined;
+
                                               const newItems = [...items];
                                               newItems[index] = {
                                                 ...newItems[index],
-                                                warehouse_item_id: warehouseItemId as unknown as string,
+                                                warehouse_item_id: warehouseItemId,
+                                                catalog_item_id: wi.id,
                                                 item_name: wi.name,
                                                 item_code: wi.item_code,
                                                 is_batch_tracked: (wi as any).is_batch_tracked || false,
@@ -612,12 +620,14 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                               newItems[index].total_cost = qty * price;
                                               setItems(newItems);
                                               setItemSearch('');
-                                              // Auto-generate batch number for batch-tracked items
-                                              if ((wi as any).is_batch_tracked && !newItems[index].batch_number) {
+                                              // Auto-generate batch number only if a per-company
+                                              // inventory row already exists. Otherwise the batch
+                                              // number is assigned at approval time.
+                                              if ((wi as any).is_batch_tracked && !newItems[index].batch_number && warehouseItemId) {
                                                 try {
                                                   const code = await generateBatch.mutateAsync({
                                                     companyId: selectedCompany.id,
-                                                    warehouseItemId: warehouseItemId as unknown as string,
+                                                    warehouseItemId,
                                                   });
                                                   handleItemChange(index, 'batch_number', code);
                                                 } catch {
@@ -625,9 +635,10 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                                                 }
                                               }
                                             } catch (err: any) {
-                                              toast.error(err?.message || 'Failed to add item to inventory');
+                                              toast.error(err?.message || 'Failed to link item');
                                             }
                                           }}
+
                                         >
                                           <Check
                                             className={cn(

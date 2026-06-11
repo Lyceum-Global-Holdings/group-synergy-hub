@@ -178,26 +178,23 @@ export function GrnBinAllocationDialog({
         let itemLabel = it.item_name;
         let itemCode = it.item_code || '';
 
-        // 1. Auto-link warehouse item via exact item_code lookup in the catalog.
+        // 1. Auto-link only when a per-company warehouse_items row already exists.
+        //    We do NOT provision new inventory rows here (ISO 9001 §8.6 GR-blocked
+        //    stock): provisioning happens atomically inside approve_grn_with_allocations.
         if (!warehouseItemId && it.item_code && companyId) {
-          const { data: catalogRow } = await supabase
-            .from('warehouse_item_catalog')
+          const { data: existing } = await supabase
+            .from('warehouse_items_full')
             .select('id, item_code, name')
             .eq('item_code', it.item_code)
-            .eq('status', 'active')
+            .eq('company_id', companyId)
             .maybeSingle();
-          if (catalogRow?.id) {
-            const { data: ensuredId, error } = await supabase.rpc(
-              'ensure_warehouse_item_for_company' as any,
-              { p_company_id: companyId, p_catalog_item_id: catalogRow.id },
-            );
-            if (!error && ensuredId) {
-              warehouseItemId = ensuredId as unknown as string;
-              itemLabel = catalogRow.name as string;
-              itemCode = catalogRow.item_code as string;
-            }
+          if (existing?.id) {
+            warehouseItemId = existing.id as unknown as string;
+            itemLabel = (existing as any).name ?? itemLabel;
+            itemCode = (existing as any).item_code ?? itemCode;
           }
         }
+
 
         // 2. Auto-pick the destination bin once we have a warehouse item.
         let binPick: { binId: string; locationId: string | null } | null = null;
