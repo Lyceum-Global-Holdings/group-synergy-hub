@@ -1,0 +1,2 @@
+ALTER TABLE public.goods_receipt_notes DROP CONSTRAINT IF EXISTS goods_receipt_notes_status_check;
+ALTER TABLE public.goods_receipt_notes ADD CONSTRAINT goods_receipt_notes_status_check CHECK (status = ANY (ARRAY['draft','submitted','approved','completed','cancelled','rejected']));
