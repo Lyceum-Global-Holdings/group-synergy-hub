@@ -85,6 +85,16 @@ export default function ReportsCenter() {
   const { selectedCompany, baseCurrency } = useCompany();
   const { user } = useAuth();
 
+  const { data: companyLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
+  const { categories = [] } = useItemCategories(selectedCompany?.id);
+  const { data: suppliers = [] } = useSuppliers();
+
+  const nameLookups = useMemo(() => ({
+    location: new Map(companyLocations.map((l: any) => [l.id, l.name])),
+    category: new Map(categories.map((c: any) => [c.id, c.name])),
+    supplier: new Map(suppliers.map((s: any) => [s.id, s.name])),
+  }), [companyLocations, categories, suppliers]);
+
   const [activeModule, setActiveModule] = useState(initialModule);
   const [search, setSearch] = useState("");
 
