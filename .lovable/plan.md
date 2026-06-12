@@ -1,32 +1,29 @@
-## Goal
-Let users view (and download) the invoice document attached to a GRN directly from the GRN Details dialog.
+# Fix: Reports export currency hardcoded as USD
 
-## Current state
-- GRNs already store `invoice_document_url` (object path inside the `grn-invoices` Supabase storage bucket), set via `InvoiceUploadField` during create/edit.
-- `GrnDetailsDialog.tsx` shows GRN info, supplier, financials, items — but no way to open the uploaded invoice.
+## Problem
+In downloaded XLSX reports (e.g. Stock on Hand), monetary columns display "USD 0.00" even when the report envelope currency is LKR. The header correctly shows "Currency: LKR (ISO 4217)" but cells still format as USD.
 
-## Change
+## Root cause
+`src/lib/reports/format.ts` → `excelNumFmt(column)` falls back to the literal string `"USD"` when a column doesn't define its own `currency`. It never receives the envelope currency. Same issue would affect any non-USD envelope.
 
-In `src/components/warehouse/GrnDetailsDialog.tsx`:
+```ts
+return `"${column.currency ?? "USD"}" #,##0.00;...`;
+```
 
-1. When the GRN has `invoice_document_url`, render a new row in the **GRN Information** card:
-   - Label: `Invoice Document:`
-   - Two small buttons: **View** (opens in new tab) and **Download** (saves locally).
-   - File-type icon (PDF vs image) next to the filename derived from the path.
-2. Add a handler that requests a short-lived signed URL from Supabase storage:
+The XLSX renderer calls `excelNumFmt(col)` without passing envelope currency.
+
+## Fix
+
+1. **`src/lib/reports/format.ts`** — Update `excelNumFmt` signature to accept the envelope currency and use it as the fallback:
    ```ts
-   const { data } = await supabase.storage
-     .from('grn-invoices')
-     .createSignedUrl(grn.invoice_document_url, 300);
-   window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+   export function excelNumFmt(column: ReportColumn, envelopeCurrency = "USD"): string | undefined
    ```
-3. Download handler uses `supabase.storage.from('grn-invoices').download(path)` then triggers a Blob download (same pattern already used in `InvoiceUploadField.handleDownload`).
-4. Show a toast + disabled state while the signed URL is being fetched; toast on failure.
-5. If `invoice_document_url` is empty/null, show muted text `No invoice attached`.
+   Currency branch becomes `column.currency ?? envelopeCurrency`.
+
+2. **`src/lib/reports/xlsxRenderer.ts`** — Pass `envelope.currency` at both call sites (data rows + totals row): `excelNumFmt(col, envelope.currency)`.
 
 ## Out of scope
-- No DB / RLS changes (bucket and column already exist).
-- No changes to upload flow, items tab, or pricing history.
+No changes to PDF/CSV renderers (they already use `formatValue` which correctly falls back to `envelopeCurrency`). No registry/column definition changes. No data/business-logic changes.
 
-## Files
-- Edit: `src/components/warehouse/GrnDetailsDialog.tsx`
+## Verification
+After fix, exporting Stock on Hand with LKR envelope shows "LKR 0.00" formatting in Unit Cost / Stock Value columns instead of "USD 0.00".
