@@ -177,6 +177,35 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                   {grn.invoice_date && (
                     <p><strong>Invoice Date:</strong> {format(new Date(grn.invoice_date), 'PP')}</p>
                   )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <strong>Invoice Document:</strong>
+                    {grn.invoice_document_url ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleViewInvoice}
+                          disabled={invoiceLoading}
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleDownloadInvoice}
+                          disabled={invoiceLoading}
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1" />
+                          Download
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">No invoice attached</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
