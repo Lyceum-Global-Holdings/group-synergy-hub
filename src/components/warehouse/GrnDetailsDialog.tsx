@@ -26,10 +26,12 @@ import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS } from '@/types/grn';
 import { format } from 'date-fns';
 import { useState } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Eye, Download } from 'lucide-react';
 import { GrnDocument } from './GrnDocument';
 import { GrnBinAllocationDialog, BinAllocation } from './GrnBinAllocationDialog';
 import { RejectGrnDialog } from './RejectGrnDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
@@ -66,6 +68,46 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const [showDocument, setShowDocument] = useState(false);
   const [showBinAllocation, setShowBinAllocation] = useState(false);
   const [showReject, setShowReject] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+
+  const handleViewInvoice = async () => {
+    if (!grn?.invoice_document_url) return;
+    try {
+      setInvoiceLoading(true);
+      const { data, error } = await supabase.storage
+        .from('grn-invoices')
+        .createSignedUrl(grn.invoice_document_url, 300);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      toast.error(e.message || 'Could not open invoice');
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!grn?.invoice_document_url) return;
+    try {
+      setInvoiceLoading(true);
+      const { data, error } = await supabase.storage
+        .from('grn-invoices')
+        .download(grn.invoice_document_url);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = grn.invoice_document_url.split('/').pop() || 'invoice';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e.message || 'Download failed');
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
 
   if (!grn) return null;
 
@@ -135,6 +177,35 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                   {grn.invoice_date && (
                     <p><strong>Invoice Date:</strong> {format(new Date(grn.invoice_date), 'PP')}</p>
                   )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <strong>Invoice Document:</strong>
+                    {grn.invoice_document_url ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleViewInvoice}
+                          disabled={invoiceLoading}
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleDownloadInvoice}
+                          disabled={invoiceLoading}
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1" />
+                          Download
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">No invoice attached</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
