@@ -41,15 +41,17 @@ export function formatValue(
 }
 
 /** Excel numFmt strings */
-export function excelNumFmt(column: ReportColumn): string | undefined {
+export function excelNumFmt(column: ReportColumn, envelopeCurrency = "USD"): string | undefined {
   switch (column.type) {
     case "integer":
       return "#,##0";
     case "number":
       return "#,##0.00";
-    case "currency":
+    case "currency": {
       // ISO 4217 code prefix to keep currency explicit
-      return `"${column.currency ?? "USD"}" #,##0.00;[Red]-"${column.currency ?? "USD"}" #,##0.00`;
+      const code = column.currency ?? envelopeCurrency;
+      return `"${code}" #,##0.00;[Red]-"${code}" #,##0.00`;
+    }
     case "percent":
       return "0.00%";
     case "date":
