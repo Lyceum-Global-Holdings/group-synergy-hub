@@ -230,11 +230,14 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {grn.grn_items?.map((item) => (
+                {grn.grn_items?.map((item: any) => {
+                  const fallbackName = item.warehouse_item?.catalog?.name;
+                  const fallbackCode = item.warehouse_item?.catalog?.item_code;
+                  return (
                   <TableRow key={item.id}>
-                    <TableCell>{item.item_name}</TableCell>
-                    <TableCell>{item.item_code || '-'}</TableCell>
-                    <TableCell>{item.unit_of_measure}</TableCell>
+                    <TableCell>{item.item_name || fallbackName || '-'}</TableCell>
+                    <TableCell>{item.item_code || fallbackCode || '-'}</TableCell>
+                    <TableCell>{item.unit_of_measure || '-'}</TableCell>
                     <TableCell className="text-right">{item.quantity_ordered || '-'}</TableCell>
                     <TableCell className="text-right">{item.quantity_received}</TableCell>
                     <TableCell className="text-right">{item.unit_price.toFixed(2)}</TableCell>
