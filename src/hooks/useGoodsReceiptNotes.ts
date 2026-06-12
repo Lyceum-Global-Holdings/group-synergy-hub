@@ -72,6 +72,7 @@ export const useGrnById = (id: string) => {
             item_name,
             description,
             warehouse_item_id,
+            warehouse_item:warehouse_items(catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)),
             po_item_id,
             quantity_ordered,
             quantity_received,
