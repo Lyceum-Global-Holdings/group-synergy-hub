@@ -26,10 +26,12 @@ import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS } from '@/types/grn';
 import { format } from 'date-fns';
 import { useState } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Eye, Download } from 'lucide-react';
 import { GrnDocument } from './GrnDocument';
 import { GrnBinAllocationDialog, BinAllocation } from './GrnBinAllocationDialog';
 import { RejectGrnDialog } from './RejectGrnDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
