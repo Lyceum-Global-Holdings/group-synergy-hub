@@ -24,6 +24,9 @@ import { ReportPreviewTable } from "@/components/management/reports/ReportPrevie
 import { buildReportEnvelope } from "@/hooks/reports/useReportData";
 import { exportReport } from "@/lib/reports/exporter";
 import { ReportEnvelope, ReportFormat } from "@/lib/reports/types";
+import { useStockBearingLocationsForCompany } from "@/hooks/useWarehouseLocations";
+import { useItemCategories } from "@/hooks/useItemCategories";
+import { useSuppliers } from "@/hooks/useSuppliers";
 
 const MODULES = [
   { key: "warehouse", label: "Warehouse" },
