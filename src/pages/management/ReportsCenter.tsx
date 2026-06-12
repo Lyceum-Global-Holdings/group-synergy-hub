@@ -324,9 +324,16 @@ export default function ReportsCenter() {
   );
 }
 
+type NameLookups = {
+  location: Map<string, string>;
+  category: Map<string, string>;
+  supplier: Map<string, string>;
+};
+
 function buildFilterDescriptors(
   def: ReportDefinition,
   params: Record<string, unknown>,
+  lookups?: NameLookups,
 ): { label: string; value: string }[] {
   const opLabels: Record<string, string> = {
     contains: "contains",
@@ -350,7 +357,9 @@ function buildFilterDescriptors(
         const opt = p.options.find((o) => o.value === v);
         display = opt?.label ?? String(v);
       } else if (p.type === "location" || p.type === "category" || p.type === "supplier") {
-        display = String(v).slice(0, 8) + "…";
+        const id = String(v);
+        const name = lookups?.[p.type]?.get(id);
+        display = name ?? `${id.slice(0, 8)}…`;
       } else if (p.type === "textOperator") {
         const tv = v as { op?: string; term?: string };
         const term = (tv.term ?? "").trim();
