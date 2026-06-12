@@ -24,6 +24,9 @@ import { ReportPreviewTable } from "@/components/management/reports/ReportPrevie
 import { buildReportEnvelope } from "@/hooks/reports/useReportData";
 import { exportReport } from "@/lib/reports/exporter";
 import { ReportEnvelope, ReportFormat } from "@/lib/reports/types";
+import { useStockBearingLocationsForCompany } from "@/hooks/useWarehouseLocations";
+import { useItemCategories } from "@/hooks/useItemCategories";
+import { useSuppliers } from "@/hooks/useSuppliers";
 
 const MODULES = [
   { key: "warehouse", label: "Warehouse" },
@@ -82,6 +85,16 @@ export default function ReportsCenter() {
   const { selectedCompany, baseCurrency } = useCompany();
   const { user } = useAuth();
 
+  const { data: companyLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
+  const { categories = [] } = useItemCategories(selectedCompany?.id);
+  const { data: suppliers = [] } = useSuppliers();
+
+  const nameLookups = useMemo(() => ({
+    location: new Map(companyLocations.map((l: any) => [l.id, l.name])),
+    category: new Map(categories.map((c: any) => [c.id, c.name])),
+    supplier: new Map(suppliers.map((s: any) => [s.id, s.name])),
+  }), [companyLocations, categories, suppliers]);
+
   const [activeModule, setActiveModule] = useState(initialModule);
   const [search, setSearch] = useState("");
 
@@ -125,7 +138,7 @@ export default function ReportsCenter() {
           companyName: selectedCompany.name,
           currency: baseCurrency || "USD",
           generatedBy: user?.email || user?.id || "system",
-          filters: buildFilterDescriptors(openReport, params),
+          filters: buildFilterDescriptors(openReport, params, nameLookups),
         },
         params,
       );
@@ -311,9 +324,16 @@ export default function ReportsCenter() {
   );
 }
 
+type NameLookups = {
+  location: Map<string, string>;
+  category: Map<string, string>;
+  supplier: Map<string, string>;
+};
+
 function buildFilterDescriptors(
   def: ReportDefinition,
   params: Record<string, unknown>,
+  lookups?: NameLookups,
 ): { label: string; value: string }[] {
   const opLabels: Record<string, string> = {
     contains: "contains",
@@ -337,7 +357,9 @@ function buildFilterDescriptors(
         const opt = p.options.find((o) => o.value === v);
         display = opt?.label ?? String(v);
       } else if (p.type === "location" || p.type === "category" || p.type === "supplier") {
-        display = String(v).slice(0, 8) + "…";
+        const id = String(v);
+        const name = lookups?.[p.type]?.get(id);
+        display = name ?? `${id.slice(0, 8)}…`;
       } else if (p.type === "textOperator") {
         const tv = v as { op?: string; term?: string };
         const term = (tv.term ?? "").trim();
