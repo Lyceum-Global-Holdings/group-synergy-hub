@@ -68,6 +68,46 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const [showDocument, setShowDocument] = useState(false);
   const [showBinAllocation, setShowBinAllocation] = useState(false);
   const [showReject, setShowReject] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+
+  const handleViewInvoice = async () => {
+    if (!grn?.invoice_document_url) return;
+    try {
+      setInvoiceLoading(true);
+      const { data, error } = await supabase.storage
+        .from('grn-invoices')
+        .createSignedUrl(grn.invoice_document_url, 300);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      toast.error(e.message || 'Could not open invoice');
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!grn?.invoice_document_url) return;
+    try {
+      setInvoiceLoading(true);
+      const { data, error } = await supabase.storage
+        .from('grn-invoices')
+        .download(grn.invoice_document_url);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = grn.invoice_document_url.split('/').pop() || 'invoice';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e.message || 'Download failed');
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
 
   if (!grn) return null;
 
