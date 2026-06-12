@@ -138,7 +138,7 @@ export default function ReportsCenter() {
           companyName: selectedCompany.name,
           currency: baseCurrency || "USD",
           generatedBy: user?.email || user?.id || "system",
-          filters: buildFilterDescriptors(openReport, params),
+          filters: buildFilterDescriptors(openReport, params, nameLookups),
         },
         params,
       );
