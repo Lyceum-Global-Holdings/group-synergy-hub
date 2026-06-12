@@ -1,51 +1,53 @@
-# Last GRN Unit Price & Price History
+## Problem
 
-Align with international ERP standards (SAP MM "Last Purchase Price" / Oracle Cost Mgmt PO history) — when a GRN is approved/completed, the receiving item's last purchase price is auto-updated, and a full per-receipt price history is preserved and viewable from item details.
+`grn_items.item_code` and `item_name` are stored as `NULL` / empty string for some lines, so the Items tab renders `-` for Item Name and Code (verified for `GRN-20260612-001` — the row has `warehouse_item_id` set and the catalog resolves to `INV-RAW-000-0015 / Metal | Chips`, but the snapshot columns are blank).
 
-## What we'll build
+Root cause: when a GRN is created from a PO line or via certain catalog-picker paths, the form sometimes only persists `warehouse_item_id` / `catalog_item_id` and leaves the denormalised `item_code` / `item_name` columns empty. The detail dialog reads those columns directly.
 
-### 1. Price history table (new)
-`warehouse_item_price_history` — one immutable row per accepted GRN line:
-- item refs: `catalog_item_id`, `warehouse_item_id`, `company_id`
-- source: `grn_id`, `grn_item_id`, `grn_number`, `grn_date`
-- supplier: `supplier_id`, `supplier_name`
-- pricing: `unit_price`, `quantity_received`, `total_cost`, `currency` (default company)
-- po linkage: `po_id`, `po_number`
-- `received_at`, `created_by`
+## Solution (SAP MM / ISO snapshot pattern)
 
-RLS: company-scoped read for `authenticated`; writes only via the trigger (SECURITY DEFINER). GRANTs follow project standard.
+A GRN line MUST carry an immutable snapshot of the item master at the moment of receipt (item code, name, UoM) — this is the international standard so historical receipts stay readable even if the master is later renamed or deleted. Enforce it server-side and self-heal existing rows.
 
-Indexes: `(catalog_item_id, received_at DESC)` and `(warehouse_item_id, received_at DESC)` for fast "latest first" lookups.
+### 1. DB trigger — `grn_items_fill_item_snapshot` (BEFORE INSERT OR UPDATE)
 
-### 2. Auto-update trigger
-`sync_item_price_on_grn_approval()` — `AFTER UPDATE` on `goods_receipt_notes` when `status` transitions to `approved` or `completed`:
+For every row, when `item_code`, `item_name`, or `unit_of_measure` is `NULL` or empty:
 
-For each `grn_items` row (with quality_status in 'good','damaged' — exclude 'rejected'):
-1. Insert a row into `warehouse_item_price_history`.
-2. Update `warehouse_item_catalog.unit_cost = NEW unit_price` (master "last purchase price").
-3. Update `warehouse_items.unit_cost` for the same `catalog_item_id` scoped to the GRN's `company_id` (per-company last cost).
+- Resolve the catalog row via `warehouse_item_id → warehouse_items.catalog_item_id → warehouse_item_catalog`, or directly via `catalog_item_id` if present.
+- COALESCE-fill `item_code` from `warehouse_item_catalog.item_code`.
+- COALESCE-fill `item_name` from `warehouse_item_catalog.name`.
+- COALESCE-fill `unit_of_measure` from `item_units.code/name` joined through the catalog.
 
-Idempotent: skip if a price-history row for `(grn_item_id)` already exists, so re-approvals don't double-insert.
+SECURITY DEFINER, `SET search_path = public`. Runs before the existing `enforce_grn_has_items` logic so approval transitions stay valid.
 
-Standards note: this matches SAP MM moving "Last PO Price" semantics; valuation/FIFO layers in `cost_layers` remain untouched — we only refresh the master "last price" pointer, never rewrite historical valuation.
+### 2. One-time backfill
 
-### 3. UI — Price history in item details
-`src/components/warehouse/ItemDetailsDialog.tsx` (or the catalog item details panel) gains a new "Purchase Price History" section:
-- New hook `useItemPriceHistory(catalogItemId)` reads from `warehouse_item_price_history` ordered by `received_at DESC`, limited to 50 with "View more".
-- Table columns: GRN Date · GRN # · Supplier · Qty · Unit Price · Total · PO #.
-- Header strip shows: **Last Price** (most recent), **Avg (last 12 mo)**, **Min / Max (last 12 mo)** — standard procurement KPIs.
-- Empty state: "No purchase history yet."
+`UPDATE grn_items SET ... FROM warehouse_item_catalog ... WHERE (item_code IS NULL OR item_code = '' OR item_name IS NULL OR item_name = '')` — uses the same resolution path as the trigger. Fixes `GRN-20260612-001` and any other historical rows.
 
-### 4. Backfill
-One-time backfill insert into `warehouse_item_price_history` from existing `grn_items` joined to `goods_receipt_notes` where status in ('approved','completed'), then refresh `unit_cost` on catalog + per-company items from the latest row per item.
+### 3. Frontend defensive display
 
-## Technical details
+In `useGoodsReceiptNotes.ts` (both `useGoodsReceiptNotes` and `useGrnById`), extend the `grn_items(...)` embed with:
 
-- All schema work in one migration; data backfill via the insert tool after migration approval.
-- Trigger uses `SECURITY DEFINER` + `SET search_path = public`.
-- No client-side cost recalc — DB is source of truth (matches `stock-ledger-immutable-balances` memory rule).
-- Realtime: add `warehouse_item_price_history` to publication so open item dialogs refresh after new GRN approvals.
+```
+warehouse_item:warehouse_items(
+  catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+)
+```
+
+In `GrnDetailsDialog.tsx` items table, render:
+
+- `item.item_name || item.warehouse_item?.catalog?.name || '-'`
+- `item.item_code || item.warehouse_item?.catalog?.item_code || '-'`
+
+This guards against any future write path that forgets the snapshot, while the trigger remains the source of truth.
 
 ## Out of scope
-- Moving average cost / weighted-avg revaluation (separate effort; would touch `cost_layers` and journal entries).
-- Currency conversion for multi-currency GRNs (use raw GRN currency for now; flagged for follow-up).
+
+- Changing GRN create/edit forms (the trigger fixes the data; forms can keep their current shape).
+- Touching `unit_price` / pricing — covered by the prior price history work.
+- Existing `enforce_grn_has_items` trigger — unchanged.
+
+## Files
+
+- New migration: `grn_items_snapshot_autofill.sql` (trigger + backfill).
+- Edit: `src/hooks/useGoodsReceiptNotes.ts` (extend select).
+- Edit: `src/components/warehouse/GrnDetailsDialog.tsx` (fallback rendering).
