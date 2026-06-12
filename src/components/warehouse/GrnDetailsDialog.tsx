@@ -263,7 +263,8 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                       </>
                     )}
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </TabsContent>
