@@ -231,8 +231,8 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
               </TableHeader>
               <TableBody>
                 {grn.grn_items?.map((item: any) => {
-                  const fallbackName = item.warehouse_item?.catalog?.name;
-                  const fallbackCode = item.warehouse_item?.catalog?.item_code;
+                  const fallbackName = item.catalog?.name;
+                  const fallbackCode = item.catalog?.item_code;
                   return (
                   <TableRow key={item.id}>
                     <TableCell>{item.item_name || fallbackName || '-'}</TableCell>
