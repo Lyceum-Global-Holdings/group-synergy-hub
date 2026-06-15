@@ -133,6 +133,61 @@ export const useMaterialIssues = () => {
     }
   });
 
+  // --- Approval workflow (ISO 9001 §8.5.1 / SAP MIGO 261) ---
+  const invalidateAfterApproval = () => {
+    queryClient.invalidateQueries({ queryKey: ['material-issues'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-stock-movements'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-reservations'] });
+    queryClient.invalidateQueries({ queryKey: ['approval-console'] });
+  };
+
+  const submitForApprovalMutation = useMutation({
+    mutationFn: async (minId: string) => {
+      const { data, error } = await supabase.rpc('submit_material_issue_for_approval', { p_min_id: minId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidateAfterApproval();
+      toast({ title: 'Submitted for approval', description: 'An admin will review this MIN.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Submit failed', description: error?.message ?? 'Could not submit MIN.', variant: 'destructive' });
+    },
+  });
+
+  const approveMaterialIssueMutation = useMutation({
+    mutationFn: async (minId: string) => {
+      const { data, error } = await supabase.rpc('approve_material_issue', { p_min_id: minId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidateAfterApproval();
+      toast({ title: 'Approved', description: 'Stock has been issued.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Approval failed', description: error?.message ?? 'Could not approve MIN.', variant: 'destructive' });
+    },
+  });
+
+  const rejectMaterialIssueMutation = useMutation({
+    mutationFn: async ({ minId, reason }: { minId: string; reason: string }) => {
+      const { data, error } = await supabase.rpc('reject_material_issue', { p_min_id: minId, p_reason: reason });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidateAfterApproval();
+      toast({ title: 'Rejected', description: 'The MIN has been rejected.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Rejection failed', description: error?.message ?? 'Could not reject MIN.', variant: 'destructive' });
+    },
+  });
+
   return {
     materialIssues,
     isLoading,
@@ -141,8 +196,16 @@ export const useMaterialIssues = () => {
     createMaterialIssueAsync: createMaterialIssueMutation.mutateAsync,
     updateMaterialIssue: updateMaterialIssueMutation.mutate,
     deleteMaterialIssue: deleteMaterialIssueMutation.mutate,
+    submitForApprovalAsync: submitForApprovalMutation.mutateAsync,
+    approveMaterialIssue: approveMaterialIssueMutation.mutate,
+    approveMaterialIssueAsync: approveMaterialIssueMutation.mutateAsync,
+    rejectMaterialIssue: rejectMaterialIssueMutation.mutate,
+    rejectMaterialIssueAsync: rejectMaterialIssueMutation.mutateAsync,
     isCreating: createMaterialIssueMutation.isPending,
     isUpdating: updateMaterialIssueMutation.isPending,
     isDeleting: deleteMaterialIssueMutation.isPending,
+    isSubmitting: submitForApprovalMutation.isPending,
+    isApproving: approveMaterialIssueMutation.isPending,
+    isRejecting: rejectMaterialIssueMutation.isPending,
   };
 };
