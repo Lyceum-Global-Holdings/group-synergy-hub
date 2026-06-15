@@ -46,6 +46,7 @@ interface IssueItemsDialogProps {
 
 export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: IssueItemsDialogProps) {
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
+  const [itemNames, setItemNames] = useState<Record<string, string>>({});
   const [issuing, setIssuing] = useState(false);
   const [batchPreviews, setBatchPreviews] = useState<ItemBatchPreview[]>([]);
   const [loadingPreviews, setLoadingPreviews] = useState(false);
