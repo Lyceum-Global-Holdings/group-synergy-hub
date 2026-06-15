@@ -234,9 +234,17 @@ export function BulkIssueFromInventoryDialog({
 
       await createItems(itemsPayload);
 
+      // Submit the MIN for admin approval. Stock is only deducted later in the
+      // server-side issue_material() RPC after approval (ISO 9001 §8.5.1 / SAP mvt 261).
+      try {
+        await submitForApprovalAsync(issueNote.id);
+      } catch (e) {
+        console.error('Failed to submit MIN for approval', e);
+      }
+
       toast({
-        title: 'Material Issued',
-        description: `MIN ${issueNote.min_number} created with ${lines.length} item(s).`,
+        title: 'Submitted for approval',
+        description: `MIN ${issueNote.min_number} created with ${lines.length} item(s). Awaiting admin approval before stock is deducted.`,
       });
 
       onOpenChange(false);
