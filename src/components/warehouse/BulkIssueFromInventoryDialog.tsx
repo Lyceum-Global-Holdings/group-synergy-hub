@@ -269,8 +269,9 @@ export function BulkIssueFromInventoryDialog({
             Bulk Issue Materials
           </DialogTitle>
           <DialogDescription>
-            Create a single Material Issue Note (MIN) covering the selected inventory items.
-            Stock is deducted from the issue location's bins on submit (SAP-style Goods Issue).
+            Creates a single Material Issue Note (MIN) covering the selected inventory items and
+            submits it for admin approval. Stock is only deducted after approval and physical issue
+            (ISO 9001 §8.5.1 / SAP Goods Issue 261).
           </DialogDescription>
         </DialogHeader>
 
