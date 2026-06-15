@@ -96,7 +96,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const { items: warehouseItems } = useWarehouseItems();
   
-  const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
+  const { createMaterialIssueAsync, submitForApprovalAsync, isCreating, isSubmitting } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
@@ -378,6 +378,13 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
       }));
 
       await createItems(itemsToCreate);
+
+      // Submit the MIN for admin approval (stock is deducted only on approval).
+      try {
+        await submitForApprovalAsync(issueNote.id);
+      } catch (e) {
+        console.error('Failed to submit MIN for approval', e);
+      }
 
       // Reset form
       setFormData({
@@ -788,8 +795,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               <Button variant="outline" onClick={() => setCurrentTab('items')}>
                 Back
               </Button>
-              <Button onClick={handleSubmit} disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'Create Material Issue Note'}
+              <Button onClick={handleSubmit} disabled={isCreating || isSubmitting}>
+                {isCreating || isSubmitting ? 'Submitting…' : 'Submit for Approval'}
               </Button>
             </div>
           </TabsContent>

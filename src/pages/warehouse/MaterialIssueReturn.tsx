@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Download } from "lucide-react";
+import { Plus, Eye, Download, Check, X } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { useMaterialIssues } from "@/hooks/useMaterialIssues";
+import { useIsAdmin } from "@/hooks/useSuperAdmin";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
 import { MaterialIssueNote, MaterialReturnNote, MaterialRequest } from "@/types/materialIssueReturn";
@@ -51,7 +52,8 @@ export default function MaterialIssueReturn() {
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
 
-  const { materialIssues, isLoading: isLoadingIssues } = useMaterialIssues();
+  const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, isApproving, isRejecting } = useMaterialIssues();
+  const { data: isAdmin } = useIsAdmin();
   const { materialReturns, isLoading: isLoadingReturns } = useMaterialReturns();
   const { materialRequests, isLoading: isLoadingRequests } = useMaterialRequests();
   const { selectedCompany, companies } = useCompany();
@@ -212,22 +214,55 @@ export default function MaterialIssueReturn() {
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => handleViewDetails(row.original.id)}>
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Download PDF"
-            disabled={pdfLoadingId === row.original.id}
-            onClick={() => handleDownloadIssuePdf(row.original)}
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const issue = row.original;
+        const isPending = issue.status === 'pending_approval';
+        const busy = isApproving || isRejecting;
+        return (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => handleViewDetails(issue.id)}>
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Download PDF"
+              disabled={pdfLoadingId === issue.id}
+              onClick={() => handleDownloadIssuePdf(issue)}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            {isAdmin && isPending && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Approve & issue stock"
+                  disabled={busy}
+                  onClick={async () => {
+                    try { await approveMaterialIssueAsync(issue.id); } catch (e) { /* toast handled */ }
+                  }}
+                >
+                  <Check className="h-4 w-4 text-green-600" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Reject"
+                  disabled={busy}
+                  onClick={async () => {
+                    const reason = window.prompt('Reason for rejection:');
+                    if (!reason || !reason.trim()) return;
+                    try { await rejectMaterialIssueAsync({ minId: issue.id, reason: reason.trim() }); } catch (e) { /* toast handled */ }
+                  }}
+                >
+                  <X className="h-4 w-4 text-destructive" />
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      },
     },
   ];
 

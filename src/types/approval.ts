@@ -8,6 +8,7 @@ export type ApprovalType =
   | 'asset_request' 
   | 'material_request' 
   | 'stock_transfer' 
+  | 'material_issue' 
   | 'grn';
 
 export type ApprovalPriority = 'low' | 'medium' | 'high' | 'urgent';

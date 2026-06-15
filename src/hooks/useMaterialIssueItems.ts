@@ -9,72 +9,15 @@ export const useMaterialIssueItems = () => {
 
   const createItemsMutation = useMutation({
     mutationFn: async (items: CreateMaterialIssueItemData[]) => {
+      // Insert items only. Stock deduction happens server-side inside
+      // approve_material_issue() once an admin approves the MIN
+      // (ISO 9001 §8.5.1 / SAP MIGO segregation of duties).
       const { data: createdItems, error } = await supabase
         .from('material_issue_items')
         .insert(items)
         .select();
 
       if (error) throw error;
-
-      const insertedIds = (createdItems ?? []).map((r: any) => r.id);
-      const failures: string[] = [];
-
-      for (const item of createdItems ?? []) {
-        try {
-          if (item.from_reservation && item.reservation_id) {
-            const { error: rpcError } = await supabase.rpc('update_reservation_on_issue', {
-              p_reservation_id: item.reservation_id,
-              p_quantity_issued: item.quantity_issued,
-            });
-            if (rpcError) throw rpcError;
-          }
-
-          let binAllocationId: string | null = null;
-          if (item.reservation_id) {
-            const { data: reservation } = await supabase
-              .from('warehouse_item_reservations')
-              .select('bin_allocation_id')
-              .eq('id', item.reservation_id)
-              .single();
-            binAllocationId = reservation?.bin_allocation_id ?? null;
-          }
-
-          const { data: minData } = await supabase
-            .from('material_issue_notes')
-            .select('min_number, location_id')
-            .eq('id', item.min_id)
-            .single();
-
-          if (!minData?.location_id) {
-            throw new Error('Material Issue Note has no location set; cannot deduct stock.');
-          }
-
-          const { error: stockError } = await supabase.rpc('process_material_issue_stock_update', {
-            p_item_id: item.item_id,
-            p_quantity_issued: item.quantity_issued,
-            p_location_id: minData.location_id,
-            p_bin_allocation_id: binAllocationId,
-            p_min_id: item.min_id,
-            p_min_number: minData?.min_number || null,
-            p_secondary_quantity_issued: (item as any).secondary_quantity_issued ?? null,
-          } as any);
-
-          if (stockError) throw stockError;
-        } catch (err: any) {
-          failures.push(`${item.item_code || item.item_id}: ${err.message || err}`);
-        }
-      }
-
-      if (failures.length > 0) {
-        // Roll back inserted items so the MIN can be retried cleanly
-        if (insertedIds.length > 0) {
-          await supabase.from('material_issue_items').delete().in('id', insertedIds);
-        }
-        throw new Error(
-          `Stock could not be deducted for ${failures.length} line(s): ${failures.join('; ')}`
-        );
-      }
-
       return createdItems;
     },
     onSuccess: () => {
