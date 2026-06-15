@@ -152,6 +152,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
       } else {
         setItemNames({});
       }
+    } catch (error) {
       console.error('Error fetching issue details:', error);
       toast({
         title: 'Error',
