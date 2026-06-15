@@ -39,6 +39,7 @@ interface MaterialIssueDetailsDialogProps {
 export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: MaterialIssueDetailsDialogProps) {
   const [issue, setIssue] = useState<MaterialIssueNote | null>(null);
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
+  const [itemNames, setItemNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
