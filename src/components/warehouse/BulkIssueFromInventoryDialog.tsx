@@ -81,7 +81,7 @@ export function BulkIssueFromInventoryDialog({
   const navigate = useNavigate();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
-  const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
+  const { createMaterialIssueAsync, submitForApprovalAsync, isCreating, isSubmitting } = useMaterialIssues();
   const { createItems, isCreating: isCreatingItems } = useMaterialIssueItems();
   const { data: stockLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
 
