@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS trg_set_min_status_after_items ON public.material_issue_items;
