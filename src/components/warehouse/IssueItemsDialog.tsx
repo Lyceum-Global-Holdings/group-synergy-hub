@@ -46,6 +46,7 @@ interface IssueItemsDialogProps {
 
 export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: IssueItemsDialogProps) {
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
+  const [itemNames, setItemNames] = useState<Record<string, string>>({});
   const [issuing, setIssuing] = useState(false);
   const [batchPreviews, setBatchPreviews] = useState<ItemBatchPreview[]>([]);
   const [loadingPreviews, setLoadingPreviews] = useState(false);
@@ -71,6 +72,14 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
 
     setItems(data || []);
     if (data && data.length > 0) {
+      const ids = Array.from(new Set(data.map((i: any) => i.item_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: names } = await supabase
+          .from('warehouse_items_full')
+          .select('id, name')
+          .in('id', ids);
+        setItemNames(Object.fromEntries((names ?? []).map((r: any) => [r.id, r.name ?? ''])));
+      }
       fetchBatchPreviews(data);
     }
   };
@@ -202,7 +211,7 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
                 <TableRow key={item.id}>
                   <TableCell>{item.line_number || index + 1}</TableCell>
                   <TableCell>{item.item_code}</TableCell>
-                  <TableCell>{item.description}</TableCell>
+                  <TableCell>{itemNames[item.item_id] || item.description}</TableCell>
                   <TableCell>{item.unit_of_measure}</TableCell>
                   <TableCell>{item.quantity_issued || item.quantity_required}</TableCell>
                 </TableRow>

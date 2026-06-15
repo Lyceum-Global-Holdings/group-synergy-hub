@@ -39,6 +39,7 @@ interface MaterialIssueDetailsDialogProps {
 export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: MaterialIssueDetailsDialogProps) {
   const [issue, setIssue] = useState<MaterialIssueNote | null>(null);
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
+  const [itemNames, setItemNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
@@ -138,7 +139,19 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
         .order('line_number', { ascending: true });
 
       if (itemsError) throw itemsError;
-      setItems(itemsData || []);
+      const list = itemsData || [];
+      setItems(list);
+
+      const ids = Array.from(new Set(list.map((i: any) => i.item_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: names } = await supabase
+          .from('warehouse_items_full')
+          .select('id, name')
+          .in('id', ids);
+        setItemNames(Object.fromEntries((names ?? []).map((r: any) => [r.id, r.name ?? ''])));
+      } else {
+        setItemNames({});
+      }
     } catch (error) {
       console.error('Error fetching issue details:', error);
       toast({
@@ -368,7 +381,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                       <TableRow key={item.id}>
                         <TableCell>{item.line_number || index + 1}</TableCell>
                         <TableCell>{item.item_code || '-'}</TableCell>
-                        <TableCell>{item.description || '-'}</TableCell>
+                        <TableCell>{itemNames[item.item_id] || item.description || '-'}</TableCell>
                         <TableCell>{item.unit_of_measure || 'pcs'}</TableCell>
                         <TableCell className="text-right">{qtyRequired}</TableCell>
                         <TableCell className="text-right font-medium">{qtyReceived}</TableCell>
