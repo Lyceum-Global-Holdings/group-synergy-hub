@@ -139,8 +139,19 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
         .order('line_number', { ascending: true });
 
       if (itemsError) throw itemsError;
-      setItems(itemsData || []);
-    } catch (error) {
+      const list = itemsData || [];
+      setItems(list);
+
+      const ids = Array.from(new Set(list.map((i: any) => i.item_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: names } = await supabase
+          .from('warehouse_items_full')
+          .select('id, name')
+          .in('id', ids);
+        setItemNames(Object.fromEntries((names ?? []).map((r: any) => [r.id, r.name ?? ''])));
+      } else {
+        setItemNames({});
+      }
       console.error('Error fetching issue details:', error);
       toast({
         title: 'Error',
