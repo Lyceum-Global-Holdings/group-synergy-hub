@@ -96,7 +96,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const { items: warehouseItems } = useWarehouseItems();
   
-  const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
+  const { createMaterialIssueAsync, submitForApprovalAsync, isCreating, isSubmitting } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
