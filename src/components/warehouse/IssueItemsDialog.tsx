@@ -192,7 +192,7 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
               <TableRow>
                 <TableHead>Line</TableHead>
                 <TableHead>Item Code</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>Item Name</TableHead>
                 <TableHead>UOM</TableHead>
                 <TableHead>Qty to Issue</TableHead>
               </TableRow>
