@@ -381,7 +381,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                       <TableRow key={item.id}>
                         <TableCell>{item.line_number || index + 1}</TableCell>
                         <TableCell>{item.item_code || '-'}</TableCell>
-                        <TableCell>{item.description || '-'}</TableCell>
+                        <TableCell>{itemNames[item.item_id] || item.description || '-'}</TableCell>
                         <TableCell>{item.unit_of_measure || 'pcs'}</TableCell>
                         <TableCell className="text-right">{qtyRequired}</TableCell>
                         <TableCell className="text-right font-medium">{qtyReceived}</TableCell>
