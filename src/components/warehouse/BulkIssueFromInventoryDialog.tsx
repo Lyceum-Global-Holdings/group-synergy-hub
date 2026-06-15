@@ -179,7 +179,7 @@ export function BulkIssueFromInventoryDialog({
   }, [header, lines]);
 
   const canSubmit =
-    validationErrors.length === 0 && !!selectedCompany?.id && !isCreating && !isCreatingItems;
+    validationErrors.length === 0 && !!selectedCompany?.id && !isCreating && !isCreatingItems && !isSubmitting;
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedCompany?.id) return;
