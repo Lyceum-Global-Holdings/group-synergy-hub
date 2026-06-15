@@ -338,7 +338,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                   <TableRow>
                     <TableHead>Line</TableHead>
                     <TableHead>Item Code</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>Item Name</TableHead>
                     <TableHead>UOM</TableHead>
                     <TableHead className="text-right">Required</TableHead>
                     <TableHead className="text-right">Received</TableHead>
