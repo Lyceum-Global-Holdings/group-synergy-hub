@@ -114,12 +114,15 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
           remaining -= take;
         }
 
+        // If the item has no batches at all, treat it as a non-batch-tracked item
+        // (stock will be deducted from bin/location directly by the server RPC).
+        const hasAnyBatch = (batches || []).length > 0;
         previews.push({
           item_id: item.item_id,
           item_code: item.item_code || '',
           quantity_issued: qtyToIssue,
           batches: allocated,
-          insufficient: remaining > 0,
+          insufficient: hasAnyBatch && remaining > 0,
         });
       }
 
