@@ -795,8 +795,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               <Button variant="outline" onClick={() => setCurrentTab('items')}>
                 Back
               </Button>
-              <Button onClick={handleSubmit} disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'Create Material Issue Note'}
+              <Button onClick={handleSubmit} disabled={isCreating || isSubmitting}>
+                {isCreating || isSubmitting ? 'Submitting…' : 'Submit for Approval'}
               </Button>
             </div>
           </TabsContent>
