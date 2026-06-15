@@ -1,68 +1,65 @@
-# Admin Approval for Material Issue Notes
+## Problem
 
-Today, clicking **Create** on a MIN immediately writes `material_issue_items` AND deducts stock via `process_material_issue_stock_update`. There is no segregation of duties — the requester is also the issuer. This violates ISO 9001 §8.5.1 (control of production / service provision) and ISO 27001 A.5.3 (segregation of duties).
+Stock is being deducted while MINs are still in `draft`, violating ISO 9001 §8.5.1 (no goods movement before authorised release).
 
-## Standard we follow
+Investigation:
 
-**SAP EWM / MIGO movement type 261 (Goods Issue for Order)** and **ISO 9001 §8.5.1** both require:
-1. A documented *request* (created by anyone with permission).
-2. An *approval* by an authorised role (independent of requester) before any stock movement.
-3. The *physical issue* posting (stock deduction) happens only after approval, and is itself logged with approver identity + timestamp for the audit trail.
+1. `IssueItemsDialog.tsx` ("Issue items" button) runs five client-side steps on whatever MIN is open — **insert `stock_transactions`, run `process_fifo_batch_issue`, run `process_material_issue_stock_update`, update `material_issue_items.issued_at`, then update `material_issue_notes.status='issued'`**. It does **not** check the MIN's status, so it executes on `draft` MINs.
+2. After our last migration, the guard trigger `trg_enforce_min_approval_path` blocks the final `draft → issued` transition. The earlier steps already ran, so stock is deducted but the MIN stays `draft`. This matches the rows now in DB: MIN-20260615-008/009/010 are `status='draft'` yet have 3-4 `stock_transactions` each with `reference_type='mrn'`.
+3. `BulkIssueFromInventoryDialog` on `/warehouse/inventory` creates a MIN with default status and never calls `submit_material_issue_for_approval`, so its MINs sit in `draft` forever and the "Issue items" button later double-deducts.
 
-We will mirror this with a 3-state lifecycle:
+## Standard followed
+
+SAP EWM Goods Issue (mvt 261) and ISO 9001 §8.5.1 require:
 
 ```text
 draft ─► pending_approval ─► approved ─► issued
-                │                │
-                └─► rejected ◄───┘
 ```
 
-- Stock is **never** moved in `draft` or `pending_approval`.
-- Only `admin` (and `super_admin`) can move `pending_approval → approved` or `→ rejected`.
-- Stock deduction (`process_material_issue_stock_update`) runs **inside the approval RPC**, atomically. Same guard pattern already used by `approve_grn_with_allocations` (see GRN approval memory).
-- Requester cannot self-approve (enforced server-side: `approved_by != created_by`).
+- No `stock_transactions`, no bin allocation changes, no FIFO consumption may happen before `approved`.
+- The physical issue posting itself must be **atomic** (all-or-nothing) and **server-side** (cannot be partially executed by a crashed client).
+- The issuer (warehouse clerk) must be distinct from the approver where possible, but both actions are logged with identity + timestamp.
 
 ## Backend (one migration)
 
-1. Extend `material_issue_status` enum / check to include `pending_approval` and `rejected` (keep existing values for backward compat).
-2. Add columns to `material_issue_notes` if missing: `submitted_at`, `submitted_by`, `rejected_by`, `rejected_at`, `rejection_reason`. `approved_by` / `approved_date` already exist.
-3. New RPC `submit_material_issue_for_approval(p_min_id uuid)` — flips `draft → pending_approval`, stamps `submitted_by/at`, validates company scope.
-4. New RPC `approve_material_issue(p_min_id uuid)`:
-   - Auth check: caller must have `admin` or `super_admin` role for the MIN's company (via `has_role`).
-   - Self-approval guard: reject if `auth.uid() = created_by`.
-   - Status check: must be `pending_approval`.
-   - For each `material_issue_items` row, run the existing stock deduction logic that today lives in `useMaterialIssueItems.ts` (reservation update + `process_material_issue_stock_update`). Move that orchestration into SQL so it is transactional.
-   - On success: status → `approved`, stamp `approved_by/approved_date`. A separate "Mark Issued" action (existing) can later flip to `issued` when physically handed over.
-   - On any failure: raise, transaction rolls back, MIN stays in `pending_approval`.
-5. New RPC `reject_material_issue(p_min_id uuid, p_reason text)` — admin only, status → `rejected`, stamps reason.
-6. **Guard trigger** `enforce_min_approval_path` on `material_issue_notes`: block any `UPDATE` that sets `status='approved'` outside the RPC, mirroring `enforce_grn_allocation_on_approval`.
-7. RLS: requesters can SELECT/INSERT own MINs in draft; only admins can call the approve/reject RPCs (SECURITY DEFINER, internal role check).
-8. Register in `get_approval_console` so pending MINs appear in `/management/approvals`. Add `'material_issue'` to `ApprovalType` union.
+1. **`issue_material(p_min_id uuid)`** — new SECURITY DEFINER RPC. In a single transaction:
+   - Load the MIN row `FOR UPDATE`; raise if `status <> 'approved'`.
+   - AuthZ: caller must have `admin`, `super_admin`, or warehouse-issuer role for the MIN's company. Reuse `has_role` / `is_min_approver` pattern.
+   - For each `material_issue_items` row:
+     - Call `process_fifo_batch_issue(...)` (existing).
+     - Call `process_material_issue_stock_update(...)` (existing) — this writes `stock_transactions` and adjusts `warehouse_bin_allocations`.
+     - Stamp `issued_at = now()`, `quantity_received = 0`.
+   - Update MIN: `status='issued'`, `issued_by`, `issued_by_name`, `updated_at`.
+   - On any failure the whole transaction rolls back, so stock is never partially deducted.
+
+2. **Extend `trg_enforce_min_approval_path`** to also block direct `approved → issued` updates from outside `issue_material()` (use the same `set_config('app.min_internal','on', true)` guard pattern already used by `approve_material_issue`). This makes client-side stock writes structurally impossible.
+
+3. **Backfill cleanup script** in the migration: for the three known broken MINs (MIN-20260615-008/009/010), either reverse the orphan `stock_transactions` and matching `warehouse_bin_allocations` changes, or flip those MINs to `status='issued'` so the books match the ledger. We will reverse — the MINs were never approved.
 
 ## Frontend
 
-1. **`useMaterialIssueItems.ts`** — remove the client-side stock deduction loop. Items are still inserted on create, but stock movement now lives in `approve_material_issue` RPC.
-2. **`useMaterialIssues.ts`** — add `submitForApproval`, `approveMaterialIssue`, `rejectMaterialIssue` mutations that call the new RPCs; invalidate `material-issues`, `warehouse-items`, `warehouse-bin-allocations`, `warehouse-stock-movements`, `approval-console`.
-3. **`CreateMaterialIssueDialog.tsx`** — final button changes from "Create" to **"Submit for approval"**. On success the MIN is created in `pending_approval` (not `draft`) so it shows in the admin queue immediately. Existing reset/close behaviour kept.
-4. **MIN list page** (`/warehouse/material-issue`) — add a Status column with badge colours; row actions:
-   - `pending_approval` + admin: **Approve** / **Reject** buttons (reject opens reason dialog).
-   - `pending_approval` + non-admin: read-only "Awaiting approval" pill.
-   - `approved`: existing "Mark Issued" action becomes enabled.
-   - `rejected`: read-only with reason tooltip.
-5. **Approval Console** (`/management/approvals`) — MIN entries surface automatically via `get_approval_console`; `ApprovalCard` routes to the MIN details dialog via `view_url`.
-6. **`GrnDetailsDialog`-style audit strip** added to `MaterialIssueDetailsDialog`: Created → Submitted → Approved/Rejected with names + timestamps.
+1. **`IssueItemsDialog.tsx`** — replace the five client-side steps with one call: `supabase.rpc('issue_material', { p_min_id: issueId })`. Keep the batch-preview UI; remove the manual `stock_transactions.insert`, `process_fifo_batch_issue` loop, `process_material_issue_stock_update` loop, and the final status update.
+
+2. **MIN list (`/warehouse/material-issue`)** — only render the "Issue items" action when `status === 'approved'`. For `draft` / `pending_approval` / `rejected`, the button is hidden or disabled with a tooltip ("Awaiting approval").
+
+3. **`BulkIssueFromInventoryDialog.tsx`** —
+   - After `createItems`, call `submitForApprovalAsync(issueNote.id)` (same as `CreateMaterialIssueDialog` already does).
+   - Replace the misleading copy: "Stock is deducted from the issue location's bins on submit (SAP-style Goods Issue)" → "Submits a Material Issue Note for admin approval. Stock is deducted only after approval and physical issue."
+   - Toast: "MIN … submitted for approval" instead of "Material Issued".
+
+4. **`useMaterialIssues.ts`** — add `issueMaterialAsync` mutation calling the new RPC; invalidate `material-issues`, `warehouse-items`, `warehouse-bin-allocations`, `warehouse-stock-movements`, `warehouse-reservations`, `approval-console`.
 
 ## Out of scope
 
-- No changes to material *requests* (`material_request_*`) or material *returns*.
-- No new role; reuses existing `admin` / `super_admin` from `user_roles`.
-- "Mark Issued" / "Receive" steps unchanged.
-- No email/Telegram notifications in this change (admins see it in Approval Console). Can be added later via existing `send-approval-notification` edge function.
+- No changes to material requests or returns.
+- No new roles; reuses admin / super_admin / existing warehouse-issuer check.
+- "Mark Received" flow downstream of `issued` is unchanged.
 
 ## Verification
 
-1. Non-admin creates MIN → status `pending_approval`, no stock change in `warehouse_bin_allocations` / `stock_transactions`.
-2. Admin opens `/management/approvals` → MIN appears; clicks Approve → stock deducted, status `approved`, ledger row written.
-3. Requester tries to approve own MIN → RPC returns permission error.
-4. Admin rejects with reason → status `rejected`, no stock change, reason visible in details dialog.
-5. Direct `UPDATE material_issue_notes SET status='approved'` from SQL editor → blocked by guard trigger.
+1. Create a MIN via Bulk Issue → status `pending_approval`, no `stock_transactions` rows, no bin allocation changes.
+2. Admin approves → status `approved`, still no stock movement.
+3. Issuer clicks "Issue items" → single RPC runs, stock deducted, `stock_transactions` written, status `issued`.
+4. Try "Issue items" on a `draft` MIN via direct RPC call → raises `MIN is not approved`.
+5. Try `UPDATE material_issue_notes SET status='issued' WHERE status='draft'` from SQL editor → blocked by guard trigger.
+6. Re-check MIN-20260615-008/009/010: backfill reversed their orphan stock_transactions; bin balances restored.
