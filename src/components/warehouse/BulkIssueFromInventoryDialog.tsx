@@ -81,7 +81,7 @@ export function BulkIssueFromInventoryDialog({
   const navigate = useNavigate();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
-  const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
+  const { createMaterialIssueAsync, submitForApprovalAsync, isCreating, isSubmitting } = useMaterialIssues();
   const { createItems, isCreating: isCreatingItems } = useMaterialIssueItems();
   const { data: stockLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
 
@@ -179,7 +179,7 @@ export function BulkIssueFromInventoryDialog({
   }, [header, lines]);
 
   const canSubmit =
-    validationErrors.length === 0 && !!selectedCompany?.id && !isCreating && !isCreatingItems;
+    validationErrors.length === 0 && !!selectedCompany?.id && !isCreating && !isCreatingItems && !isSubmitting;
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedCompany?.id) return;
@@ -234,9 +234,17 @@ export function BulkIssueFromInventoryDialog({
 
       await createItems(itemsPayload);
 
+      // Submit the MIN for admin approval. Stock is only deducted later in the
+      // server-side issue_material() RPC after approval (ISO 9001 §8.5.1 / SAP mvt 261).
+      try {
+        await submitForApprovalAsync(issueNote.id);
+      } catch (e) {
+        console.error('Failed to submit MIN for approval', e);
+      }
+
       toast({
-        title: 'Material Issued',
-        description: `MIN ${issueNote.min_number} created with ${lines.length} item(s).`,
+        title: 'Submitted for approval',
+        description: `MIN ${issueNote.min_number} created with ${lines.length} item(s). Awaiting admin approval before stock is deducted.`,
       });
 
       onOpenChange(false);
@@ -261,8 +269,9 @@ export function BulkIssueFromInventoryDialog({
             Bulk Issue Materials
           </DialogTitle>
           <DialogDescription>
-            Create a single Material Issue Note (MIN) covering the selected inventory items.
-            Stock is deducted from the issue location's bins on submit (SAP-style Goods Issue).
+            Creates a single Material Issue Note (MIN) covering the selected inventory items and
+            submits it for admin approval. Stock is only deducted after approval and physical issue
+            (ISO 9001 §8.5.1 / SAP Goods Issue 261).
           </DialogDescription>
         </DialogHeader>
 

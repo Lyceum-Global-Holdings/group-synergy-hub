@@ -134,35 +134,8 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
   const handleIssue = async () => {
     setIssuing(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('user_id', user.id)
-        .single();
-
-      const { data: issueNote, error: issueNoteError } = await supabase
-        .from('material_issue_notes')
-        .select('company_id, location_id, min_number')
-        .eq('id', issueId)
-        .single();
-
-      if (issueNoteError) throw issueNoteError;
-
-      if (!issueNote.location_id) {
-        toast({
-          title: 'Location Required',
-          description: 'This Material Issue Note has no location. Stock cannot be issued.',
-          variant: 'destructive',
-        });
-        setIssuing(false);
-        return;
-      }
-
-      // Check batch insufficiency
-      const hasInsufficient = batchPreviews.some(p => p.insufficient);
+      // Pre-flight: warn on FIFO/batch insufficiency before calling the RPC.
+      const hasInsufficient = batchPreviews.some((p) => p.insufficient);
       if (hasInsufficient) {
         toast({
           title: 'Insufficient Batch Stock',
@@ -173,120 +146,15 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
         return;
       }
 
-      // Pre-flight: verify each item has enough stock at the issue location (per-bin sum)
-      const itemIds = items.map(i => i.item_id);
-      const { data: locAllocs, error: locAllocErr } = await supabase
-        .from('warehouse_bin_allocations')
-        .select('warehouse_item_id, allocated_quantity, warehouse_bins!inner(location_id)')
-        .in('warehouse_item_id', itemIds)
-        .eq('warehouse_bins.location_id', issueNote.location_id);
-
-      if (locAllocErr) throw locAllocErr;
-
-      const availableAtLocation = new Map<string, number>();
-      (locAllocs || []).forEach((a: any) => {
-        availableAtLocation.set(
-          a.warehouse_item_id,
-          (availableAtLocation.get(a.warehouse_item_id) || 0) + Number(a.allocated_quantity || 0)
-        );
-      });
-
-      const insufficientStock = items.filter(item => {
-        const avail = availableAtLocation.get(item.item_id) || 0;
-        return avail < item.quantity_issued;
-      });
-
-      if (insufficientStock.length > 0) {
-        toast({
-          title: 'Insufficient Stock at Location',
-          description: `${insufficientStock.length} item(s) lack stock at the selected issue location`,
-          variant: 'destructive',
-        });
-        setIssuing(false);
-        return;
-      }
-
-      const currentTimestamp = new Date().toISOString();
-
-      // Create stock_transactions audit rows (location-scoped)
-      const stockTransactions = items.map(item => {
-        const before = availableAtLocation.get(item.item_id) || 0;
-        return {
-          item_id: item.item_id,
-          location_id: issueNote.location_id,
-          transaction_type: 'material_issue' as const,
-          reference_type: 'manual' as const,
-          reference_id: issueId,
-          quantity_change: -item.quantity_issued,
-          quantity_before: before,
-          quantity_after: before - item.quantity_issued,
-          unit_cost: item.unit_cost || 0,
-          total_value: item.total_cost || 0,
-          notes: `Material Issue: ${issueNote.min_number || issueId}`,
-          company_id: issueNote.company_id,
-          created_by: user.id,
-        };
-      });
-
-      const { error: stockError } = await supabase
-        .from('stock_transactions')
-        .insert(stockTransactions);
-
-      if (stockError) throw stockError;
-
-      // FIFO batch consumption via RPC
-      for (const item of items) {
-        const { error: fifoError } = await supabase.rpc('process_fifo_batch_issue', {
-          p_issue_item_id: item.id,
-          p_item_id: item.item_id,
-          p_quantity_issued: item.quantity_issued,
-          p_company_id: issueNote.company_id,
-        });
-
-        if (fifoError) {
-          console.error('FIFO batch issue error:', fifoError);
-          throw new Error(`Batch allocation failed for ${item.item_code || item.item_id}: ${fifoError.message}`);
-        }
-      }
-
-      // Deduct stock at the chosen location via location-scoped RPC
-      for (const item of items) {
-        const { error: deductErr } = await supabase.rpc('process_material_issue_stock_update', {
-          p_item_id: item.item_id,
-          p_quantity_issued: item.quantity_issued,
-          p_location_id: issueNote.location_id,
-          p_bin_allocation_id: null,
-          p_min_id: issueId,
-          p_min_number: issueNote.min_number || null,
-          p_secondary_quantity_issued: (item as any).secondary_quantity_issued ?? null,
-        } as any);
-
-        if (deductErr) {
-          throw new Error(`Stock deduction failed for ${item.item_code || item.item_id}: ${deductErr.message}`);
-        }
-
-        const { error: updateItemError } = await supabase
-          .from('material_issue_items')
-          .update({ issued_at: currentTimestamp, quantity_received: 0 })
-          .eq('id', item.id);
-
-        if (updateItemError) throw updateItemError;
-      }
-
-      const { error: updateError } = await supabase
-        .from('material_issue_notes')
-        .update({
-          status: 'issued',
-          issued_by: user.id,
-          issued_by_name: profile?.full_name || user.email,
-        })
-        .eq('id', issueId);
-
-      if (updateError) throw updateError;
+      // Single atomic, server-side, approval-gated posting (ISO 9001 §8.5.1 / SAP mvt 261).
+      // The RPC verifies status='approved', caller is admin, then runs FIFO + bin/location
+      // deduction + stock_transactions in one transaction. Nothing happens if any step fails.
+      const { error } = await supabase.rpc('issue_material', { p_min_id: issueId } as any);
+      if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: 'Items issued successfully with FIFO batch allocation',
+        title: 'Goods Issue posted',
+        description: 'Stock has been deducted and the MIN is marked as issued.',
       });
 
       onSuccess();
@@ -294,8 +162,8 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
     } catch (error: any) {
       console.error('Error issuing items:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to issue items',
+        title: 'Issue failed',
+        description: error?.message || 'Failed to post goods issue',
         variant: 'destructive',
       });
     } finally {
