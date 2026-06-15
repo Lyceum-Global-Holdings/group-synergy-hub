@@ -379,6 +379,13 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
       await createItems(itemsToCreate);
 
+      // Submit the MIN for admin approval (stock is deducted only on approval).
+      try {
+        await submitForApprovalAsync(issueNote.id);
+      } catch (e) {
+        console.error('Failed to submit MIN for approval', e);
+      }
+
       // Reset form
       setFormData({
         requested_by: '',
