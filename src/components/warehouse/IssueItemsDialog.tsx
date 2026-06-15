@@ -72,6 +72,14 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
 
     setItems(data || []);
     if (data && data.length > 0) {
+      const ids = Array.from(new Set(data.map((i: any) => i.item_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: names } = await supabase
+          .from('warehouse_items_full')
+          .select('id, name')
+          .in('id', ids);
+        setItemNames(Object.fromEntries((names ?? []).map((r: any) => [r.id, r.name ?? ''])));
+      }
       fetchBatchPreviews(data);
     }
   };
