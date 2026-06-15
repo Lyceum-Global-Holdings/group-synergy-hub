@@ -52,7 +52,8 @@ export default function MaterialIssueReturn() {
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
 
-  const { materialIssues, isLoading: isLoadingIssues } = useMaterialIssues();
+  const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, isApproving, isRejecting } = useMaterialIssues();
+  const { data: isAdmin } = useIsAdmin();
   const { materialReturns, isLoading: isLoadingReturns } = useMaterialReturns();
   const { materialRequests, isLoading: isLoadingRequests } = useMaterialRequests();
   const { selectedCompany, companies } = useCompany();
