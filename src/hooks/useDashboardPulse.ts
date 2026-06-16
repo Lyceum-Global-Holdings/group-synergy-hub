@@ -111,7 +111,6 @@ export interface DashboardAnalytics {
 export function useDashboardAnalytics(companyId?: string | null, locationId?: string | null) {
   return useQuery({
     queryKey: ["dashboard-pulse", "analytics", companyId, locationId],
-    enabled: !!companyId,
     queryFn: () =>
       callRpc<DashboardAnalytics>("get_dashboard_analytics", {
         p_company_id: companyId ?? null,
