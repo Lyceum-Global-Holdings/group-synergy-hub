@@ -99,6 +99,28 @@ export function useFinancePulse(companyId?: string | null) {
   });
 }
 
+export interface DashboardAnalytics {
+  material_flow: Array<{ d: string; issued: number; returned: number }>;
+  inbound_outbound: Array<{ d: string; inbound: number; outbound: number }>;
+  top_issued: Array<{ item_id: string; name: string; item_code: string | null; qty: number }>;
+  top_returned: Array<{ item_id: string; name: string; item_code: string | null; qty: number }>;
+  movement_mix: Array<{ type: string; count: number }>;
+  spend_trend: Array<{ w: string; amount: number }>;
+}
+
+export function useDashboardAnalytics(companyId?: string | null, locationId?: string | null) {
+  return useQuery({
+    queryKey: ["dashboard-pulse", "analytics", companyId, locationId],
+    enabled: !!companyId,
+    queryFn: () =>
+      callRpc<DashboardAnalytics>("get_dashboard_analytics", {
+        p_company_id: companyId ?? null,
+        p_location_id: locationId ?? null,
+      }),
+    staleTime: 30_000,
+  });
+}
+
 export function useHealthStrip(companyId?: string | null, locationId?: string | null) {
   return useQuery({
     queryKey: ["dashboard-pulse", "health", companyId, locationId],
