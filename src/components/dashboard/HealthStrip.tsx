@@ -1,5 +1,5 @@
 import { ShoppingCart, PackageCheck, AlertTriangle, FileSearch, Clock, LucideIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import type { HealthStrip as HealthStripData } from "@/hooks/useDashboardPulse";
@@ -18,20 +18,28 @@ interface Tile {
   tone: "primary" | "warning" | "destructive" | "info" | "success";
 }
 
-const toneRing = {
-  primary: "ring-primary/20 hover:ring-primary/40",
-  warning: "ring-warning/20 hover:ring-warning/40",
-  destructive: "ring-destructive/20 hover:ring-destructive/40",
-  info: "ring-info/20 hover:ring-info/40",
-  success: "ring-success/20 hover:ring-success/40",
-};
-
 const toneIcon = {
   primary: "text-primary bg-primary/10",
   warning: "text-warning bg-warning/10",
   destructive: "text-destructive bg-destructive/10",
   info: "text-info bg-info/10",
   success: "text-success bg-success/10",
+};
+
+const toneRail = {
+  primary: "",
+  info: "",
+  success: "",
+  warning: "border-l-2 border-l-warning",
+  destructive: "border-l-2 border-l-destructive",
+};
+
+const toneValue = {
+  primary: "text-foreground",
+  info: "text-foreground",
+  success: "text-foreground",
+  warning: "text-warning",
+  destructive: "text-destructive",
 };
 
 export function HealthStrip({ data, loading }: HealthStripProps) {
@@ -88,34 +96,45 @@ export function HealthStrip({ data, loading }: HealthStripProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
       {tiles.map((t) => (
-        <Link key={t.label} to={t.href} className="block">
+        <Link key={t.label} to={t.href} className="block group">
           <Card
             className={cn(
-              "ring-1 transition-all hover:shadow-md hover:-translate-y-0.5",
-              toneRing[t.tone],
+              "p-4 transition-all hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5",
+              toneRail[t.tone],
             )}
           >
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between mb-2">
-                <span className={cn("p-1.5 rounded-md", toneIcon[t.tone])}>
-                  <t.icon className="h-4 w-4" />
-                </span>
-                {t.delta && (
-                  <span
-                    className={cn(
-                      "text-xs font-medium",
-                      t.delta.positive ? "text-success" : "text-destructive",
-                    )}
-                  >
-                    {t.delta.positive ? "↑" : "↓"} {t.delta.label}
-                  </span>
+            <div className="flex items-start justify-between gap-3">
+              <span className={cn("p-2 rounded-lg", toneIcon[t.tone])}>
+                <t.icon className="h-4 w-4" />
+              </span>
+              <span
+                className={cn(
+                  "font-mono text-2xl font-extrabold tabular-nums leading-none mt-0.5",
+                  toneValue[t.tone],
                 )}
-              </div>
-              <div className="text-2xl font-bold tracking-tight">
-                {loading ? <span className="inline-block h-7 w-12 bg-muted rounded animate-pulse" /> : t.value.toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{t.label}</p>
-            </CardContent>
+              >
+                {loading ? (
+                  <span className="inline-block h-7 w-10 bg-muted rounded animate-pulse" />
+                ) : (
+                  t.value.toLocaleString()
+                )}
+              </span>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                {t.label}
+              </p>
+              {t.delta && (
+                <span
+                  className={cn(
+                    "text-[10px] font-bold tabular-nums",
+                    t.delta.positive ? "text-success" : "text-destructive",
+                  )}
+                >
+                  {t.delta.positive ? "↑" : "↓"} {t.delta.label}
+                </span>
+              )}
+            </div>
           </Card>
         </Link>
       ))}

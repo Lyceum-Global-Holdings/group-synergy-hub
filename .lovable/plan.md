@@ -1,41 +1,30 @@
-# Material Returns Linked to Material Issue Notes (MIN → MRN)
+## Plan: Modernize Operations Pulse Dashboard
 
-Align Material Return Notes (MRN) with international warehouse standards (SAP MIGO 262 / 122, ISO 9001 §8.5.1): every internal return must reference an approved issue, items are inherited from that issue, and return quantity per line cannot exceed `issued − already_returned`.
+User skipped the direction picker, so I'll implement **Direction 3 — Precision Canvas** (the most aligned with the project's existing SAP Fiori / Oracle Redwood enterprise design language already recorded in project memory). It gives:
 
-## UX flow in `CreateMaterialReturnDialog`
+- Crisp panel headers with section labels + accent rail
+- JetBrains Mono numerics for data-grade legibility
+- Tight 5-tile health strip with left-rail status accent for alerts
+- Two-column pillar grid with header bar, hero metric, sparkline / progress, and a striped key-value list
+- A refreshed Construction section using the same panel grammar
 
-1. **Return Type** is the first field.
-   - `Internal Return` → requires linking a MIN.
-   - `Supplier Return` → keeps current free-form flow (out of scope here).
-2. When `Internal Return` is selected, show a **Source Material Issue (MIN)** combobox:
-   - Lists approved / issued MINs for the current company + location (status in `approved`, `issued`, `partially_received`, `completed`).
-   - Shows `MIN number · issue date · issued_to`.
-3. On MIN select:
-   - Auto-fill `reference_type = material_issue`, `reference_id = min.id`, and prefill `returned_by` from `issued_to` (editable).
-   - Fetch lines from `material_issue_items` joined with `warehouse_items_full` for code/name + already-returned aggregate from `material_return_items` (grouped by `item_id` for MRNs whose `reference_id = min.id`).
-   - Populate the items grid (read-only item picker, with: item code, item name, UoM, qty issued, already returned, **qty to return** (default 0, max = issued − returned), condition, unit cost prefilled from the issue line, notes).
-   - Disable the manual "Add Item" button while a MIN is linked (returns must come from the issued lines).
-4. Inline validation: per-row qty must be `> 0` and `≤ remaining`; submit disabled until at least one row has qty > 0 and all rows are within limits.
-5. Existing SRN number, SRN document, reason, notes, dual-quantity (secondary UoM) fields are retained.
+### Scope (frontend only)
+1. `src/pages/Dashboard.tsx` — restructure layout, add section labels, switch hero header to enterprise cockpit style.
+2. `src/components/dashboard/PillarCard.tsx` — adopt panel-header bar with accent rail; tighten HeroMetric and SecondaryStat to the precision style (mono numerics, divider rows).
+3. `src/components/dashboard/HealthStrip.tsx` — restyle to 5 equal tiles with icon chip top-left, monospace value top-right, uppercase micro label, left-rail when destructive/warning.
+4. `src/components/dashboard/Sparkline.tsx` — light polish (stroke + soft fill), no API change.
+5. `src/index.css` — add a single `--font-mono` token alias if missing; no palette changes.
 
-For `Supplier Return`, the current free-form item picker remains unchanged.
+### Guardrails
+- **No data/business-logic changes.** All hooks, RPCs, props, and routes stay identical.
+- **Semantic tokens only** — no hardcoded `text-white`, `bg-slate-*`, hex values. Use existing `--primary`, `--muted`, `--success`, `--warning`, `--destructive`, `--border`, `--card`. The prototype's slate/indigo/rose visuals map to the project's already-defined tokens.
+- Keep all existing sections: header, health strip, 4 pillars, Construction grid.
+- Admin-gated Finance pillar stays admin-gated.
+- Light mode primary; dark mode preserved via tokens.
 
-## Server-side guard (defense in depth)
+### Technical notes
+- Mono numerics via `font-mono` Tailwind utility (already wired through `tailwind.config.ts`).
+- Accent rail = `border-l-2 border-destructive` (or warning) on threshold-breached tiles, driven by existing `tone` prop on `SecondaryStat`.
+- No new dependencies.
 
-Add a `BEFORE INSERT/UPDATE` trigger on `material_return_items` that, when the parent `material_return_notes.reference_type = 'material_issue'`, enforces:
-`sum(quantity_returned for this item on this MIN) ≤ sum(quantity_issued for this item on this MIN)`.
-
-This protects against any client bypass and matches SAP's "return with reference" behaviour.
-
-## Files
-
-- Edit `src/components/warehouse/CreateMaterialReturnDialog.tsx` — add MIN selector, fetch issue lines + prior returns, render locked item rows with remaining-qty validation, submit using the loaded lines.
-- New small hook `src/hooks/useIssuableMaterialIssues.ts` — lists MINs eligible as return sources for the current company/location.
-- New helper inside the dialog (or `src/hooks/useMinReturnableLines.ts`) — returns `{ item_id, item_code, item_name, uom, qty_issued, qty_returned, remaining, unit_cost }` for a given MIN.
-- New migration: trigger function `enforce_material_return_within_issued()` + trigger on `material_return_items`.
-
-## Out of scope
-
-- Approval workflow for MRNs (separate request).
-- Stock-on-hand updates on MRN approval (existing logic untouched).
-- Supplier-return flow changes.
+After implementation I'll verify visually via `browser--view_preview` at 1440 width.
