@@ -36,6 +36,27 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
   const { updateMaterialReturn, approveMaterialReturn, isUpdating, isApproving } = useMaterialReturns();
   const { data: userRoles = [] } = useCurrentUserRoles();
   const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
+  const [itemDetails, setItemDetails] = useState<Record<string, { name: string; item_code: string }>>({});
+
+  useEffect(() => {
+    if (!returnItems || returnItems.length === 0) {
+      setItemDetails({});
+      return;
+    }
+    const ids = Array.from(new Set(returnItems.map((i) => i.item_id).filter(Boolean)));
+    if (ids.length === 0) return;
+    supabase
+      .from('warehouse_items_full')
+      .select('id, name, item_code')
+      .in('id', ids)
+      .then(({ data }) => {
+        setItemDetails(
+          Object.fromEntries(
+            (data ?? []).map((r: any) => [r.id, { name: r.name ?? '', item_code: r.item_code ?? '' }])
+          )
+        );
+      });
+  }, [returnItems]);
 
   if (!returnNote) return null;
 
