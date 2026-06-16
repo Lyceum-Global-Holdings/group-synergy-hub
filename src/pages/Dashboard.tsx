@@ -1,6 +1,4 @@
-import { useState } from "react";
 import {
-  MapPin,
   HardHat,
   Wrench,
   Boxes,
@@ -12,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardLocations } from "@/hooks/useWarehouseLocations";
 import { useDashboardLocationData } from "@/hooks/useDashboardLocationData";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
@@ -27,12 +24,11 @@ import { SourcingPillar } from "@/components/dashboard/SourcingPillar";
 import { FinancePillar } from "@/components/dashboard/FinancePillar";
 
 export default function Dashboard() {
-  const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const { globalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
   const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
-  const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
-  const { data: locations, isLoading: locationsLoading, isError: locationsError } = useDashboardLocations(selectedCompany?.id);
-  const activeLocationId = locationFilter === "all" ? null : locationFilter;
+  const { data: locations } = useDashboardLocations(selectedCompany?.id);
+  const activeLocationId = globalLocationId;
   const companyId = selectedCompany?.id ?? null;
 
   const { inventory, labour, isLoading: locationDataLoading } = useDashboardLocationData(activeLocationId);
@@ -40,19 +36,9 @@ export default function Dashboard() {
   const { data: health, isLoading: healthLoading } = useHealthStrip(companyId, activeLocationId);
 
   const selectedLocationName =
-    locationFilter === "all"
+    globalLocationId === null
       ? "All Locations"
-      : locations?.find((l) => l.id === locationFilter)?.name || "Selected Location";
-
-  const handleLocationChange = (value: string) => {
-    setLocationFilter(value);
-    setGlobalLocationId(value === "all" ? null : value);
-  };
-
-  let locationPlaceholder = "All Locations";
-  if (!selectedCompany?.id) locationPlaceholder = "Select a company";
-  else if (locationsLoading) locationPlaceholder = "Loading locations…";
-  else if (locationsError) locationPlaceholder = "Failed to load locations";
+      : locations?.find((l) => l.id === globalLocationId)?.name || "Selected Location";
 
   return (
     <div className="space-y-6">
@@ -79,38 +65,6 @@ export default function Dashboard() {
       </div>
 
 
-      {/* Location Filter */}
-      <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-        <MapPin className="h-5 w-5 text-primary" />
-        <span className="text-sm font-medium text-muted-foreground">Location:</span>
-        <Select
-          value={locationFilter}
-          onValueChange={handleLocationChange}
-          disabled={locationsLoading || !selectedCompany?.id}
-        >
-          <SelectTrigger className="w-[260px]">
-            <SelectValue placeholder={locationPlaceholder} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Locations</SelectItem>
-            {locationsError && (
-              <SelectItem value="__error" disabled>
-                Failed to load locations
-              </SelectItem>
-            )}
-            {!locationsError && !locationsLoading && (locations?.length ?? 0) === 0 && selectedCompany?.id && (
-              <SelectItem value="__empty" disabled>
-                No locations mapped to this company
-              </SelectItem>
-            )}
-            {locations && locations.length > 0 && locations.map(loc => (
-              <SelectItem key={loc.id} value={loc.id}>
-                {loc.parent_id ? `↳ ${loc.name}` : loc.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
       {/* Health Strip */}
       <HealthStrip data={health} loading={healthLoading} />
