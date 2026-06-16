@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ArrowRight, LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,20 @@ interface PillarCardProps {
   children: ReactNode;
 }
 
-const accentMap = {
-  primary: "text-primary bg-primary/10",
-  success: "text-success bg-success/10",
-  warning: "text-warning bg-warning/10",
-  info: "text-info bg-info/10",
-  destructive: "text-destructive bg-destructive/10",
+const accentText = {
+  primary: "text-primary",
+  success: "text-success",
+  warning: "text-warning",
+  info: "text-info",
+  destructive: "text-destructive",
+};
+
+const accentRail = {
+  primary: "bg-primary",
+  success: "bg-success",
+  warning: "bg-warning",
+  info: "bg-info",
+  destructive: "bg-destructive",
 };
 
 export function PillarCard({
@@ -32,36 +40,39 @@ export function PillarCard({
   children,
 }: PillarCardProps) {
   return (
-    <Card className="flex flex-col h-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <span className={cn("p-1.5 rounded-md", accentMap[accent])}>
-              <Icon className="h-4 w-4" />
-            </span>
+    <Card className="flex flex-col h-full overflow-hidden p-0 transition-shadow hover:shadow-[var(--shadow-md)]">
+      {/* Panel header with accent rail */}
+      <div className="relative flex items-center justify-between px-5 py-3 border-b border-border bg-[hsl(var(--surface-2))]">
+        <span className={cn("absolute left-0 top-0 bottom-0 w-0.5", accentRail[accent])} />
+        <div className="flex items-center gap-2">
+          <Icon className={cn("h-4 w-4", accentText[accent])} />
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/80">
             {title}
-          </CardTitle>
-          {href && (
-            <Link
-              to={href}
-              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
-            >
-              {cta} <ArrowRight className="h-3 w-3" />
-            </Link>
-          )}
+          </span>
         </div>
-      </CardHeader>
-      <CardContent className="flex-1 space-y-3">
+        {href && (
+          <Link
+            to={href}
+            className={cn(
+              "text-[10px] font-bold uppercase tracking-[0.1em] inline-flex items-center gap-1 transition-colors hover:underline",
+              accentText[accent],
+            )}
+          >
+            {cta} <ArrowRight className="h-3 w-3" />
+          </Link>
+        )}
+      </div>
+      <div className="flex-1 p-6">
         {loading ? (
-          <div className="space-y-2 animate-pulse">
-            <div className="h-8 w-32 bg-muted rounded" />
-            <div className="h-4 w-48 bg-muted rounded" />
-            <div className="h-16 bg-muted rounded" />
+          <div className="space-y-3 animate-pulse">
+            <div className="h-8 w-36 bg-muted rounded" />
+            <div className="h-3 w-48 bg-muted rounded" />
+            <div className="h-16 bg-muted/60 rounded" />
           </div>
         ) : (
           children
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }
@@ -74,13 +85,15 @@ interface HeroMetricProps {
 
 export function HeroMetric({ value, label, delta }: HeroMetricProps) {
   return (
-    <div>
+    <div className="mb-5">
       <div className="flex items-baseline gap-2">
-        <div className="text-3xl font-bold tracking-tight">{value}</div>
+        <div className="font-mono text-3xl font-extrabold tracking-tight text-foreground tabular-nums">
+          {value}
+        </div>
         {delta && (
           <span
             className={cn(
-              "text-xs font-medium",
+              "text-[11px] font-semibold",
               delta.positive ? "text-success" : "text-destructive",
             )}
           >
@@ -88,7 +101,7 @@ export function HeroMetric({ value, label, delta }: HeroMetricProps) {
           </span>
         )}
       </div>
-      <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+      <p className="text-xs font-medium text-muted-foreground mt-1">{label}</p>
     </div>
   );
 }
@@ -107,9 +120,11 @@ export function SecondaryStat({ label, value, tone = "default" }: SecondaryStatP
     success: "text-success",
   };
   return (
-    <div className="flex items-center justify-between text-sm py-1.5 border-t border-border/50">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={cn("font-semibold", toneMap[tone])}>{value}</span>
+    <div className="flex items-center justify-between py-2 border-t border-border-subtle first:border-t-0">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className={cn("font-mono text-xs font-bold tabular-nums", toneMap[tone])}>
+        {value}
+      </span>
     </div>
   );
 }
