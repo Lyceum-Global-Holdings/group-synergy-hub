@@ -22008,6 +22008,10 @@ export type Database = {
         }[]
       }
       get_current_tenant_id: { Args: never; Returns: string }
+      get_dashboard_analytics: {
+        Args: { p_company_id: string; p_location_id?: string }
+        Returns: Json
+      }
       get_dashboard_finance_pulse: {
         Args: { p_company_id?: string }
         Returns: Json

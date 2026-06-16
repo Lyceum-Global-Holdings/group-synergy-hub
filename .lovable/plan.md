@@ -1,30 +1,52 @@
-## Plan: Modernize Operations Pulse Dashboard
+# Obsidian Data Matrix Dashboard — Light Theme
 
-User skipped the direction picker, so I'll implement **Direction 3 — Precision Canvas** (the most aligned with the project's existing SAP Fiori / Oracle Redwood enterprise design language already recorded in project memory). It gives:
+Build the approved Obsidian Data Matrix layout with 6 new material-flow charts, rendered on a **light** background (not the originally proposed dark zinc-900 surface). All existing pillars, business logic, and RBAC stay intact.
 
-- Crisp panel headers with section labels + accent rail
-- JetBrains Mono numerics for data-grade legibility
-- Tight 5-tile health strip with left-rail status accent for alerts
-- Two-column pillar grid with header bar, hero metric, sparkline / progress, and a striped key-value list
-- A refreshed Construction section using the same panel grammar
+## Visual direction (light)
 
-### Scope (frontend only)
-1. `src/pages/Dashboard.tsx` — restructure layout, add section labels, switch hero header to enterprise cockpit style.
-2. `src/components/dashboard/PillarCard.tsx` — adopt panel-header bar with accent rail; tighten HeroMetric and SecondaryStat to the precision style (mono numerics, divider rows).
-3. `src/components/dashboard/HealthStrip.tsx` — restyle to 5 equal tiles with icon chip top-left, monospace value top-right, uppercase micro label, left-rail when destructive/warning.
-4. `src/components/dashboard/Sparkline.tsx` — light polish (stroke + soft fill), no API change.
-5. `src/index.css` — add a single `--font-mono` token alias if missing; no palette changes.
+- Page surface: `bg-background` (existing light token) with a subtle `bg-muted/30` grid backdrop.
+- Cards: white surfaces, `border border-border`, soft `shadow-sm`, 1px hairline dividers.
+- Accent rails on tiles: `border-l-2` using `primary`, `warning`, `destructive`, `success` semantic tokens.
+- Numerics: monospace `font-mono tabular-nums`, large hero metrics in `text-foreground`.
+- Micro-labels: uppercase `text-[10px] tracking-[0.14em] text-muted-foreground`.
+- Charts: Recharts with semantic HSL tokens (primary / success / warning / destructive / muted); light gridlines via `hsl(var(--border))`.
+- No `data-theme="obsidian"` override — page uses the standard light shell so it matches the rest of the app.
 
-### Guardrails
-- **No data/business-logic changes.** All hooks, RPCs, props, and routes stay identical.
-- **Semantic tokens only** — no hardcoded `text-white`, `bg-slate-*`, hex values. Use existing `--primary`, `--muted`, `--success`, `--warning`, `--destructive`, `--border`, `--card`. The prototype's slate/indigo/rose visuals map to the project's already-defined tokens.
-- Keep all existing sections: header, health strip, 4 pillars, Construction grid.
-- Admin-gated Finance pillar stays admin-gated.
-- Light mode primary; dark mode preserved via tokens.
+## New charts (all from existing tables, no schema changes)
 
-### Technical notes
-- Mono numerics via `font-mono` Tailwind utility (already wired through `tailwind.config.ts`).
-- Accent rail = `border-l-2 border-destructive` (or warning) on threshold-breached tiles, driven by existing `tone` prop on `SecondaryStat`.
-- No new dependencies.
+1. **Material Flow — 14d** dual area: issued vs returned (`material_issue_items` + `material_return_items`)
+2. **Inbound vs Outbound — 30d** stacked bars: GRN vs Issue per day (`grn_items` + `material_issue_items`)
+3. **Top 5 Issued Items — 30d** horizontal bars (`material_issue_items` grouped by `item_id`)
+4. **Top 5 Returned Items — 30d** horizontal bars, warning tone (`material_return_items` grouped by `item_id`)
+5. **Stock Movement Mix — 7d** donut by `stock_transactions.transaction_type`
+6. **PO Spend Trend — 12 weeks** area chart (`purchase_orders.total_amount` weekly)
 
-After implementation I'll verify visually via `browser--view_preview` at 1440 width.
+## Backend
+
+- **New RPC** `public.get_dashboard_analytics(p_company_id uuid, p_location_id uuid default null)` — SECURITY INVOKER, returns single `jsonb` with all six datasets. Respects existing RLS; location filter optional.
+- No table or column changes.
+
+## Frontend
+
+- **Hook**: extend `src/hooks/useDashboardPulse.ts` with `useDashboardAnalytics(companyId, locationId)` — React Query, `staleTime: 30_000`.
+- **New components** under `src/components/dashboard/`:
+  - `AnalyticsGrid.tsx` — bento layout wrapper
+  - `MaterialFlowChart.tsx` (Recharts AreaChart)
+  - `InboundOutboundChart.tsx` (stacked BarChart)
+  - `TopItemsBarList.tsx` (horizontal bars, reused for issued + returned)
+  - `MovementMixDonut.tsx` (PieChart)
+  - `SpendTrendChart.tsx` (AreaChart)
+- **`src/pages/Dashboard.tsx`**: mount `<AnalyticsGrid />` below the existing pillar grid and above Construction. Existing `PillarCard` / `HealthStrip` keep their current light styling.
+
+## Guardrails
+
+- Semantic tokens only — no hardcoded colors.
+- Finance-restricted figures continue to honour existing admin gating.
+- All queries via the new RPC + existing hooks; no direct table reads added.
+- Recharts already in the project — no new dependencies.
+
+## Order of operations
+
+1. Run the `get_dashboard_analytics` migration.
+2. After approval + regenerated types, add the hook and the 6 chart components.
+3. Wire `AnalyticsGrid` into `Dashboard.tsx`.

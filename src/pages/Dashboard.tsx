@@ -22,6 +22,7 @@ import { WarehousePillar } from "@/components/dashboard/WarehousePillar";
 import { ProcurementPillar } from "@/components/dashboard/ProcurementPillar";
 import { SourcingPillar } from "@/components/dashboard/SourcingPillar";
 import { FinancePillar } from "@/components/dashboard/FinancePillar";
+import { AnalyticsGrid } from "@/components/dashboard/AnalyticsGrid";
 
 export default function Dashboard() {
   const { globalLocationId } = useLocationFilter();
@@ -80,6 +81,11 @@ export default function Dashboard() {
         <SourcingPillar companyId={companyId} />
         {isAdminOrHigher && <FinancePillar companyId={companyId} />}
       </div>
+
+      {/* Material Flow Analytics */}
+      <AnalyticsGrid companyId={companyId} locationId={activeLocationId} />
+
+
 
       {/* Construction Module - Location Filtered */}
       <div className="space-y-3">
