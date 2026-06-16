@@ -157,8 +157,8 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                 ) : returnItems && returnItems.length > 0 ? (
                   returnItems.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.item_id}</TableCell>
-                      <TableCell>Item #{item.item_id.slice(0, 8)}</TableCell>
+                      <TableCell>{itemDetails[item.item_id]?.item_code || item.item_id}</TableCell>
+                      <TableCell>{itemDetails[item.item_id]?.name || `Item #${item.item_id.slice(0, 8)}`}</TableCell>
                       <TableCell>{item.quantity_returned}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
