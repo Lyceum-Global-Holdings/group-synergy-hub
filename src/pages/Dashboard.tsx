@@ -27,7 +27,7 @@ export default function Dashboard() {
   const { globalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
   const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
-  const { data: locations, isLoading: locationsLoading, isError: locationsError } = useDashboardLocations(selectedCompany?.id);
+  const { data: locations } = useDashboardLocations(selectedCompany?.id);
   const activeLocationId = globalLocationId;
   const companyId = selectedCompany?.id ?? null;
 
