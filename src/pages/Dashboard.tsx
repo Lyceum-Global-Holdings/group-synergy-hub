@@ -83,10 +83,14 @@ export default function Dashboard() {
 
       {/* Construction Module - Location Filtered */}
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <HardHat className="h-5 w-5 text-primary" />
-          Construction — {selectedLocationName}
-        </h2>
+        <div className="flex items-center gap-2 pt-2">
+          <div className="h-px flex-1 bg-border" />
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground flex items-center gap-2">
+            <HardHat className="h-3.5 w-3.5 text-primary" />
+            Construction · {selectedLocationName}
+          </h2>
+          <div className="h-px flex-1 bg-border" />
+        </div>
 
         {locationDataLoading ? (
           <div className="flex items-center justify-center p-8">
