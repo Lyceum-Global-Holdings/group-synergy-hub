@@ -9,6 +9,8 @@ import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { format } from "date-fns";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MaterialReturnDetailsDialogProps {
   open: boolean;
@@ -34,6 +36,27 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
   const { updateMaterialReturn, approveMaterialReturn, isUpdating, isApproving } = useMaterialReturns();
   const { data: userRoles = [] } = useCurrentUserRoles();
   const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
+  const [itemDetails, setItemDetails] = useState<Record<string, { name: string; item_code: string }>>({});
+
+  useEffect(() => {
+    if (!returnItems || returnItems.length === 0) {
+      setItemDetails({});
+      return;
+    }
+    const ids = Array.from(new Set(returnItems.map((i) => i.item_id).filter(Boolean)));
+    if (ids.length === 0) return;
+    supabase
+      .from('warehouse_items_full')
+      .select('id, name, item_code')
+      .in('id', ids)
+      .then(({ data }) => {
+        setItemDetails(
+          Object.fromEntries(
+            (data ?? []).map((r: any) => [r.id, { name: r.name ?? '', item_code: r.item_code ?? '' }])
+          )
+        );
+      });
+  }, [returnItems]);
 
   if (!returnNote) return null;
 
@@ -134,8 +157,8 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                 ) : returnItems && returnItems.length > 0 ? (
                   returnItems.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.item_id}</TableCell>
-                      <TableCell>Item #{item.item_id.slice(0, 8)}</TableCell>
+                      <TableCell>{itemDetails[item.item_id]?.item_code || item.item_id}</TableCell>
+                      <TableCell>{itemDetails[item.item_id]?.name || `Item #${item.item_id.slice(0, 8)}`}</TableCell>
                       <TableCell>{item.quantity_returned}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
