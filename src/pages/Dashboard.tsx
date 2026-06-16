@@ -44,14 +44,18 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Activity className="h-7 w-7 text-primary" />
-            Operations Pulse
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Realtime view of warehouse, procurement, sourcing and finance.
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary text-primary-foreground shadow-[var(--shadow-sm)]">
+            <Activity className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+              Operations Pulse
+            </h1>
+            <p className="text-xs font-medium text-muted-foreground mt-0.5">
+              Real-time view of warehouse, procurement, sourcing and finance.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm" className="gap-2">
