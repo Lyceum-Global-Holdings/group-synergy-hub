@@ -96,63 +96,21 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     enabled: !!selectedMinId && returnType === 'internal',
     staleTime: 0,
     queryFn: async (): Promise<ReturnableLine[]> => {
-      const { data: issueItems, error: e1 } = await supabase
-        .from('material_issue_items')
-        .select('item_id, quantity_issued, unit_cost, unit_of_measure')
-        .eq('min_id', selectedMinId);
-      if (e1) throw e1;
-
-      const itemIds = Array.from(new Set((issueItems ?? []).map((i: any) => i.item_id))).filter(Boolean);
-      if (itemIds.length === 0) return [];
-
-      const [{ data: masters, error: e2 }, { data: priorReturns, error: e3 }] = await Promise.all([
-        supabase.from('warehouse_items_full').select('id, item_code, name, unit_of_measure').in('id', itemIds),
-        supabase
-          .from('material_return_items')
-          .select('item_id, quantity_returned, mrn:material_return_notes!inner(reference_id, reference_type)')
-          .eq('material_return_notes.reference_type', 'material_issue')
-          .eq('material_return_notes.reference_id', selectedMinId),
-      ]);
-      if (e2) throw e2;
-      if (e3) throw e3;
-
-      const masterMap = new Map<string, any>((masters ?? []).map((m: any) => [m.id, m]));
-      const returnedMap = new Map<string, number>();
-      (priorReturns ?? []).forEach((r: any) => {
-        returnedMap.set(r.item_id, (returnedMap.get(r.item_id) ?? 0) + Number(r.quantity_returned || 0));
-      });
-
-      // Aggregate issued by item_id (in case MIN has multiple lines for same item)
-      const issuedMap = new Map<string, { qty: number; unit_cost: number; uom: string | null }>();
-      (issueItems ?? []).forEach((i: any) => {
-        const cur = issuedMap.get(i.item_id);
-        issuedMap.set(i.item_id, {
-          qty: (cur?.qty ?? 0) + Number(i.quantity_issued || 0),
-          unit_cost: cur?.unit_cost || Number(i.unit_cost || 0),
-          uom: cur?.uom || i.unit_of_measure || null,
-        });
-      });
-
-      const rows: ReturnableLine[] = [];
-      issuedMap.forEach((v, item_id) => {
-        const m = masterMap.get(item_id);
-        const qty_returned_prev = returnedMap.get(item_id) ?? 0;
-        const remaining = Math.max(v.qty - qty_returned_prev, 0);
-        rows.push({
-          item_id,
-          item_code: m?.item_code ?? '',
-          item_name: m?.name ?? `Item ${item_id.slice(0, 8)}`,
-          uom: m?.unit_of_measure ?? v.uom,
-          qty_issued: v.qty,
-          qty_returned_prev,
-          remaining,
-          unit_cost: v.unit_cost,
-          quantity_returned: 0,
-          condition: 'good',
-          notes: '',
-        });
-      });
-      return rows.sort((a, b) => a.item_code.localeCompare(b.item_code));
+      const { data, error } = await supabase.rpc('get_min_returnable_lines', { p_min_id: selectedMinId });
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        item_id: r.item_id,
+        item_code: r.item_code ?? '',
+        item_name: r.item_name ?? `Item ${String(r.item_id).slice(0, 8)}`,
+        uom: r.unit_of_measure ?? null,
+        qty_issued: Number(r.qty_issued || 0),
+        qty_returned_prev: Number(r.qty_returned_prev || 0),
+        remaining: Number(r.remaining || 0),
+        unit_cost: Number(r.unit_cost || 0),
+        quantity_returned: 0,
+        condition: 'good' as const,
+        notes: '',
+      }));
     },
   });
 

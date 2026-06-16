@@ -22086,6 +22086,19 @@ export type Database = {
           location_id: string
         }[]
       }
+      get_min_returnable_lines: {
+        Args: { p_min_id: string }
+        Returns: {
+          item_code: string
+          item_id: string
+          item_name: string
+          qty_issued: number
+          qty_returned_prev: number
+          remaining: number
+          unit_cost: number
+          unit_of_measure: string
+        }[]
+      }
       get_pending_sap_sync_items: {
         Args: { _company_id: string; _limit?: number; _table_name: string }
         Returns: Json[]
