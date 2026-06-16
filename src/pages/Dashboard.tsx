@@ -1,6 +1,4 @@
-import { useState } from "react";
 import {
-  MapPin,
   HardHat,
   Wrench,
   Boxes,
@@ -12,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardLocations } from "@/hooks/useWarehouseLocations";
 import { useDashboardLocationData } from "@/hooks/useDashboardLocationData";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
@@ -27,12 +24,11 @@ import { SourcingPillar } from "@/components/dashboard/SourcingPillar";
 import { FinancePillar } from "@/components/dashboard/FinancePillar";
 
 export default function Dashboard() {
-  const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const { globalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
   const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
-  const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
   const { data: locations, isLoading: locationsLoading, isError: locationsError } = useDashboardLocations(selectedCompany?.id);
-  const activeLocationId = locationFilter === "all" ? null : locationFilter;
+  const activeLocationId = globalLocationId;
   const companyId = selectedCompany?.id ?? null;
 
   const { inventory, labour, isLoading: locationDataLoading } = useDashboardLocationData(activeLocationId);
@@ -40,19 +36,9 @@ export default function Dashboard() {
   const { data: health, isLoading: healthLoading } = useHealthStrip(companyId, activeLocationId);
 
   const selectedLocationName =
-    locationFilter === "all"
+    globalLocationId === null
       ? "All Locations"
-      : locations?.find((l) => l.id === locationFilter)?.name || "Selected Location";
-
-  const handleLocationChange = (value: string) => {
-    setLocationFilter(value);
-    setGlobalLocationId(value === "all" ? null : value);
-  };
-
-  let locationPlaceholder = "All Locations";
-  if (!selectedCompany?.id) locationPlaceholder = "Select a company";
-  else if (locationsLoading) locationPlaceholder = "Loading locations…";
-  else if (locationsError) locationPlaceholder = "Failed to load locations";
+      : locations?.find((l) => l.id === globalLocationId)?.name || "Selected Location";
 
   return (
     <div className="space-y-6">
