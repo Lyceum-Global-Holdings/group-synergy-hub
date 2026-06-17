@@ -184,7 +184,10 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                 <p className="text-sm text-muted-foreground">Total Value</p>
                 <p className="text-lg font-semibold">{totalValue.toFixed(2)}</p>
               </div>
+            </div>
           </div>
+
+
 
           {returnNote.company_id && (
             <div className="border rounded-lg p-4 space-y-2">
