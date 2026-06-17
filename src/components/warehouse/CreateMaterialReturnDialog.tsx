@@ -187,7 +187,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0);
   }, [returnType, supplierItems]);
 
-  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && internalValid && supplierValid && !isCreating;
+  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && internalValid && supplierValid && !isCreating && !loadingLines;
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedCompany?.id) return;
