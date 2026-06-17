@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
@@ -94,10 +95,16 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   });
 
   // ---- Load issue lines + prior returns for selected MIN ----
-  const { data: loadedLines, isFetching: loadingLines } = useQuery({
+  const {
+    data: loadedLines,
+    isFetching: loadingLines,
+    error: linesError,
+    refetch: refetchLines,
+  } = useQuery({
     queryKey: ['min-returnable-lines', selectedMinId],
     enabled: !!selectedMinId && returnType === 'internal',
     staleTime: 0,
+    retry: 1,
     queryFn: async (): Promise<ReturnableLine[]> => {
       const { data, error } = await supabase.rpc('get_min_returnable_lines', { p_min_id: selectedMinId });
       if (error) throw error;
@@ -117,9 +124,22 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     },
   });
 
+  // Reset lines immediately when MIN selection changes — prevents stale rows
+  // from a previous MIN from leaking into a new selection.
+  useEffect(() => {
+    setLines([]);
+  }, [selectedMinId]);
+
   useEffect(() => {
     if (loadedLines) setLines(loadedLines);
   }, [loadedLines]);
+
+  // Surface RPC error once per failure (toast). Inline Alert is rendered below.
+  useEffect(() => {
+    if (linesError) {
+      toast.error(`Could not load issued items: ${(linesError as any)?.message ?? 'Unknown error'}`);
+    }
+  }, [linesError]);
 
   // Prefill returned_by from selected MIN
   useEffect(() => {
@@ -167,7 +187,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0);
   }, [returnType, supplierItems]);
 
-  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && internalValid && supplierValid && !isCreating;
+  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && internalValid && supplierValid && !isCreating && !loadingLines;
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedCompany?.id) return;
@@ -331,10 +351,23 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading issued items…
                 </div>
+              ) : linesError ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Could not load issued items</AlertTitle>
+                  <AlertDescription className="flex items-center justify-between gap-3">
+                    <span className="text-xs">{(linesError as any)?.message ?? 'Unknown error'}</span>
+                    <Button type="button" size="sm" variant="outline" onClick={() => refetchLines()}>
+                      <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                    </Button>
+                  </AlertDescription>
+                </Alert>
               ) : !selectedMinId ? (
                 <p className="text-sm text-muted-foreground border rounded p-4">Select a MIN above to load its items.</p>
               ) : lines.length === 0 ? (
-                <p className="text-sm text-muted-foreground border rounded p-4">This MIN has no returnable items.</p>
+                <p className="text-sm text-muted-foreground border rounded p-4">This MIN has no issued items to return.</p>
+              ) : lines.every((l) => l.remaining <= 0) ? (
+                <p className="text-sm text-muted-foreground border rounded p-4">All items from this MIN have already been returned.</p>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
