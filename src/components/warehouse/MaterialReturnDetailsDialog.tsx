@@ -78,6 +78,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
 
   const totalValue = returnItems?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0;
   const isProcessing = isUpdating || isApproving;
+  const hasReturnItems = (returnItems?.length ?? 0) > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,7 +174,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">No items found</TableCell>
+                    <TableCell colSpan={7} className="text-center">No return items saved for this draft</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -218,7 +219,8 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                 {canApprove ? (
                   <Button
                     onClick={handleApprove}
-                    disabled={isProcessing}
+                    disabled={isProcessing || isLoading || !hasReturnItems}
+                    title={!hasReturnItems ? 'Add at least one return item before approval' : undefined}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     {isApproving ? 'Processing...' : 'Approve Return'}
