@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
-import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUploadField";
@@ -201,7 +200,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
               condition: l.condition,
               unit_cost: l.unit_cost,
               total_cost: l.quantity_returned * l.unit_cost,
-              notes: l.notes || null,
+              notes: l.notes || undefined,
             }))
         : supplierItems.map((i) => ({
             item_id: i.warehouse_item_id,
@@ -209,7 +208,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             condition: i.condition,
             unit_cost: i.unit_cost,
             total_cost: i.quantity_returned * i.unit_cost,
-            notes: i.notes || null,
+            notes: i.notes || undefined,
           }));
 
       const newReturn = await createMaterialReturnWithItemsAsync({
