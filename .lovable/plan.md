@@ -1,58 +1,50 @@
-# Multi-file attachments for MIN & MRN
+## Problem
 
-Today MIN (`material_issue_notes`) and MRN (`material_return_notes`) each store **one** SRN file in a single text column (`srn_document_url`). International document-management practice (ISO 15489 records management, GS1 EPCIS evidence packs, SAP/Oracle attachment models) treats supporting evidence as a **1-to-many attachment set** with per-file metadata, audit trail, and category tagging — not a single overwrite-only URL.
+In **Create Material Return Note → Internal Return**, selecting a source MIN shows *"This MIN has no returnable items"* even when the MIN has issued items (verified in DB: MIN `MIN-20260611-005` has 3 items, 0 previously returned).
 
-## What you'll see in the UI
+Root cause analysis:
 
-On both **Create/Edit Material Issue Note** and **Create/Edit Material Return Note** dialogs, the current single-file "SRN Document" block becomes an **Attachments** panel:
+1. `CreateMaterialReturnDialog` calls RPC `get_min_returnable_lines(p_min_id)`. Any RPC failure (auth raise, transient error, network) is **silently swallowed** by React Query — `loadedLines` stays `undefined`, the `useEffect` never fires, and `lines` remains `[]`, so the UI shows the misleading "no items" message.
+2. When the user switches between MINs, `lines` is **not reset** until the next successful fetch — stale rows from a previous MIN can linger.
+3. The RPC itself is fragile: it joins `warehouse_items_full` for item code/name/UOM and reads `unit_cost`/`unit_of_measure` from issue lines. For this MIN both `unit_cost` and `unit_of_measure` on `material_issue_items` are `NULL`/empty in the DB, so even when rows load the user sees blank UOM and zero unit cost.
+4. The "Not authorized for this MIN" raise inside the RPC kills the entire result instead of letting RLS filter, even though the calling user already passed RLS to see the MIN in the dropdown.
 
-- Drag-and-drop zone + "Take photo" + "Choose files" buttons (multi-select enabled).
-- List of uploaded files showing: thumbnail/icon, original filename, size, category tag (Signed SRN / Gate Pass / Photo / Delivery Proof / Other), uploader, timestamp.
-- Per-row actions: preview, download, replace, remove.
-- Up to **10 files** per document, **5 MB** each, types: JPG/PNG/WEBP/PDF (same as today).
-- The first uploaded "Signed SRN" remains the primary evidence shown on PDF exports and list views, so existing PDF/print flows don't regress.
+## Plan
 
-## Backend (one migration)
+Apply ISO 15489 / SAP-style robust document loading: fail loud, never silently empty, and enrich line data from authoritative master.
 
-New table `public.material_document_attachments` — generic, parent-typed so MIN, MRN, and future MR can share it:
+### Backend — migration
 
-```text
-id uuid pk
-parent_type text  check in ('material_issue','material_return','material_request')
-parent_id uuid    not null
-company_id uuid   not null     -- multi-tenant scope (Core rule)
-category text     check in ('signed_srn','gate_pass','photo','delivery_proof','other')
-file_path text    not null     -- storage object key
-file_name text, mime_type text, file_size bigint
-uploaded_by uuid, uploaded_at, created_at, updated_at
-index (parent_type, parent_id)
-index (company_id, created_at desc)
-```
+Update `public.get_min_returnable_lines(p_min_id uuid)`:
 
-- GRANTs: `authenticated` (SELECT/INSERT/UPDATE/DELETE), `service_role` ALL. No `anon`.
-- RLS: company-scoped via `can_access_company(company_id)`; writers must also have edit rights on the parent MIN/MRN (reuse existing helper, mirroring current `srn_document_url` update path).
-- Reuses the existing **`min-srn-documents`** storage bucket — no new bucket, no new policies needed; path prefix stays `{company_id}/{parent_id}/...` so current RLS continues to apply.
-- **Back-compat:** keep `srn_document_url` column. A trigger keeps it in sync with the latest `signed_srn` attachment so existing PDFs, list columns, and the MR module that read it keep working unchanged. No data migration required for existing rows.
+- Drop the explicit `RAISE 42501`. Rely on RLS: if `material_issue_notes` row is not visible to caller, the leading `SELECT company_id` returns `NULL` and the function returns 0 rows naturally (RLS-aligned, matches PostgREST conventions).
+- Coalesce display fields so every returnable line has a usable `item_code`, `item_name`, `unit_of_measure`, and `unit_cost` even when `material_issue_items` columns are blank:
+  - `item_code` ← `wif.item_code`, fallback to `'ITEM-' || substring(item_id::text,1,8)`
+  - `item_name` ← `wif.name`, fallback to `'(Unnamed item)'`
+  - `unit_of_measure` ← `NULLIF(mii.unit_of_measure,'')` → `wif.unit_of_measure` → `'EA'`
+  - `unit_cost` ← `mii.unit_cost` → `wif.unit_cost` → `0`
+- Keep `SECURITY DEFINER` + `search_path=public` (project standard) and existing grants.
 
-## Frontend
+### Frontend — `src/components/warehouse/CreateMaterialReturnDialog.tsx`
 
-1. **New shared component** `src/components/warehouse/SrnAttachmentsField.tsx` — replaces `SrnDocumentUploadField` usage in MIN and MRN dialogs. Props: `parentType`, `parentId?`, `companyId`, `disabled`. Handles temp-folder uploads when `parentId` is absent and re-parents on save.
-2. **New hook** `src/hooks/useMaterialAttachments.ts` — React Query list + upload + delete + category-change mutations, scoped by `(parentType, parentId)`.
-3. **Wire-in points** (UI-only edits, no business-logic change):
-   - `src/components/warehouse/CreateMaterialIssueDialog.tsx` (and edit dialog if separate)
-   - `src/components/warehouse/material-return/...` create/edit dialog
-   - Detail views: render the attachment list read-only.
-4. Keep the existing `SrnDocumentUploadField` file untouched for now so the MR module and any other consumers keep working; remove it in a later cleanup once all callers migrate.
+- Capture the React Query `error` from `useQuery(['min-returnable-lines', selectedMinId], …)` and:
+  - Show an inline destructive `Alert` ("Could not load issued items: <message>. Try again.") with a Retry button (`refetch()`).
+  - Fire a `toast.error(...)` once per failure.
+- Reset `lines` to `[]` immediately when `selectedMinId` changes (before refetch resolves), so stale rows never bleed across MINs.
+- Differentiate three empty states clearly:
+  1. No MIN selected → "Select a MIN above to load its items."
+  2. Loaded successfully but every line fully returned → "All items from this MIN have already been returned."
+  3. MIN truly has no issue items → "This MIN has no issued items to return."
+- Disable **Create Return** while `loadingLines` is true (prevents submitting before items load).
 
-## Out of scope (intentionally)
+### Order of work
 
-- No change to MIN/MRN business logic, approvals, stock movements, or PDF layout beyond swapping the single SRN thumbnail for the primary signed-SRN attachment.
-- No new storage bucket; no public access.
-- MR (Material Request) module attachments — same pattern can be applied later by passing `parent_type='material_request'`.
+1. SQL migration: replace `get_min_returnable_lines` with the hardened version above.
+2. Regenerate Supabase types.
+3. Patch `CreateMaterialReturnDialog.tsx` for error surfacing, line reset, and empty-state messaging.
+4. Smoke test: pick MIN-20260611-005 → expect 3 rows with item codes, UOM, and remaining qty populated.
 
-## Order of execution
+### Out of scope
 
-1. Run migration (new table + GRANTs + RLS + sync trigger).
-2. After types regenerate: add hook + shared component.
-3. Swap component into MIN and MRN create/edit dialogs and detail views.
-4. Smoke test: upload 3 files on a new MIN, save, reopen, delete one, confirm `srn_document_url` reflects the latest signed SRN.
+- No change to MRN business logic, stock movements, approvals, or PDF output.
+- No change to the supplier-return branch.
