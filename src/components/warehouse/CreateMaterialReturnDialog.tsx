@@ -55,8 +55,7 @@ interface Props {
 
 export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, referenceType }: Props) {
   const { selectedCompany } = useCompany();
-  const { createMaterialReturnAsync, isCreating } = useMaterialReturns();
-  const { createItems } = useMaterialReturnItems();
+  const { createMaterialReturnWithItemsAsync, isCreating } = useMaterialReturns();
 
   const [returnDate, setReturnDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [returnedBy, setReturnedBy] = useState('');
@@ -193,7 +192,27 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     if (!canSubmit || !selectedCompany?.id) return;
     try {
       const isInternal = returnType === 'internal';
-      const newReturn = await createMaterialReturnAsync({
+      const payload = isInternal
+        ? lines
+            .filter((l) => l.quantity_returned > 0)
+            .map((l) => ({
+              item_id: l.item_id,
+              quantity_returned: l.quantity_returned,
+              condition: l.condition,
+              unit_cost: l.unit_cost,
+              total_cost: l.quantity_returned * l.unit_cost,
+              notes: l.notes || null,
+            }))
+        : supplierItems.map((i) => ({
+            item_id: i.warehouse_item_id,
+            quantity_returned: i.quantity_returned,
+            condition: i.condition,
+            unit_cost: i.unit_cost,
+            total_cost: i.quantity_returned * i.unit_cost,
+            notes: i.notes || null,
+          }));
+
+      const newReturn = await createMaterialReturnWithItemsAsync({
         return_date: returnDate,
         returned_by: returnedBy,
         return_type: returnType,
@@ -203,6 +222,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
         notes,
         company_id: selectedCompany.id,
         srn_number: srnNumber || undefined,
+        items: payload,
       });
 
       if (srnDocumentTempPath && newReturn?.id) {
@@ -234,30 +254,6 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
           console.error('Failed to attach extra files to MRN', e);
         }
       }
-
-      const payload = isInternal
-        ? lines
-            .filter((l) => l.quantity_returned > 0)
-            .map((l) => ({
-              mrn_id: newReturn.id,
-              item_id: l.item_id,
-              quantity_returned: l.quantity_returned,
-              condition: l.condition,
-              unit_cost: l.unit_cost,
-              total_cost: l.quantity_returned * l.unit_cost,
-              notes: l.notes || null,
-            }))
-        : supplierItems.map((i) => ({
-            mrn_id: newReturn.id,
-            item_id: i.warehouse_item_id,
-            quantity_returned: i.quantity_returned,
-            condition: i.condition,
-            unit_cost: i.unit_cost,
-            total_cost: i.quantity_returned * i.unit_cost,
-            notes: i.notes || null,
-          }));
-
-      await createItems(payload);
       resetAll();
       onOpenChange(false);
     } catch (e: any) {
