@@ -21,6 +21,8 @@ import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { SrnDocumentUploadField } from '@/components/warehouse/SrnDocumentUploadField';
+import { MaterialAttachmentsPanel } from '@/components/warehouse/MaterialAttachmentsPanel';
+import { BufferedAttachment, commitBufferedAttachments } from '@/hooks/useMaterialAttachments';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -92,6 +94,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
+  const [bufferedAttachments, setBufferedAttachments] = useState<BufferedAttachment[]>([]);
   const [browseOpen, setBrowseOpen] = useState(false);
 
   const { items: warehouseItems } = useWarehouseItems();
@@ -358,6 +361,20 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         }
       }
 
+      // Persist additional multi-file attachments
+      if (bufferedAttachments.length && issueNote?.id && selectedCompany?.id) {
+        try {
+          await commitBufferedAttachments(
+            'material_issue',
+            issueNote.id,
+            selectedCompany.id,
+            bufferedAttachments,
+          );
+        } catch (e) {
+          console.error('Failed to attach extra files to MIN', e);
+        }
+      }
+
       // Create items with reservation linkage
       const itemsToCreate = items.map((item, index) => ({
         min_id: issueNote.id,
@@ -408,6 +425,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
       setReservedItems([]);
       setLocationTouched(false);
       setSrnDocumentTempPath('');
+      setBufferedAttachments([]);
       setCurrentTab('header');
       onOpenChange(false);
     } catch (error) {
@@ -499,6 +517,14 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               companyId={selectedCompany?.id}
               currentDocumentUrl={srnDocumentTempPath || undefined}
               onUpload={(path) => setSrnDocumentTempPath(path)}
+            />
+
+            <MaterialAttachmentsPanel
+              parentType="material_issue"
+              companyId={selectedCompany?.id}
+              label="Additional Attachments"
+              buffered={bufferedAttachments}
+              onBufferedChange={setBufferedAttachments}
             />
 
 
