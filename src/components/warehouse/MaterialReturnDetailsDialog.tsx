@@ -220,11 +220,99 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">No return items saved for this draft</TableCell>
+                    <TableCell colSpan={7} className="text-center">
+                      No return items were saved for this MRN
+                    </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
+
+            {canRepairMissingItems && (
+              <div className="mt-4 rounded-lg border p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium">Add missing return items</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Use this only to repair MRNs that were saved before item lines were recorded.
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={addRepairItem} disabled={isProcessing}>
+                    <Plus className="h-4 w-4 mr-2" /> Add item
+                  </Button>
+                </div>
+
+                {repairItems.map((item, index) => (
+                  <div key={index} className="rounded-md border p-3 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <ItemSelector
+                          value={item.item_id}
+                          onSelect={(selected) => updateRepairItem(index, {
+                            item_id: selected?.id ?? '',
+                            item_code: selected?.item_code ?? '',
+                            item_name: selected?.name ?? '',
+                            unit_cost: selected?.unit_cost ?? 0,
+                          })}
+                        />
+                      </div>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => removeRepairItem(index)} disabled={isProcessing}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label>Quantity</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.quantity_returned || ''}
+                          onChange={(event) => updateRepairItem(index, { quantity_returned: Math.max(0, parseFloat(event.target.value) || 0) })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Condition</Label>
+                        <Select value={item.condition} onValueChange={(value: any) => updateRepairItem(index, { condition: value })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="good">Good</SelectItem>
+                            <SelectItem value="damaged">Damaged</SelectItem>
+                            <SelectItem value="expired">Expired</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Unit Cost</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.unit_cost || ''}
+                          onChange={(event) => updateRepairItem(index, { unit_cost: Math.max(0, parseFloat(event.target.value) || 0) })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Notes</Label>
+                      <Input value={item.notes} onChange={(event) => updateRepairItem(index, { notes: event.target.value })} />
+                    </div>
+                  </div>
+                ))}
+
+                {repairItems.length > 0 && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleAddMissingItems}
+                      disabled={isProcessing || !repairItems.some((item) => item.item_id && item.quantity_returned > 0)}
+                    >
+                      {isRepairing ? 'Saving…' : 'Save missing items'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-4 flex justify-end">
               <div className="text-right">
