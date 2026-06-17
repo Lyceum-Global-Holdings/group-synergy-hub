@@ -280,6 +280,40 @@ export const useMaterialReturns = () => {
     }
   });
 
+  const addMissingReturnItemsMutation = useMutation({
+    mutationFn: async ({ mrnId, items }: { mrnId: string; items: Omit<CreateMaterialReturnItemData, 'mrn_id'>[] }) => {
+      if (!items.length) throw new Error('At least one return item is required');
+
+      const { data, error } = await supabase.rpc('add_missing_material_return_items' as any, {
+        p_mrn_id: mrnId,
+        p_items: items,
+      });
+
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (_count, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['material-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['material-return-items', variables.mrnId] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['item-bin-allocations'] });
+      toast({
+        title: "Success",
+        description: "Missing return items added successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error adding missing return items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add missing return items",
+        variant: "destructive",
+      });
+    }
+  });
+
   const deleteMaterialReturnMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -313,12 +347,14 @@ export const useMaterialReturns = () => {
     createMaterialReturn: createMaterialReturnMutation.mutate,
     createMaterialReturnAsync: createMaterialReturnMutation.mutateAsync,
     createMaterialReturnWithItemsAsync: createMaterialReturnWithItemsMutation.mutateAsync,
+    addMissingReturnItemsAsync: addMissingReturnItemsMutation.mutateAsync,
     updateMaterialReturn: updateMaterialReturnMutation.mutate,
     approveMaterialReturn: approveMaterialReturnMutation.mutate,
     deleteMaterialReturn: deleteMaterialReturnMutation.mutate,
     isCreating: createMaterialReturnMutation.isPending || createMaterialReturnWithItemsMutation.isPending,
     isUpdating: updateMaterialReturnMutation.isPending,
     isApproving: approveMaterialReturnMutation.isPending,
+    isRepairing: addMissingReturnItemsMutation.isPending,
     isDeleting: deleteMaterialReturnMutation.isPending,
   };
 };

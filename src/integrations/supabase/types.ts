@@ -21452,6 +21452,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_missing_material_return_items: {
+        Args: { p_items?: Json; p_mrn_id: string }
+        Returns: number
+      }
       add_shared_bin_allocation: {
         Args: {
           _bin_id: string
