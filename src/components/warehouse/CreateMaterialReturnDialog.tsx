@@ -351,10 +351,23 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading issued items…
                 </div>
+              ) : linesError ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Could not load issued items</AlertTitle>
+                  <AlertDescription className="flex items-center justify-between gap-3">
+                    <span className="text-xs">{(linesError as any)?.message ?? 'Unknown error'}</span>
+                    <Button type="button" size="sm" variant="outline" onClick={() => refetchLines()}>
+                      <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                    </Button>
+                  </AlertDescription>
+                </Alert>
               ) : !selectedMinId ? (
                 <p className="text-sm text-muted-foreground border rounded p-4">Select a MIN above to load its items.</p>
               ) : lines.length === 0 ? (
-                <p className="text-sm text-muted-foreground border rounded p-4">This MIN has no returnable items.</p>
+                <p className="text-sm text-muted-foreground border rounded p-4">This MIN has no issued items to return.</p>
+              ) : lines.every((l) => l.remaining <= 0) ? (
+                <p className="text-sm text-muted-foreground border rounded p-4">All items from this MIN have already been returned.</p>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
