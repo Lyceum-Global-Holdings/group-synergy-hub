@@ -1,17 +1,31 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MaterialReturnNote } from "@/types/materialIssueReturn";
 import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { format } from "date-fns";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, Plus, Trash2, XCircle } from "lucide-react";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MaterialAttachmentsPanel } from "./MaterialAttachmentsPanel";
+import { ItemSelector } from "@/components/common/ItemSelector";
+
+type RepairItem = {
+  item_id: string;
+  item_code: string;
+  item_name: string;
+  quantity_returned: number;
+  condition: 'good' | 'damaged' | 'expired';
+  unit_cost: number;
+  notes: string;
+};
 
 interface MaterialReturnDetailsDialogProps {
   open: boolean;
@@ -34,10 +48,11 @@ const getStatusColor = (status: string): "default" | "destructive" | "secondary"
 
 export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: MaterialReturnDetailsDialogProps) {
   const { returnItems, isLoading } = useMaterialReturnItems(returnNote?.id);
-  const { updateMaterialReturn, approveMaterialReturn, isUpdating, isApproving } = useMaterialReturns();
+  const { updateMaterialReturn, approveMaterialReturn, addMissingReturnItemsAsync, isUpdating, isApproving, isRepairing } = useMaterialReturns();
   const { data: userRoles = [] } = useCurrentUserRoles();
   const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
   const [itemDetails, setItemDetails] = useState<Record<string, { name: string; item_code: string }>>({});
+  const [repairItems, setRepairItems] = useState<RepairItem[]>([]);
 
   useEffect(() => {
     if (!returnItems || returnItems.length === 0) {
@@ -77,8 +92,39 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
   };
 
   const totalValue = returnItems?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0;
-  const isProcessing = isUpdating || isApproving;
+  const isProcessing = isUpdating || isApproving || isRepairing;
   const hasReturnItems = (returnItems?.length ?? 0) > 0;
+  const canRepairMissingItems = canApprove && !isLoading && !hasReturnItems && returnNote.company_id && returnNote.status !== 'cancelled';
+
+  const addRepairItem = () => {
+    setRepairItems((prev) => [...prev, { item_id: '', item_code: '', item_name: '', quantity_returned: 0, condition: 'good', unit_cost: 0, notes: '' }]);
+  };
+
+  const updateRepairItem = (index: number, patch: Partial<RepairItem>) => {
+    setRepairItems((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
+  };
+
+  const removeRepairItem = (index: number) => {
+    setRepairItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAddMissingItems = async () => {
+    if (!returnNote || !canRepairMissingItems) return;
+    const payload = repairItems
+      .filter((item) => item.item_id && item.quantity_returned > 0)
+      .map((item) => ({
+        item_id: item.item_id,
+        quantity_returned: item.quantity_returned,
+        condition: item.condition,
+        unit_cost: item.unit_cost,
+        total_cost: item.quantity_returned * item.unit_cost,
+        notes: item.notes || undefined,
+      }));
+
+    if (!payload.length) return;
+    await addMissingReturnItemsAsync({ mrnId: returnNote.id, items: payload });
+    setRepairItems([]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
