@@ -1,8 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MaterialReturnNote, CreateMaterialReturnData } from '@/types/materialIssueReturn';
+import { MaterialReturnNote, CreateMaterialReturnData, CreateMaterialReturnItemData } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
+
+type CreateMaterialReturnWithItemsData = CreateMaterialReturnData & {
+  items: Omit<CreateMaterialReturnItemData, 'mrn_id'>[];
+};
 
 export const useMaterialReturns = () => {
   const { toast } = useToast();
@@ -66,6 +70,44 @@ export const useMaterialReturns = () => {
       toast({
         title: "Error",
         description: "Failed to create material return note",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const createMaterialReturnWithItemsMutation = useMutation({
+    mutationFn: async ({ items, ...returnData }: CreateMaterialReturnWithItemsData) => {
+      if (!items.length) throw new Error('At least one return item is required');
+
+      const { data, error } = await supabase.rpc('create_material_return_with_items' as any, {
+        p_return_date: returnData.return_date,
+        p_returned_by: returnData.returned_by,
+        p_return_type: returnData.return_type,
+        p_reason: returnData.reason,
+        p_reference_type: returnData.reference_type ?? null,
+        p_reference_id: returnData.reference_id ?? null,
+        p_notes: returnData.notes ?? null,
+        p_company_id: returnData.company_id ?? null,
+        p_srn_number: returnData.srn_number ?? null,
+        p_items: items,
+      });
+
+      if (error) throw error;
+      return data as MaterialReturnNote;
+    },
+    onSuccess: (createdReturn) => {
+      queryClient.invalidateQueries({ queryKey: ['material-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['material-return-items', createdReturn?.id] });
+      toast({
+        title: "Success",
+        description: "Material return note created successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating material return with items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create material return note with items",
         variant: "destructive",
       });
     }
@@ -137,7 +179,7 @@ export const useMaterialReturns = () => {
       console.log('[MaterialReturn] Return items data:', JSON.stringify(returnItems, null, 2));
 
       if (!returnItems || returnItems.length === 0) {
-        console.warn('[MaterialReturn] WARNING: No return items found!');
+        throw new Error('This draft has no return items. Add at least one item before approval.');
       }
 
       // Process stock updates for each item
@@ -270,10 +312,11 @@ export const useMaterialReturns = () => {
     error,
     createMaterialReturn: createMaterialReturnMutation.mutate,
     createMaterialReturnAsync: createMaterialReturnMutation.mutateAsync,
+    createMaterialReturnWithItemsAsync: createMaterialReturnWithItemsMutation.mutateAsync,
     updateMaterialReturn: updateMaterialReturnMutation.mutate,
     approveMaterialReturn: approveMaterialReturnMutation.mutate,
     deleteMaterialReturn: deleteMaterialReturnMutation.mutate,
-    isCreating: createMaterialReturnMutation.isPending,
+    isCreating: createMaterialReturnMutation.isPending || createMaterialReturnWithItemsMutation.isPending,
     isUpdating: updateMaterialReturnMutation.isPending,
     isApproving: approveMaterialReturnMutation.isPending,
     isDeleting: deleteMaterialReturnMutation.isPending,
