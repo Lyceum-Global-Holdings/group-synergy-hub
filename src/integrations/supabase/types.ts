@@ -10405,6 +10405,54 @@ export type Database = {
           },
         ]
       }
+      material_document_attachments: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          file_name: string | null
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          parent_id: string
+          parent_type: string
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          file_name?: string | null
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          parent_id: string
+          parent_type: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          file_name?: string | null
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          parent_id?: string
+          parent_type?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       material_issue_items: {
         Row: {
           batch_allocation_mode: string | null
