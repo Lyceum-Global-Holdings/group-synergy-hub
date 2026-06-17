@@ -12,6 +12,8 @@ import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUploadField";
+import { MaterialAttachmentsPanel } from "@/components/warehouse/MaterialAttachmentsPanel";
+import { BufferedAttachment, commitBufferedAttachments } from "@/hooks/useMaterialAttachments";
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -64,6 +66,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   const [notes, setNotes] = useState('');
   const [srnNumber, setSrnNumber] = useState('');
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
+  const [bufferedAttachments, setBufferedAttachments] = useState<BufferedAttachment[]>([]);
 
   // Internal return state
   const [selectedMinId, setSelectedMinId] = useState<string>(referenceId ?? '');
@@ -198,6 +201,20 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
         }
       }
 
+      if (bufferedAttachments.length && newReturn?.id && selectedCompany?.id) {
+        try {
+          await commitBufferedAttachments(
+            'material_return',
+            newReturn.id,
+            selectedCompany.id,
+            bufferedAttachments,
+          );
+          setBufferedAttachments([]);
+        } catch (e) {
+          console.error('Failed to attach extra files to MRN', e);
+        }
+      }
+
       const payload = isInternal
         ? lines
             .filter((l) => l.quantity_returned > 0)
@@ -287,6 +304,14 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             companyId={selectedCompany?.id}
             currentDocumentUrl={srnDocumentTempPath}
             onUpload={setSrnDocumentTempPath}
+          />
+
+          <MaterialAttachmentsPanel
+            parentType="material_return"
+            companyId={selectedCompany?.id}
+            label="Additional Attachments"
+            buffered={bufferedAttachments}
+            onBufferedChange={setBufferedAttachments}
           />
 
           <div>
