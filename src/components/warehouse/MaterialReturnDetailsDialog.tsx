@@ -174,7 +174,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">No items found</TableCell>
+                    <TableCell colSpan={7} className="text-center">No return items saved for this draft</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -220,6 +220,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                   <Button
                     onClick={handleApprove}
                     disabled={isProcessing || isLoading || !hasReturnItems}
+                    title={!hasReturnItems ? 'Add at least one return item before approval' : undefined}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     {isApproving ? 'Processing...' : 'Approve Return'}
