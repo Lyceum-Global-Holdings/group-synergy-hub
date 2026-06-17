@@ -26,6 +26,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { IssueItemsDialog } from './IssueItemsDialog';
 import { ReceiveItemsDialog } from './ReceiveItemsDialog';
 import { SrnDocumentUploadField } from './SrnDocumentUploadField';
+import { MaterialAttachmentsPanel } from './MaterialAttachmentsPanel';
 import { downloadMaterialIssuePdf } from '@/utils/materialIssuePdfExport';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
@@ -328,7 +329,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
             )}
 
             {issue.company_id && (
-              <div className="border rounded-lg p-4 space-y-2">
+              <div className="border rounded-lg p-4 space-y-4">
                 <h3 className="font-semibold">SRN Evidence</h3>
                 <SrnDocumentUploadField
                   companyId={issue.company_id}
@@ -339,6 +340,13 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                   onUpload={(path) =>
                     setIssue((prev) => (prev ? { ...prev, srn_document_url: path || null } : prev))
                   }
+                />
+                <MaterialAttachmentsPanel
+                  parentType="material_issue"
+                  parentId={issue.id}
+                  companyId={issue.company_id}
+                  disabled={issue.status === 'cancelled'}
+                  label="Additional Attachments"
                 />
               </div>
             )}
