@@ -95,10 +95,16 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   });
 
   // ---- Load issue lines + prior returns for selected MIN ----
-  const { data: loadedLines, isFetching: loadingLines } = useQuery({
+  const {
+    data: loadedLines,
+    isFetching: loadingLines,
+    error: linesError,
+    refetch: refetchLines,
+  } = useQuery({
     queryKey: ['min-returnable-lines', selectedMinId],
     enabled: !!selectedMinId && returnType === 'internal',
     staleTime: 0,
+    retry: 1,
     queryFn: async (): Promise<ReturnableLine[]> => {
       const { data, error } = await supabase.rpc('get_min_returnable_lines', { p_min_id: selectedMinId });
       if (error) throw error;
@@ -118,9 +124,22 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     },
   });
 
+  // Reset lines immediately when MIN selection changes — prevents stale rows
+  // from a previous MIN from leaking into a new selection.
+  useEffect(() => {
+    setLines([]);
+  }, [selectedMinId]);
+
   useEffect(() => {
     if (loadedLines) setLines(loadedLines);
   }, [loadedLines]);
+
+  // Surface RPC error once per failure (toast). Inline Alert is rendered below.
+  useEffect(() => {
+    if (linesError) {
+      toast.error(`Could not load issued items: ${(linesError as any)?.message ?? 'Unknown error'}`);
+    }
+  }, [linesError]);
 
   // Prefill returned_by from selected MIN
   useEffect(() => {
