@@ -29,7 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueItem } from '@/types/materialIssueReturn';
-import { useMaterialReturnItems } from '@/hooks/useMaterialReturnItems';
+import { useMaterialReturns } from '@/hooks/useMaterialReturns';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface ReceiveItemsDialogProps {
@@ -53,7 +53,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
   const [receiveData, setReceiveData] = useState<Record<string, ItemReceiveData>>({});
   const [receiving, setReceiving] = useState(false);
   const { toast } = useToast();
-  const { createItems: createReturnItems } = useMaterialReturnItems();
+  const { createMaterialReturnWithItemsAsync } = useMaterialReturns();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -202,32 +202,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
       let returnReference = '';
       if (varianceItemsForReturn.length > 0) {
         try {
-          // Generate MRN number
-          const { data: mrnNumber } = await supabase.rpc('generate_mrn_number');
-          
-          // Create return note
-          const { data: returnNote, error: returnError } = await supabase
-            .from('material_return_notes')
-            .insert({
-              mrn_number: mrnNumber,
-              return_date: new Date().toISOString().split('T')[0],
-              returned_by: user.email,
-              return_type: 'internal',
-              reason: 'Variance from receiving',
-              reference_type: 'material_issue',
-              reference_id: issueId,
-              status: 'draft',
-              company_id: profile?.company_id,
-              created_by: user.id
-            })
-            .select()
-            .single();
-
-          if (returnError) throw returnError;
-
-          // Create return items
           const returnItems = varianceItemsForReturn.map(v => ({
-            mrn_id: returnNote.id,
             item_id: v.item.item_id,
             quantity_returned: v.variance,
             condition: v.condition || 'good',
@@ -236,7 +211,16 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
             notes: v.notes || `Variance from ${v.reason || 'receiving'}: ${v.item.item_code} - ${v.item.description}`
           }));
 
-          await createReturnItems(returnItems);
+          const returnNote = await createMaterialReturnWithItemsAsync({
+            return_date: new Date().toISOString().split('T')[0],
+            returned_by: profile?.full_name || user.email || 'Unknown user',
+            return_type: 'internal',
+            reason: 'Variance from receiving',
+            reference_type: 'material_issue',
+            reference_id: issueId,
+            company_id: profile?.company_id,
+            items: returnItems,
+          });
           await queryClient.invalidateQueries({ queryKey: ['material-returns'] });
           returnReference = returnNote.mrn_number;
         } catch (returnErr: any) {
