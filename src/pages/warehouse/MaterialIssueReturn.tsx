@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Download, Check, X } from "lucide-react";
+import { Plus, Eye, Download, Check, X, Wrench } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -19,6 +20,8 @@ import { CreateMaterialIssueDialog } from "@/components/warehouse/CreateMaterial
 import { MaterialIssueDetailsDialog } from "@/components/warehouse/MaterialIssueDetailsDialog";
 import { CreateMaterialReturnDialog } from "@/components/warehouse/CreateMaterialReturnDialog";
 import { MaterialReturnDetailsDialog } from "@/components/warehouse/MaterialReturnDetailsDialog";
+import { RepairMaterialReturnDialog } from "@/components/warehouse/RepairMaterialReturnDialog";
+import { BulkRepairMaterialReturnsDialog } from "@/components/warehouse/BulkRepairMaterialReturnsDialog";
 import { CreateMaterialRequestDialog } from "@/components/warehouse/CreateMaterialRequestDialog";
 import { MaterialRequestDetailsDialog } from "@/components/warehouse/MaterialRequestDetailsDialog";
 import { format } from "date-fns";
