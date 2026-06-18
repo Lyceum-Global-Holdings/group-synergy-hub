@@ -74,6 +74,9 @@ export default function Dashboard() {
       {/* Health Strip */}
       <HealthStrip data={health} loading={healthLoading} />
 
+      {/* Material Flow Analytics */}
+      <AnalyticsGrid companyId={companyId} locationId={activeLocationId} />
+
       {/* Domain Pillars */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <WarehousePillar companyId={companyId} locationId={activeLocationId} />
@@ -81,9 +84,6 @@ export default function Dashboard() {
         <SourcingPillar companyId={companyId} />
         {isAdminOrHigher && <FinancePillar companyId={companyId} />}
       </div>
-
-      {/* Material Flow Analytics */}
-      <AnalyticsGrid companyId={companyId} locationId={activeLocationId} />
 
 
 
