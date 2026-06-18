@@ -12,9 +12,10 @@ import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { format } from "date-fns";
 import { CheckCircle, Plus, Trash2, XCircle } from "lucide-react";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MaterialAttachmentsPanel } from "./MaterialAttachmentsPanel";
 import { ItemSelector } from "@/components/common/ItemSelector";
+import { supabase } from "@/integrations/supabase/client";
 
 type RepairItem = {
   item_id: string;
@@ -51,6 +52,27 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
   const { data: userRoles = [] } = useCurrentUserRoles();
   const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
   const [repairItems, setRepairItems] = useState<RepairItem[]>([]);
+
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setLocationLabel(null);
+    const id = returnNote?.location_id;
+    if (!id) return;
+    (async () => {
+      const { data } = await supabase
+        .from('warehouse_locations')
+        .select('name, location_code')
+        .eq('id', id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const label = (data as any).location_code
+        ? `${(data as any).location_code} · ${(data as any).name}`
+        : (data as any).name;
+      setLocationLabel(label);
+    })();
+    return () => { cancelled = true; };
+  }, [returnNote?.location_id]);
 
   if (!returnNote) return null;
 
@@ -135,6 +157,10 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
             <div>
               <p className="text-sm text-muted-foreground">Return Type</p>
               <Badge variant="outline" className="capitalize">{returnNote.return_type}</Badge>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Location</p>
+              <p className="text-sm">{locationLabel ?? (returnNote.location_id ? '…' : '—')}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Reference</p>

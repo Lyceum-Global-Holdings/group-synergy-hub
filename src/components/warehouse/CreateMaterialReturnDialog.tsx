@@ -15,6 +15,7 @@ import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUpload
 import { MaterialAttachmentsPanel } from "@/components/warehouse/MaterialAttachmentsPanel";
 import { BufferedAttachment, commitBufferedAttachments } from "@/hooks/useMaterialAttachments";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
@@ -54,6 +55,7 @@ interface Props {
 
 export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, referenceType }: Props) {
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { createMaterialReturnWithItemsAsync, isCreating } = useMaterialReturns();
 
   const [returnDate, setReturnDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -70,6 +72,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   // Internal return state
   const [selectedMinId, setSelectedMinId] = useState<string>(referenceId ?? '');
   const [lines, setLines] = useState<ReturnableLine[]>([]);
+  const [locationId, setLocationId] = useState<string>(globalLocationId ?? '');
 
   // Supplier return state (free-form, existing behaviour)
   const [supplierItems, setSupplierItems] = useState<SupplierReturnItem[]>([]);
@@ -82,7 +85,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     queryFn: async () => {
       const { data, error } = await supabase
         .from('material_issue_notes')
-        .select('id, min_number, issue_date, issued_to, status')
+        .select('id, min_number, issue_date, issued_to, status, location_id')
         .eq('company_id', selectedCompany!.id)
         .in('status', ['approved', 'issued', 'partially_received', 'completed'])
         .order('issue_date', { ascending: false })
@@ -139,12 +142,30 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     }
   }, [linesError]);
 
-  // Prefill returned_by from selected MIN
+  // Prefill returned_by and location from selected MIN
   useEffect(() => {
     if (!selectedMinId) return;
     const min = eligibleMins.find((m: any) => m.id === selectedMinId);
-    if (min && !returnedBy) setReturnedBy(min.issued_to ?? '');
+    if (min) {
+      if (!returnedBy) setReturnedBy(min.issued_to ?? '');
+      if (min.location_id) setLocationId(min.location_id);
+    }
   }, [selectedMinId, eligibleMins]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- User-accessible locations for the selected company (RLS scoped) ----
+  const { data: accessibleLocations = [] } = useQuery({
+    queryKey: ['user-accessible-locations', selectedCompany?.id],
+    enabled: !!selectedCompany?.id && open,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_locations')
+        .select('id, name, location_code')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   const resetAll = () => {
     setReturnDate(format(new Date(), 'yyyy-MM-dd'));
@@ -156,6 +177,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     setSelectedMinId('');
     setLines([]);
     setSupplierItems([]);
+    setLocationId(globalLocationId ?? '');
   };
 
   const updateLine = (idx: number, patch: Partial<ReturnableLine>) => {
@@ -185,7 +207,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0);
   }, [returnType, supplierItems]);
 
-  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && internalValid && supplierValid && !isCreating && !loadingLines;
+  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && !!locationId && internalValid && supplierValid && !isCreating && !loadingLines;
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedCompany?.id) return;
@@ -220,6 +242,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
         reference_id: isInternal ? selectedMinId : referenceId || undefined,
         notes,
         company_id: selectedCompany.id,
+        location_id: locationId || undefined,
         srn_number: srnNumber || undefined,
         items: payload,
       });
@@ -311,6 +334,27 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             <div>
               <Label>Returned By *</Label>
               <Input value={returnedBy} onChange={(e) => setReturnedBy(e.target.value)} placeholder="Name of person returning" />
+            </div>
+            <div>
+              <Label>Location *</Label>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select the warehouse / site location" />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {accessibleLocations.map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.location_code ? `${l.location_code} · ` : ''}{l.name}
+                    </SelectItem>
+                  ))}
+                  {accessibleLocations.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">No locations available</div>
+                  )}
+                </SelectContent>
+              </Select>
+              {returnType === 'internal' && selectedMinId && (
+                <p className="text-xs text-muted-foreground mt-1">Auto-filled from the selected MIN; change only if needed.</p>
+              )}
             </div>
           </div>
 

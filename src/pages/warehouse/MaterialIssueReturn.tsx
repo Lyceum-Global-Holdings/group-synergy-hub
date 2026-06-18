@@ -89,6 +89,37 @@ export default function MaterialIssueReturn() {
     [materialReturns, emptyMrnIdSet]
   );
 
+  // Lookup map for warehouse location names shown on the Returns table
+  const mrnLocationIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (materialReturns ?? [])
+            .map((m) => m.location_id)
+            .filter((v): v is string => !!v)
+        )
+      ),
+    [materialReturns]
+  );
+  const { data: locationNameById } = useQuery({
+    queryKey: ['mrn-location-names', mrnLocationIds],
+    enabled: mrnLocationIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_locations')
+        .select('id, name, location_code')
+        .in('id', mrnLocationIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const l of data ?? []) {
+        map[(l as any).id] = (l as any).location_code
+          ? `${(l as any).location_code} · ${(l as any).name}`
+          : (l as any).name;
+      }
+      return map;
+    },
+  });
+
   const handleDownloadIssuePdf = async (issue: MaterialIssueNote) => {
     setPdfLoadingId(issue.id);
     try {
@@ -311,6 +342,15 @@ export default function MaterialIssueReturn() {
           {row.original.return_type}
         </Badge>
       )
+    },
+    {
+      accessorKey: "location_id",
+      header: "Location",
+      cell: ({ row }) => {
+        const id = row.original.location_id;
+        if (!id) return <span className="text-muted-foreground">—</span>;
+        return locationNameById?.[id] ?? <span className="text-muted-foreground">…</span>;
+      },
     },
     {
       accessorKey: "srn_number",

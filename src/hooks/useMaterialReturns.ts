@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { MaterialReturnNote, CreateMaterialReturnData, CreateMaterialReturnItemData } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 
 type CreateMaterialReturnWithItemsData = CreateMaterialReturnData & {
   items: Omit<CreateMaterialReturnItemData, 'mrn_id'>[];
@@ -12,6 +13,7 @@ export const useMaterialReturns = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const companyId = selectedCompany?.id ?? null;
 
   const {
@@ -19,15 +21,21 @@ export const useMaterialReturns = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['material-returns', companyId],
+    queryKey: ['material-returns', companyId, globalLocationId],
     enabled: !!companyId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('material_return_notes')
         .select('*')
         .eq('company_id', companyId as string)
         .order('created_at', { ascending: false });
 
+      if (globalLocationId) {
+        // Show MRNs in the selected location plus legacy unscoped ones
+        query = query.or(`location_id.eq.${globalLocationId},location_id.is.null`);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as MaterialReturnNote[];
     }
@@ -54,6 +62,7 @@ export const useMaterialReturns = () => {
         p_company_id: returnData.company_id ?? null,
         p_srn_number: returnData.srn_number ?? null,
         p_items: items,
+        p_location_id: returnData.location_id ?? null,
       });
 
       if (error) throw error;
