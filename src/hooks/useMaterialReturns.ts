@@ -62,6 +62,7 @@ export const useMaterialReturns = () => {
         p_company_id: returnData.company_id ?? null,
         p_srn_number: returnData.srn_number ?? null,
         p_items: items,
+        p_location_id: returnData.location_id ?? null,
       });
 
       if (error) throw error;
