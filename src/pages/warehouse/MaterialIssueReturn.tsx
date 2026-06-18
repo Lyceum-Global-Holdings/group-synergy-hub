@@ -51,6 +51,9 @@ export default function MaterialIssueReturn() {
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestDetailsOpen, setRequestDetailsOpen] = useState(false);
   const [returnDetailsOpen, setReturnDetailsOpen] = useState(false);
+  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
+  const [bulkRepairOpen, setBulkRepairOpen] = useState(false);
+  const [repairTarget, setRepairTarget] = useState<MaterialReturnNote | null>(null);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
@@ -62,6 +65,29 @@ export default function MaterialIssueReturn() {
   const { selectedCompany, companies } = useCompany();
   const { toast } = useToast();
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
+
+  // Fetch counts of items per MRN so we can flag empty ones for repair.
+  const mrnIds = useMemo(() => (materialReturns ?? []).map((m) => m.id), [materialReturns]);
+  const { data: emptyMrnIdSet } = useQuery({
+    queryKey: ['mrn-empty-ids', mrnIds],
+    enabled: mrnIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('material_return_items')
+        .select('mrn_id')
+        .in('mrn_id', mrnIds);
+      if (error) throw error;
+      const withItems = new Set((data ?? []).map((r: any) => r.mrn_id as string));
+      return new Set(mrnIds.filter((id) => !withItems.has(id)));
+    },
+  });
+  const emptyMrns = useMemo(
+    () =>
+      (materialReturns ?? []).filter(
+        (m) => emptyMrnIdSet?.has(m.id) && m.status !== 'cancelled'
+      ),
+    [materialReturns, emptyMrnIdSet]
+  );
 
   const handleDownloadIssuePdf = async (issue: MaterialIssueNote) => {
     setPdfLoadingId(issue.id);
