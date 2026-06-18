@@ -22717,6 +22717,19 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_repair_candidate_mrns: {
+        Args: { p_limit?: number; p_search?: string; p_target_mrn_id: string }
+        Returns: {
+          id: string
+          item_count: number
+          mrn_number: string
+          notes: string
+          return_date: string
+          returned_by: string
+          status: string
+          total_value: number
+        }[]
+      }
       list_warehouse_catalog: {
         Args: {
           _category_id?: string
@@ -23087,6 +23100,14 @@ export type Database = {
       remove_item_from_inventory: {
         Args: { p_item_id: string }
         Returns: undefined
+      }
+      repair_material_return_from_reference: {
+        Args: {
+          p_overrides?: Json
+          p_source_mrn_id: string
+          p_target_mrn_id: string
+        }
+        Returns: number
       }
       report_abc_classification: {
         Args: {

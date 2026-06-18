@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Download, Check, X } from "lucide-react";
+import { Plus, Eye, Download, Check, X, Wrench } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -19,6 +20,8 @@ import { CreateMaterialIssueDialog } from "@/components/warehouse/CreateMaterial
 import { MaterialIssueDetailsDialog } from "@/components/warehouse/MaterialIssueDetailsDialog";
 import { CreateMaterialReturnDialog } from "@/components/warehouse/CreateMaterialReturnDialog";
 import { MaterialReturnDetailsDialog } from "@/components/warehouse/MaterialReturnDetailsDialog";
+import { RepairMaterialReturnDialog } from "@/components/warehouse/RepairMaterialReturnDialog";
+import { BulkRepairMaterialReturnsDialog } from "@/components/warehouse/BulkRepairMaterialReturnsDialog";
 import { CreateMaterialRequestDialog } from "@/components/warehouse/CreateMaterialRequestDialog";
 import { MaterialRequestDetailsDialog } from "@/components/warehouse/MaterialRequestDetailsDialog";
 import { format } from "date-fns";
@@ -48,6 +51,9 @@ export default function MaterialIssueReturn() {
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestDetailsOpen, setRequestDetailsOpen] = useState(false);
   const [returnDetailsOpen, setReturnDetailsOpen] = useState(false);
+  const [repairDialogOpen, setRepairDialogOpen] = useState(false);
+  const [bulkRepairOpen, setBulkRepairOpen] = useState(false);
+  const [repairTarget, setRepairTarget] = useState<MaterialReturnNote | null>(null);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
@@ -59,6 +65,29 @@ export default function MaterialIssueReturn() {
   const { selectedCompany, companies } = useCompany();
   const { toast } = useToast();
   const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
+
+  // Fetch counts of items per MRN so we can flag empty ones for repair.
+  const mrnIds = useMemo(() => (materialReturns ?? []).map((m) => m.id), [materialReturns]);
+  const { data: emptyMrnIdSet } = useQuery({
+    queryKey: ['mrn-empty-ids', mrnIds],
+    enabled: mrnIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('material_return_items')
+        .select('mrn_id')
+        .in('mrn_id', mrnIds);
+      if (error) throw error;
+      const withItems = new Set((data ?? []).map((r: any) => r.mrn_id as string));
+      return new Set(mrnIds.filter((id) => !withItems.has(id)));
+    },
+  });
+  const emptyMrns = useMemo(
+    () =>
+      (materialReturns ?? []).filter(
+        (m) => emptyMrnIdSet?.has(m.id) && m.status !== 'cancelled'
+      ),
+    [materialReturns, emptyMrnIdSet]
+  );
 
   const handleDownloadIssuePdf = async (issue: MaterialIssueNote) => {
     setPdfLoadingId(issue.id);
@@ -301,18 +330,37 @@ export default function MaterialIssueReturn() {
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setSelectedReturn(row.original);
-            setReturnDetailsOpen(true);
-          }}
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const mrn = row.original;
+        const isEmpty = !!emptyMrnIdSet?.has(mrn.id) && mrn.status !== 'cancelled';
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedReturn(mrn);
+                setReturnDetailsOpen(true);
+              }}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            {isEmpty && isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Repair empty return"
+                onClick={() => {
+                  setRepairTarget(mrn);
+                  setRepairDialogOpen(true);
+                }}
+              >
+                <Wrench className="h-4 w-4 text-amber-600" />
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -379,10 +427,21 @@ export default function MaterialIssueReturn() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Material Returns</CardTitle>
-                <Button onClick={() => setReturnDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Return
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isAdmin && emptyMrns.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setBulkRepairOpen(true)}
+                    >
+                      <Wrench className="mr-2 h-4 w-4 text-amber-600" />
+                      Repair empty returns ({emptyMrns.length})
+                    </Button>
+                  )}
+                  <Button onClick={() => setReturnDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Return
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -422,6 +481,16 @@ export default function MaterialIssueReturn() {
         open={returnDetailsOpen}
         onOpenChange={setReturnDetailsOpen}
         returnNote={selectedReturn}
+      />
+      <RepairMaterialReturnDialog
+        open={repairDialogOpen}
+        onOpenChange={setRepairDialogOpen}
+        targetMrn={repairTarget}
+      />
+      <BulkRepairMaterialReturnsDialog
+        open={bulkRepairOpen}
+        onOpenChange={setBulkRepairOpen}
+        emptyMrns={emptyMrns}
       />
     </div>
   );
