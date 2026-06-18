@@ -330,18 +330,37 @@ export default function MaterialIssueReturn() {
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setSelectedReturn(row.original);
-            setReturnDetailsOpen(true);
-          }}
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const mrn = row.original;
+        const isEmpty = !!emptyMrnIdSet?.has(mrn.id) && mrn.status !== 'cancelled';
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedReturn(mrn);
+                setReturnDetailsOpen(true);
+              }}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            {isEmpty && isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Repair empty return"
+                onClick={() => {
+                  setRepairTarget(mrn);
+                  setRepairDialogOpen(true);
+                }}
+              >
+                <Wrench className="h-4 w-4 text-amber-600" />
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
