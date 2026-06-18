@@ -15,6 +15,7 @@ import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUpload
 import { MaterialAttachmentsPanel } from "@/components/warehouse/MaterialAttachmentsPanel";
 import { BufferedAttachment, commitBufferedAttachments } from "@/hooks/useMaterialAttachments";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
