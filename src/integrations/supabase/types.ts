@@ -22183,6 +22183,26 @@ export type Database = {
           location_id: string
         }[]
       }
+      get_material_return_items: {
+        Args: { p_mrn_id: string }
+        Returns: {
+          condition: string
+          created_at: string
+          id: string
+          item_code: string
+          item_id: string
+          item_name: string
+          mrn_id: string
+          notes: string
+          quantity_returned: number
+          secondary_quantity_returned: number
+          secondary_uom: string
+          total_cost: number
+          unit_cost: number
+          unit_of_measure: string
+          updated_at: string
+        }[]
+      }
       get_min_returnable_lines: {
         Args: { p_min_id: string }
         Returns: {
