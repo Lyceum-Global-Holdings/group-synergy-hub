@@ -11079,6 +11079,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          location_id: string | null
           mrn_number: string
           notes: string | null
           reason: string
@@ -11100,6 +11101,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          location_id?: string | null
           mrn_number: string
           notes?: string | null
           reason: string
@@ -11121,6 +11123,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          location_id?: string | null
           mrn_number?: string
           notes?: string | null
           reason?: string
@@ -11135,7 +11138,15 @@ export type Database = {
           total_value?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "material_return_notes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       packing_list_items: {
         Row: {
@@ -21567,6 +21578,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          location_id: string | null
           mrn_number: string
           notes: string | null
           reason: string
@@ -21781,47 +21793,92 @@ export type Database = {
           asset_id: string
         }[]
       }
-      create_material_return_with_items: {
-        Args: {
-          p_company_id?: string
-          p_items?: Json
-          p_notes?: string
-          p_reason: string
-          p_reference_id?: string
-          p_reference_type?: string
-          p_return_date: string
-          p_return_type: string
-          p_returned_by: string
-          p_srn_number?: string
-        }
-        Returns: {
-          approved_by: string | null
-          approved_date: string | null
-          company_id: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          mrn_number: string
-          notes: string | null
-          reason: string
-          reference_id: string | null
-          reference_type: string | null
-          return_date: string
-          return_type: string
-          returned_by: string
-          srn_document_url: string | null
-          srn_number: string | null
-          status: string
-          total_value: number | null
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "material_return_notes"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+      create_material_return_with_items:
+        | {
+            Args: {
+              p_company_id?: string
+              p_items?: Json
+              p_notes?: string
+              p_reason: string
+              p_reference_id?: string
+              p_reference_type?: string
+              p_return_date: string
+              p_return_type: string
+              p_returned_by: string
+              p_srn_number?: string
+            }
+            Returns: {
+              approved_by: string | null
+              approved_date: string | null
+              company_id: string | null
+              created_at: string
+              created_by: string | null
+              id: string
+              location_id: string | null
+              mrn_number: string
+              notes: string | null
+              reason: string
+              reference_id: string | null
+              reference_type: string | null
+              return_date: string
+              return_type: string
+              returned_by: string
+              srn_document_url: string | null
+              srn_number: string | null
+              status: string
+              total_value: number | null
+              updated_at: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "material_return_notes"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: {
+              p_company_id?: string
+              p_items?: Json
+              p_location_id?: string
+              p_notes?: string
+              p_reason: string
+              p_reference_id?: string
+              p_reference_type?: string
+              p_return_date: string
+              p_return_type: string
+              p_returned_by: string
+              p_srn_number?: string
+            }
+            Returns: {
+              approved_by: string | null
+              approved_date: string | null
+              company_id: string | null
+              created_at: string
+              created_by: string | null
+              id: string
+              location_id: string | null
+              mrn_number: string
+              notes: string | null
+              reason: string
+              reference_id: string | null
+              reference_type: string | null
+              return_date: string
+              return_type: string
+              returned_by: string
+              srn_document_url: string | null
+              srn_number: string | null
+              status: string
+              total_value: number | null
+              updated_at: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "material_return_notes"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       create_partial_piece: { Args: { p_payload: Json }; Returns: string }
       create_partial_pieces_bulk: {
         Args: {
