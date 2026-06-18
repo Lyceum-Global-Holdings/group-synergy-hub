@@ -53,6 +53,27 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
   const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
   const [repairItems, setRepairItems] = useState<RepairItem[]>([]);
 
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setLocationLabel(null);
+    const id = returnNote?.location_id;
+    if (!id) return;
+    (async () => {
+      const { data } = await supabase
+        .from('warehouse_locations')
+        .select('name, location_code')
+        .eq('id', id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const label = (data as any).location_code
+        ? `${(data as any).location_code} · ${(data as any).name}`
+        : (data as any).name;
+      setLocationLabel(label);
+    })();
+    return () => { cancelled = true; };
+  }, [returnNote?.location_id]);
+
   if (!returnNote) return null;
 
   const handleApprove = () => {
