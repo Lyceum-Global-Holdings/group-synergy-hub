@@ -482,6 +482,16 @@ export default function MaterialIssueReturn() {
         onOpenChange={setReturnDetailsOpen}
         returnNote={selectedReturn}
       />
+      <RepairMaterialReturnDialog
+        open={repairDialogOpen}
+        onOpenChange={setRepairDialogOpen}
+        targetMrn={repairTarget}
+      />
+      <BulkRepairMaterialReturnsDialog
+        open={bulkRepairOpen}
+        onOpenChange={setBulkRepairOpen}
+        emptyMrns={emptyMrns}
+      />
     </div>
   );
 }
