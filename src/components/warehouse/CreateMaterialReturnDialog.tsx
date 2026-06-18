@@ -72,6 +72,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   // Internal return state
   const [selectedMinId, setSelectedMinId] = useState<string>(referenceId ?? '');
   const [lines, setLines] = useState<ReturnableLine[]>([]);
+  const [locationId, setLocationId] = useState<string>(globalLocationId ?? '');
 
   // Supplier return state (free-form, existing behaviour)
   const [supplierItems, setSupplierItems] = useState<SupplierReturnItem[]>([]);
