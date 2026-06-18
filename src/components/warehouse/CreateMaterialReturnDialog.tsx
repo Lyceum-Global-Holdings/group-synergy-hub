@@ -142,12 +142,30 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     }
   }, [linesError]);
 
-  // Prefill returned_by from selected MIN
+  // Prefill returned_by and location from selected MIN
   useEffect(() => {
     if (!selectedMinId) return;
     const min = eligibleMins.find((m: any) => m.id === selectedMinId);
-    if (min && !returnedBy) setReturnedBy(min.issued_to ?? '');
+    if (min) {
+      if (!returnedBy) setReturnedBy(min.issued_to ?? '');
+      if (min.location_id) setLocationId(min.location_id);
+    }
   }, [selectedMinId, eligibleMins]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- User-accessible locations for the selected company (RLS scoped) ----
+  const { data: accessibleLocations = [] } = useQuery({
+    queryKey: ['user-accessible-locations', selectedCompany?.id],
+    enabled: !!selectedCompany?.id && open,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_locations')
+        .select('id, name, location_code')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   const resetAll = () => {
     setReturnDate(format(new Date(), 'yyyy-MM-dd'));
