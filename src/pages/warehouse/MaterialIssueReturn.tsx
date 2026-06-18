@@ -344,6 +344,15 @@ export default function MaterialIssueReturn() {
       )
     },
     {
+      accessorKey: "location_id",
+      header: "Location",
+      cell: ({ row }) => {
+        const id = row.original.location_id;
+        if (!id) return <span className="text-muted-foreground">—</span>;
+        return locationNameById?.[id] ?? <span className="text-muted-foreground">…</span>;
+      },
+    },
+    {
       accessorKey: "srn_number",
       header: "SRN #",
       cell: ({ row }) => row.original.srn_number
