@@ -159,6 +159,10 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
               <Badge variant="outline" className="capitalize">{returnNote.return_type}</Badge>
             </div>
             <div>
+              <p className="text-sm text-muted-foreground">Location</p>
+              <p className="text-sm">{locationLabel ?? (returnNote.location_id ? '…' : '—')}</p>
+            </div>
+            <div>
               <p className="text-sm text-muted-foreground">Reference</p>
               <p className="text-sm">
                 {returnNote.reference_type ? (
