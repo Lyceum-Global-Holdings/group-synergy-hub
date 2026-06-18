@@ -85,7 +85,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     queryFn: async () => {
       const { data, error } = await supabase
         .from('material_issue_notes')
-        .select('id, min_number, issue_date, issued_to, status')
+        .select('id, min_number, issue_date, issued_to, status, location_id')
         .eq('company_id', selectedCompany!.id)
         .in('status', ['approved', 'issued', 'partially_received', 'completed'])
         .order('issue_date', { ascending: false })
