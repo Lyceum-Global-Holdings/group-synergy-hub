@@ -335,6 +335,27 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
               <Label>Returned By *</Label>
               <Input value={returnedBy} onChange={(e) => setReturnedBy(e.target.value)} placeholder="Name of person returning" />
             </div>
+            <div>
+              <Label>Location *</Label>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select the warehouse / site location" />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {accessibleLocations.map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.location_code ? `${l.location_code} · ` : ''}{l.name}
+                    </SelectItem>
+                  ))}
+                  {accessibleLocations.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">No locations available</div>
+                  )}
+                </SelectContent>
+              </Select>
+              {returnType === 'internal' && selectedMinId && (
+                <p className="text-xs text-muted-foreground mt-1">Auto-filled from the selected MIN; change only if needed.</p>
+              )}
+            </div>
           </div>
 
           <SrnNumberField value={srnNumber} onChange={setSrnNumber} />
