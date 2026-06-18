@@ -427,10 +427,21 @@ export default function MaterialIssueReturn() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Material Returns</CardTitle>
-                <Button onClick={() => setReturnDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Return
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isAdmin && emptyMrns.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setBulkRepairOpen(true)}
+                    >
+                      <Wrench className="mr-2 h-4 w-4 text-amber-600" />
+                      Repair empty returns ({emptyMrns.length})
+                    </Button>
+                  )}
+                  <Button onClick={() => setReturnDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Return
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
