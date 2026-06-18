@@ -33,47 +33,11 @@ export const useMaterialReturns = () => {
     }
   });
 
-  const createMaterialReturnMutation = useMutation({
-    mutationFn: async (returnData: CreateMaterialReturnData) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+  // NOTE: The legacy header-only `createMaterialReturn` mutation was intentionally
+  // removed. It allowed creating an MRN without items, which produced empty drafts
+  // that could never be approved. All callers must use `createMaterialReturnWithItemsAsync`
+  // which atomically inserts the header and its line items via an RPC.
 
-      // Generate MRN number
-      const { data: mrnNumber, error: mrnError } = await supabase
-        .rpc('generate_mrn_number');
-      
-      if (mrnError) throw mrnError;
-
-      const { data, error } = await supabase
-        .from('material_return_notes')
-        .insert({
-          ...returnData,
-          srn_number: returnData.srn_number?.trim() || null,
-          mrn_number: mrnNumber,
-          created_by: user.id
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['material-returns'] });
-      toast({
-        title: "Success",
-        description: "Material return note created successfully",
-      });
-    },
-    onError: (error) => {
-      console.error('Error creating material return:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create material return note",
-        variant: "destructive",
-      });
-    }
-  });
 
   const createMaterialReturnWithItemsMutation = useMutation({
     mutationFn: async ({ items, ...returnData }: CreateMaterialReturnWithItemsData) => {
@@ -344,14 +308,13 @@ export const useMaterialReturns = () => {
     materialReturns,
     isLoading,
     error,
-    createMaterialReturn: createMaterialReturnMutation.mutate,
-    createMaterialReturnAsync: createMaterialReturnMutation.mutateAsync,
     createMaterialReturnWithItemsAsync: createMaterialReturnWithItemsMutation.mutateAsync,
     addMissingReturnItemsAsync: addMissingReturnItemsMutation.mutateAsync,
     updateMaterialReturn: updateMaterialReturnMutation.mutate,
     approveMaterialReturn: approveMaterialReturnMutation.mutate,
     deleteMaterialReturn: deleteMaterialReturnMutation.mutate,
-    isCreating: createMaterialReturnMutation.isPending || createMaterialReturnWithItemsMutation.isPending,
+    isCreating: createMaterialReturnWithItemsMutation.isPending,
+
     isUpdating: updateMaterialReturnMutation.isPending,
     isApproving: approveMaterialReturnMutation.isPending,
     isRepairing: addMissingReturnItemsMutation.isPending,
