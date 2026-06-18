@@ -31,8 +31,7 @@ export const useMaterialReturns = () => {
         .order('created_at', { ascending: false });
 
       if (globalLocationId) {
-        // Show MRNs in the selected location plus legacy unscoped ones
-        query = query.or(`location_id.eq.${globalLocationId},location_id.is.null`);
+        query = query.eq('location_id', globalLocationId);
       }
 
       const { data, error } = await query;
