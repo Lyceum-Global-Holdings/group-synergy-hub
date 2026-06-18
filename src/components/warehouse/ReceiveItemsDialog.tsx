@@ -202,6 +202,10 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
       let returnReference = '';
       if (varianceItemsForReturn.length > 0) {
         try {
+          if (!profile?.company_id) {
+            throw new Error('Company is required to create a material return');
+          }
+
           const returnItems = varianceItemsForReturn.map(v => ({
             item_id: v.item.item_id,
             quantity_returned: v.variance,
@@ -218,7 +222,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
             reason: 'Variance from receiving',
             reference_type: 'material_issue',
             reference_id: issueId,
-            company_id: profile?.company_id,
+            company_id: profile.company_id,
             items: returnItems,
           });
           await queryClient.invalidateQueries({ queryKey: ['material-returns'] });
