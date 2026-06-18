@@ -12,9 +12,10 @@ import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { format } from "date-fns";
 import { CheckCircle, Plus, Trash2, XCircle } from "lucide-react";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MaterialAttachmentsPanel } from "./MaterialAttachmentsPanel";
 import { ItemSelector } from "@/components/common/ItemSelector";
+import { supabase } from "@/integrations/supabase/client";
 
 type RepairItem = {
   item_id: string;
