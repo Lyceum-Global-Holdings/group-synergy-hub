@@ -21558,6 +21558,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_material_return: {
+        Args: { p_mrn_id: string }
+        Returns: {
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          mrn_number: string
+          notes: string | null
+          reason: string
+          reference_id: string | null
+          reference_type: string | null
+          return_date: string
+          return_type: string
+          returned_by: string
+          srn_document_url: string | null
+          srn_number: string | null
+          status: string
+          total_value: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "material_return_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       bootstrap_admin: {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
