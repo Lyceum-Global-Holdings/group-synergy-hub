@@ -242,6 +242,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
         reference_id: isInternal ? selectedMinId : referenceId || undefined,
         notes,
         company_id: selectedCompany.id,
+        location_id: locationId || undefined,
         srn_number: srnNumber || undefined,
         items: payload,
       });
