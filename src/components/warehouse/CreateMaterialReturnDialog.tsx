@@ -177,6 +177,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     setSelectedMinId('');
     setLines([]);
     setSupplierItems([]);
+    setLocationId(globalLocationId ?? '');
   };
 
   const updateLine = (idx: number, patch: Partial<ReturnableLine>) => {
