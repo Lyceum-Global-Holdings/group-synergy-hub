@@ -55,6 +55,7 @@ interface Props {
 
 export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, referenceType }: Props) {
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { createMaterialReturnWithItemsAsync, isCreating } = useMaterialReturns();
 
   const [returnDate, setReturnDate] = useState(format(new Date(), 'yyyy-MM-dd'));
