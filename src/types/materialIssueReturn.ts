@@ -138,6 +138,7 @@ export interface MaterialReturnNote {
   total_value: number | null;
   notes: string | null;
   company_id: string | null;
+  location_id: string | null;
   created_by: string | null;
   approved_by: string | null;
   approved_date: string | null;
@@ -155,6 +156,7 @@ export interface CreateMaterialReturnData {
   reference_id?: string;
   notes?: string;
   company_id?: string;
+  location_id?: string;
   srn_number?: string;
 }
 
