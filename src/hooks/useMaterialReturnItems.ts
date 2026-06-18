@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { MaterialReturnItem, CreateMaterialReturnItemData } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
 
+export type MaterialReturnItemWithDetails = MaterialReturnItem & {
+  item_code?: string | null;
+  item_name?: string | null;
+  unit_of_measure?: string | null;
+};
+
 export const useMaterialReturnItems = (returnId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -12,13 +18,12 @@ export const useMaterialReturnItems = (returnId?: string) => {
     queryFn: async () => {
       if (!returnId) return [];
       
-      const { data, error } = await supabase
-        .from('material_return_items')
-        .select('*')
-        .eq('mrn_id', returnId);
+      const { data, error } = await supabase.rpc('get_material_return_items' as any, {
+        p_mrn_id: returnId,
+      });
 
       if (error) throw error;
-      return data as MaterialReturnItem[];
+      return data as MaterialReturnItemWithDetails[];
     },
     enabled: !!returnId,
   });
