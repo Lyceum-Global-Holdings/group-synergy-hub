@@ -58,6 +58,8 @@ export function SrnDocumentUploadField({
   const [uploading, setUploading] = useState(false);
   const [documentPath, setDocumentPath] = useState<string | undefined>(currentDocumentUrl);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fallbackPreviewUrl, setFallbackPreviewUrl] = useState<string | null>(null);
+  const [promoting, setPromoting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,6 +87,61 @@ export function SrnDocumentUploadField({
       active = false;
     };
   }, [documentPath]);
+
+  // Signed URL for the fallback attachment preview (images only).
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!fallbackDocumentUrl || documentPath) {
+        setFallbackPreviewUrl(null);
+        return;
+      }
+      const isImage = /\.(jpe?g|png|webp)$/i.test(fallbackDocumentUrl);
+      if (!isImage) {
+        setFallbackPreviewUrl(null);
+        return;
+      }
+      const { data } = await supabase.storage.from(BUCKET).createSignedUrl(fallbackDocumentUrl, 120);
+      if (active) setFallbackPreviewUrl(data?.signedUrl ?? null);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [fallbackDocumentUrl, documentPath]);
+
+  const handleFallbackDownload = async () => {
+    if (!fallbackDocumentUrl) return;
+    try {
+      const { data, error } = await supabase.storage.from(BUCKET).download(fallbackDocumentUrl);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fallbackDocumentUrl.split("/").pop() ?? "srn-document";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: "Download failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handlePromoteFallback = async () => {
+    if (!fallbackDocumentUrl || !onPromoteFallback) return;
+    try {
+      setPromoting(true);
+      await onPromoteFallback(fallbackDocumentUrl);
+      setDocumentPath(fallbackDocumentUrl);
+      onUpload(fallbackDocumentUrl);
+      toast({ title: "SRN document set", description: "Linked from attachments." });
+    } catch (e: any) {
+      toast({ title: "Could not set SRN", description: e.message, variant: "destructive" });
+    } finally {
+      setPromoting(false);
+    }
+  };
+
 
   const persist = async (newPath: string | null) => {
     if (!persistOnChange || !effectiveId) return;
