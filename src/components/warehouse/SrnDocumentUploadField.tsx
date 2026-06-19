@@ -32,6 +32,12 @@ interface SrnDocumentUploadFieldProps {
   table?: SrnPersistTable;
   disabled?: boolean;
   label?: string;
+  /** Optional fallback path (e.g. from material_document_attachments) shown read-only when no primary SRN is set. */
+  fallbackDocumentUrl?: string | null;
+  /** Caption shown next to the fallback preview, e.g. "From attachments · Signed SRN". */
+  fallbackLabel?: string;
+  /** When provided + fallback shown, renders a "Use as SRN" button that promotes the fallback. */
+  onPromoteFallback?: (path: string) => Promise<void> | void;
 }
 
 export function SrnDocumentUploadField({
@@ -44,6 +50,9 @@ export function SrnDocumentUploadField({
   table = "material_issue_notes",
   disabled,
   label = "SRN Document (photo / scan)",
+  fallbackDocumentUrl,
+  fallbackLabel,
+  onPromoteFallback,
 }: SrnDocumentUploadFieldProps) {
   const effectiveId = recordId ?? minId;
   const [uploading, setUploading] = useState(false);
