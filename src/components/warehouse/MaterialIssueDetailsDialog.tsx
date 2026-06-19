@@ -355,6 +355,23 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                   currentDocumentUrl={issue.srn_document_url ?? undefined}
                   persistOnChange
                   disabled={issue.status === 'cancelled'}
+                  fallbackDocumentUrl={srnFallback?.path ?? null}
+                  fallbackLabel={
+                    srnFallback
+                      ? srnFallback.category === 'signed_srn'
+                        ? 'From attachments · Signed SRN'
+                        : `From attachments · ${srnFallback.category.replace(/_/g, ' ')}`
+                      : undefined
+                  }
+                  onPromoteFallback={async (path) => {
+                    const { error } = await supabase
+                      .from('material_issue_notes')
+                      .update({ srn_document_url: path })
+                      .eq('id', issue.id);
+                    if (error) throw error;
+                    setIssue((prev) => (prev ? { ...prev, srn_document_url: path } : prev));
+                    setSrnFallback(null);
+                  }}
                   onUpload={(path) =>
                     setIssue((prev) => (prev ? { ...prev, srn_document_url: path || null } : prev))
                   }
