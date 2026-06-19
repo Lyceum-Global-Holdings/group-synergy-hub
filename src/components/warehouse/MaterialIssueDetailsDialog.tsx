@@ -134,6 +134,23 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
       if (issueError) throw issueError;
       setIssue(issueData as MaterialIssueNote);
 
+      // Fallback: surface the most relevant attachment when the primary SRN field is empty.
+      if (!(issueData as any)?.srn_document_url) {
+        const { data: atts } = await supabase
+          .from('material_document_attachments')
+          .select('file_path, category, uploaded_at')
+          .eq('parent_type', 'material_issue')
+          .eq('parent_id', issueId)
+          .order('uploaded_at', { ascending: false });
+        const preferred =
+          (atts ?? []).find((a: any) => a.category === 'signed_srn') ?? (atts ?? [])[0];
+        setSrnFallback(
+          preferred ? { path: preferred.file_path, category: preferred.category } : null,
+        );
+      } else {
+        setSrnFallback(null);
+      }
+
       const { data: itemsData, error: itemsError } = await supabase
         .from('material_issue_items')
         .select('*')
