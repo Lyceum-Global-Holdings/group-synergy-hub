@@ -324,6 +324,45 @@ export function SrnDocumentUploadField({
           <p className="text-xs text-muted-foreground">
             Attach a photo or scan of the signed SRN. JPG, PNG, WEBP or PDF — max 5MB.
           </p>
+
+          {fallbackDocumentUrl && (
+            <div className="flex items-center gap-3 p-3 border border-dashed rounded-lg bg-muted/30">
+              {fallbackPreviewUrl ? (
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <img
+                  src={fallbackPreviewUrl}
+                  alt="SRN evidence (from attachments)"
+                  className="h-14 w-14 object-cover rounded border"
+                />
+              ) : /\.pdf$/i.test(fallbackDocumentUrl) ? (
+                <FileText className="h-8 w-8 text-muted-foreground" />
+              ) : (
+                <ImageIcon className="h-8 w-8 text-muted-foreground" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {fallbackDocumentUrl.split("/").pop()}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {fallbackLabel ?? "Linked from attachments"}
+                </p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={handleFallbackDownload}>
+                <Download className="h-4 w-4" />
+              </Button>
+              {onPromoteFallback && !disabled && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePromoteFallback}
+                  disabled={promoting}
+                >
+                  {promoting ? "Linking..." : "Use as SRN"}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
