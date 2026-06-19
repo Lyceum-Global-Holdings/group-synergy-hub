@@ -32,6 +32,12 @@ interface SrnDocumentUploadFieldProps {
   table?: SrnPersistTable;
   disabled?: boolean;
   label?: string;
+  /** Optional fallback path (e.g. from material_document_attachments) shown read-only when no primary SRN is set. */
+  fallbackDocumentUrl?: string | null;
+  /** Caption shown next to the fallback preview, e.g. "From attachments · Signed SRN". */
+  fallbackLabel?: string;
+  /** When provided + fallback shown, renders a "Use as SRN" button that promotes the fallback. */
+  onPromoteFallback?: (path: string) => Promise<void> | void;
 }
 
 export function SrnDocumentUploadField({
@@ -44,11 +50,16 @@ export function SrnDocumentUploadField({
   table = "material_issue_notes",
   disabled,
   label = "SRN Document (photo / scan)",
+  fallbackDocumentUrl,
+  fallbackLabel,
+  onPromoteFallback,
 }: SrnDocumentUploadFieldProps) {
   const effectiveId = recordId ?? minId;
   const [uploading, setUploading] = useState(false);
   const [documentPath, setDocumentPath] = useState<string | undefined>(currentDocumentUrl);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fallbackPreviewUrl, setFallbackPreviewUrl] = useState<string | null>(null);
+  const [promoting, setPromoting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +87,61 @@ export function SrnDocumentUploadField({
       active = false;
     };
   }, [documentPath]);
+
+  // Signed URL for the fallback attachment preview (images only).
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!fallbackDocumentUrl || documentPath) {
+        setFallbackPreviewUrl(null);
+        return;
+      }
+      const isImage = /\.(jpe?g|png|webp)$/i.test(fallbackDocumentUrl);
+      if (!isImage) {
+        setFallbackPreviewUrl(null);
+        return;
+      }
+      const { data } = await supabase.storage.from(BUCKET).createSignedUrl(fallbackDocumentUrl, 120);
+      if (active) setFallbackPreviewUrl(data?.signedUrl ?? null);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [fallbackDocumentUrl, documentPath]);
+
+  const handleFallbackDownload = async () => {
+    if (!fallbackDocumentUrl) return;
+    try {
+      const { data, error } = await supabase.storage.from(BUCKET).download(fallbackDocumentUrl);
+      if (error) throw error;
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fallbackDocumentUrl.split("/").pop() ?? "srn-document";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: "Download failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handlePromoteFallback = async () => {
+    if (!fallbackDocumentUrl || !onPromoteFallback) return;
+    try {
+      setPromoting(true);
+      await onPromoteFallback(fallbackDocumentUrl);
+      setDocumentPath(fallbackDocumentUrl);
+      onUpload(fallbackDocumentUrl);
+      toast({ title: "SRN document set", description: "Linked from attachments." });
+    } catch (e: any) {
+      toast({ title: "Could not set SRN", description: e.message, variant: "destructive" });
+    } finally {
+      setPromoting(false);
+    }
+  };
+
 
   const persist = async (newPath: string | null) => {
     if (!persistOnChange || !effectiveId) return;
@@ -258,6 +324,45 @@ export function SrnDocumentUploadField({
           <p className="text-xs text-muted-foreground">
             Attach a photo or scan of the signed SRN. JPG, PNG, WEBP or PDF — max 5MB.
           </p>
+
+          {fallbackDocumentUrl && (
+            <div className="flex items-center gap-3 p-3 border border-dashed rounded-lg bg-muted/30">
+              {fallbackPreviewUrl ? (
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <img
+                  src={fallbackPreviewUrl}
+                  alt="SRN evidence (from attachments)"
+                  className="h-14 w-14 object-cover rounded border"
+                />
+              ) : /\.pdf$/i.test(fallbackDocumentUrl) ? (
+                <FileText className="h-8 w-8 text-muted-foreground" />
+              ) : (
+                <ImageIcon className="h-8 w-8 text-muted-foreground" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {fallbackDocumentUrl.split("/").pop()}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {fallbackLabel ?? "Linked from attachments"}
+                </p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={handleFallbackDownload}>
+                <Download className="h-4 w-4" />
+              </Button>
+              {onPromoteFallback && !disabled && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePromoteFallback}
+                  disabled={promoting}
+                >
+                  {promoting ? "Linking..." : "Use as SRN"}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
