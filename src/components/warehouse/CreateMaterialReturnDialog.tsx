@@ -296,7 +296,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   const addSupplierItem = () =>
     setSupplierItems((p) => [
       ...p,
-      { warehouse_item_id: '', item_code: '', item_name: '', quantity_returned: 0, condition: 'good', unit_cost: 0, notes: '' },
+      { warehouse_item_id: '', item_code: '', item_name: '', quantity_returned: 0, condition: 'good', unit_cost: 0, notes: '', bin_id: null },
     ]);
   const removeSupplierItem = (i: number) => setSupplierItems((p) => p.filter((_, idx) => idx !== i));
   const patchSupplierItem = (i: number, patch: Partial<SupplierReturnItem>) =>
