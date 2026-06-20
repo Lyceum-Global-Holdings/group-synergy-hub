@@ -70,16 +70,28 @@ In scope: MIN, MRN, GRN — header edits, line add/update/remove, resubmit, reop
 
 ---
 
-## Implementation Status (this turn)
+## Implementation Status
 
-**Shipped (MIN edit-mode, end-to-end):**
-- `useMaterialIssueItems.replaceItemsForMinAsync` — atomic delete + reinsert of draft lines (drafts have no stock-side deps).
-- `useMaterialIssues.updateMaterialIssueAsync` exposed.
-- `CreateMaterialIssueDialog` now accepts an `editingDraft` prop. When present it pre-fills header + line items from `material_issue_notes` + `material_issue_items`, retitles to "Edit Draft — {min_number}", and routes Save/Submit through `updateMaterialIssueAsync` + `replaceItemsForMinAsync` (with a status-still-draft guard against the approver-race). Submit-for-approval then runs the existing RPC.
-- List page (`MaterialIssueReturn.tsx`): drafts get a Pencil "Edit" button alongside Send; clicking it opens the create dialog in edit mode.
-- `MaterialIssueDetailsDialog` shows a Draft banner with an "Edit Draft" button when status='draft'; clicking closes details and opens the editor.
+**Shipped (MIN + MRN + GRN edit-mode, end-to-end):**
 
-**Follow-up (next turn):**
-- Apply the same pattern to `CreateMaterialReturnDialog` (MRN). Trickier because internal returns are derived from a MIN via `get_min_returnable_lines` RPC — edit mode needs to load the saved `material_return_items` directly instead of re-running the RPC.
-- Apply to `CreateGrnDialog` (GRN). Largest file (~900 lines); also needs to handle batch tracking fields on edit.
-- Optional hardening: wrap delete+insert in a SECURITY DEFINER `replace_draft_items` RPC if race conditions appear under multi-tab editing.
+- **MIN**:
+  - `useMaterialIssueItems.replaceItemsForMinAsync` (delete + reinsert draft lines).
+  - `useMaterialIssues.updateMaterialIssueAsync` exposed.
+  - `CreateMaterialIssueDialog` accepts `editingDraft`; pre-fills header + lines, retitles, status-still-draft guard, Save Changes / Submit for Approval.
+  - List page: Pencil "Edit" button on draft rows + `MaterialIssueDetailsDialog` "Edit Draft" banner.
+
+- **MRN**:
+  - `useMaterialReturns.updateDraftWithItemsAsync` (status guard, header update, delete + reinsert items).
+  - `CreateMaterialReturnDialog` accepts `editingDraft`; locks Return Type + Source MIN, hydrates header + existing line quantities for internal flows (merges with `get_min_returnable_lines` so `remaining` = rpc + saved-qty, letting the user increase up to the true cap), hydrates supplier items via two-step item-master lookup, Save Changes button.
+  - List page: Pencil "Edit" button on draft rows + `MaterialReturnDetailsDialog` "Edit Draft" button.
+
+- **GRN**:
+  - `useUpdateDraftGrnWithItems` (status guard, header update, delete + reinsert items, optional submit transition).
+  - `CreateGrnDialog` accepts `editingDraft`; hydrates form + line items, gates the PO auto-loader so it doesn't clobber the saved lines on first render (changes to PO mid-edit still load normally), retitles, supports Save Changes and Submit for Approval (writes draft → submitted in one shot).
+  - List page actions split into Eye + Pencil; `GrnDetailsDialog` gains "Edit Draft" button next to Submit/Delete.
+
+**Known limitations / follow-up:**
+- MRN internal edit assumes `get_min_returnable_lines.qty_returned_prev` includes draft items; if the RPC excludes drafts the `remaining + saved_qty` adjustment double-counts. Verify against live data.
+- Line reconciliation is client-side (delete + reinsert in two calls). If concurrent-edit races appear, wrap each module's update in a SECURITY DEFINER `replace_draft_*` RPC.
+- Editing a MIN/GRN draft does not re-validate against stock availability — that happens at approval time, which is consistent with SAP/Oracle/D365 norms.
+
