@@ -963,16 +963,20 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
             type="button"
             variant="outline"
             onClick={() => handleSubmit('draft')}
-            disabled={createGrn.isPending}
+            disabled={createGrn.isPending || updateDraftGrn.isPending}
           >
-            Save as Draft
+            {(createGrn.isPending || updateDraftGrn.isPending)
+              ? 'Saving…'
+              : isEditMode ? 'Save Changes' : 'Save as Draft'}
           </Button>
           <Button
             type="button"
             onClick={() => handleSubmit('submitted')}
-            disabled={createGrn.isPending}
+            disabled={createGrn.isPending || updateDraftGrn.isPending}
           >
-            Submit for Approval
+            {(createGrn.isPending || updateDraftGrn.isPending)
+              ? 'Submitting…'
+              : 'Submit for Approval'}
           </Button>
         </div>
       </DialogContent>
