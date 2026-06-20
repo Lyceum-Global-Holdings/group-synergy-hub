@@ -103,8 +103,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
 
   const { items: warehouseItems } = useWarehouseItems();
   
-  const { createMaterialIssueAsync, submitForApprovalAsync, isCreating, isSubmitting } = useMaterialIssues();
-  const { createItems } = useMaterialIssueItems();
+  const { createMaterialIssueAsync, updateMaterialIssueAsync, submitForApprovalAsync, isCreating, isUpdating, isSubmitting } = useMaterialIssues();
+  const { createItems, replaceItemsForMinAsync, isReplacing } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
