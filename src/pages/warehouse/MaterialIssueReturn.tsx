@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Download, Check, X, Wrench } from "lucide-react";
+import { Plus, Eye, Download, Check, X, Wrench, Send } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -58,7 +58,7 @@ export default function MaterialIssueReturn() {
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
 
-  const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, isApproving, isRejecting } = useMaterialIssues();
+  const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, submitForApprovalAsync, isApproving, isRejecting, isSubmitting } = useMaterialIssues();
   const { data: isAdmin } = useIsAdmin();
   const { materialReturns, isLoading: isLoadingReturns } = useMaterialReturns();
   const { materialRequests, isLoading: isLoadingRequests } = useMaterialRequests();
@@ -277,7 +277,8 @@ export default function MaterialIssueReturn() {
       cell: ({ row }) => {
         const issue = row.original;
         const isPending = issue.status === 'pending_approval';
-        const busy = isApproving || isRejecting;
+        const isDraft = issue.status === 'draft';
+        const busy = isApproving || isRejecting || isSubmitting;
         return (
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="sm" onClick={() => handleViewDetails(issue.id)}>
@@ -292,6 +293,19 @@ export default function MaterialIssueReturn() {
             >
               <Download className="h-4 w-4" />
             </Button>
+            {isDraft && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Submit this draft for approval"
+                disabled={busy}
+                onClick={async () => {
+                  try { await submitForApprovalAsync(issue.id); } catch (e) { /* toast handled */ }
+                }}
+              >
+                <Send className="h-4 w-4 text-primary" />
+              </Button>
+            )}
             {isAdmin && isPending && (
               <>
                 <Button
