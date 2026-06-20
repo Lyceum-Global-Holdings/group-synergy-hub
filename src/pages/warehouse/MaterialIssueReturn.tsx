@@ -565,12 +565,20 @@ export default function MaterialIssueReturn() {
       />
       <CreateMaterialReturnDialog
         open={returnDialogOpen}
-        onOpenChange={setReturnDialogOpen}
+        onOpenChange={(o) => {
+          setReturnDialogOpen(o);
+          if (!o) setEditingReturnDraft(null);
+        }}
+        editingDraft={editingReturnDraft}
       />
       <MaterialReturnDetailsDialog
         open={returnDetailsOpen}
         onOpenChange={setReturnDetailsOpen}
         returnNote={selectedReturn}
+        onEditDraft={(mrn) => {
+          setEditingReturnDraft(mrn);
+          setReturnDialogOpen(true);
+        }}
       />
       <RepairMaterialReturnDialog
         open={repairDialogOpen}
