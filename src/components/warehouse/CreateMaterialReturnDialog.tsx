@@ -192,7 +192,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     (async () => {
       const { data, error } = await supabase
         .from('material_return_items')
-        .select('item_id, quantity_returned, condition, unit_cost, notes')
+        .select('item_id, quantity_returned, condition, unit_cost, notes, bin_id')
         .eq('mrn_id', editingDraft.id);
       if (error) {
         console.error('Failed to load draft return items', error);
@@ -213,6 +213,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             condition: (saved?.condition as 'good' | 'damaged' | 'expired') ?? l.condition,
             notes: saved?.notes ?? l.notes,
             unit_cost: Number(saved?.unit_cost ?? l.unit_cost),
+            bin_id: saved?.bin_id ?? l.bin_id ?? null,
           };
         }),
       );
