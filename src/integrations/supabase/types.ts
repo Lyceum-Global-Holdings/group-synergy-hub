@@ -23158,6 +23158,105 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
+      reopen_grn_draft: {
+        Args: { p_grn_id: string }
+        Returns: {
+          approved_by: string | null
+          approved_date: string | null
+          branch: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          grn_date: string
+          grn_number: string
+          id: string
+          invoice_date: string | null
+          invoice_document_url: string | null
+          invoice_number: string | null
+          mr_number: string | null
+          po_id: string | null
+          po_number: string | null
+          pr_number: string | null
+          received_by: string | null
+          rejected_by: string | null
+          rejected_date: string | null
+          rejection_notes: string | null
+          rejection_reason:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
+          remarks: string | null
+          status: string
+          supplier_address: string | null
+          supplier_id: string | null
+          supplier_name: string
+          total_value: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "goods_receipt_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reopen_material_issue_draft: {
+        Args: { p_min_id: string }
+        Returns: {
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          contact_number: string | null
+          cpo_id: string | null
+          cpo_number: string | null
+          created_at: string
+          created_by: string | null
+          department: string | null
+          dispatch_note: string | null
+          epf_number: string | null
+          form_reference: string | null
+          hod_approval_date: string | null
+          hod_approved_by: string | null
+          id: string
+          issue_date: string
+          issued_by: string | null
+          issued_by_name: string | null
+          issued_to: string
+          items_required_date: string | null
+          job_number: string | null
+          location_id: string | null
+          management_approval_date: string | null
+          management_approved_by: string | null
+          min_number: string
+          mr_received_by: string | null
+          mr_received_date: string | null
+          notes: string | null
+          order_completed: boolean | null
+          po_number: string | null
+          pr_number: string | null
+          purpose: string | null
+          received_by: string | null
+          received_by_name: string | null
+          received_date: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          request_id: string | null
+          requested_by: string | null
+          srn_document_url: string | null
+          srn_number: string | null
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          total_value: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "material_issue_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       repair_material_return_from_reference: {
         Args: {
           p_overrides?: Json
