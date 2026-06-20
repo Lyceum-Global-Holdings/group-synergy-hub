@@ -64,10 +64,46 @@ export const useMaterialIssueItems = () => {
     }
   });
 
+  const replaceItemsForMinMutation = useMutation({
+    mutationFn: async ({ minId, items }: { minId: string; items: CreateMaterialIssueItemData[] }) => {
+      // Wipe existing draft lines, re-insert. Drafts have no stock-side
+      // dependencies (no stock_transactions / bin_allocations), so
+      // delete-then-insert is safe and keeps line numbering deterministic.
+      const { error: delErr } = await supabase
+        .from('material_issue_items')
+        .delete()
+        .eq('min_id', minId);
+      if (delErr) throw delErr;
+
+      if (items.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from('material_issue_items')
+        .insert(items)
+        .select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['material-issues'] });
+      queryClient.invalidateQueries({ queryKey: ['material-issue-items'] });
+    },
+    onError: (error: any) => {
+      console.error('Error replacing material issue items:', error);
+      toast({
+        title: 'Could not update items',
+        description: error?.message || 'Failed to replace draft items',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     createItems: createItemsMutation.mutateAsync,
     updateItem: updateItemMutation.mutate,
+    replaceItemsForMinAsync: replaceItemsForMinMutation.mutateAsync,
     isCreating: createItemsMutation.isPending,
     isUpdating: updateItemMutation.isPending,
+    isReplacing: replaceItemsForMinMutation.isPending,
   };
 };
