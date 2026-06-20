@@ -36,6 +36,9 @@ interface ReturnableLine {
   quantity_returned: number;
   condition: 'good' | 'damaged' | 'expired';
   notes: string;
+  bin_id: string | null;
+  // metadata for UX hint
+  default_bin_code?: string | null;
 }
 
 interface SupplierReturnItem {
@@ -46,6 +49,7 @@ interface SupplierReturnItem {
   condition: 'good' | 'damaged' | 'expired';
   unit_cost: number;
   notes?: string;
+  bin_id: string | null;
 }
 
 interface Props {
