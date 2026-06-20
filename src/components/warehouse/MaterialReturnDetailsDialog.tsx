@@ -347,6 +347,17 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, on
             <>
               <Separator />
               <div className="flex justify-end gap-2">
+                {onEditDraft && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onEditDraft(returnNote);
+                      onOpenChange(false);
+                    }}
+                  >
+                    Edit Draft
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={handleCancel}
