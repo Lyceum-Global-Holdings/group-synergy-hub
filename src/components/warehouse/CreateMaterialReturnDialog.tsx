@@ -219,24 +219,28 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     (async () => {
       const { data, error } = await supabase
         .from('material_return_items')
-        .select(`
-          item_id,
-          quantity_returned,
-          condition,
-          unit_cost,
-          notes,
-          warehouse_item:warehouse_items_full!material_return_items_item_id_fkey(item_code, name)
-        `)
+        .select('item_id, quantity_returned, condition, unit_cost, notes')
         .eq('mrn_id', editingDraft.id);
       if (error) {
         console.error('Failed to load draft supplier return items', error);
         return;
       }
+      const itemIds = Array.from(new Set((data ?? []).map((r: any) => r.item_id).filter(Boolean)));
+      let nameByItemId: Record<string, { item_code: string; name: string }> = {};
+      if (itemIds.length) {
+        const { data: wiRows } = await supabase
+          .from('warehouse_items_full')
+          .select('id, item_code, name')
+          .in('id', itemIds);
+        nameByItemId = Object.fromEntries(
+          (wiRows ?? []).map((w: any) => [w.id, { item_code: w.item_code ?? '', name: w.name ?? '' }]),
+        );
+      }
       setSupplierItems(
         (data ?? []).map((r: any) => ({
           warehouse_item_id: r.item_id,
-          item_code: r.warehouse_item?.item_code ?? '',
-          item_name: r.warehouse_item?.name ?? '',
+          item_code: nameByItemId[r.item_id]?.item_code ?? '',
+          item_name: nameByItemId[r.item_id]?.name ?? '',
           quantity_returned: Number(r.quantity_returned ?? 0),
           condition: (r.condition as 'good' | 'damaged' | 'expired') ?? 'good',
           unit_cost: Number(r.unit_cost ?? 0),
@@ -245,6 +249,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
       );
     })();
   }, [open, isEditMode, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
 
   // ---- User-accessible locations for the selected company (RLS scoped) ----
