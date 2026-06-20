@@ -54,6 +54,24 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const { data: userRoles = [] } = useCurrentUserRoles();
   const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
+  const { reopenDraftAsync, isReopening } = useMaterialIssues();
+
+  const handleReopen = async () => {
+    if (!issue) return;
+    try {
+      await reopenDraftAsync(issue.id);
+      // Refresh local view
+      const { data } = await supabase
+        .from('material_issue_notes')
+        .select('*')
+        .eq('id', issue.id)
+        .single();
+      if (data) setIssue(data as any);
+    } catch (e) {
+      // toast handled inside hook
+    }
+  };
+
 
   const handleDownloadPdf = async () => {
     if (!issue) return;
