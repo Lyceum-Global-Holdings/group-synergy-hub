@@ -276,6 +276,80 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     },
   });
 
+  // ---- Bins at the MRN's location (used by the per-line bin picker) ----
+  const { data: binsAtLocation = [] } = useBinsAtLocation(locationId || null);
+
+  // ---- Pre-fill each line's bin from where the MIN issued the stock from ----
+  // Runs whenever the source MIN or its lines change. Only fills lines that
+  // don't already have a bin_id (so user overrides and saved drafts stick).
+  useEffect(() => {
+    if (returnType !== 'internal' || !selectedMinId || lines.length === 0) return;
+    const targets = lines
+      .map((l, idx) => ({ l, idx }))
+      .filter(({ l }) => !l.bin_id);
+    if (targets.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        targets.map(async ({ l, idx }) => {
+          const { data, error } = await supabase.rpc('get_min_issued_bins' as any, {
+            p_min_id: selectedMinId,
+            p_item_id: l.item_id,
+          });
+          if (error || !data || (data as any[]).length === 0) {
+            return { idx, bin_id: null as string | null, bin_code: null as string | null };
+          }
+          const top = (data as any[])[0];
+          return { idx, bin_id: top.bin_id as string, bin_code: top.bin_code as string };
+        }),
+      );
+      if (cancelled) return;
+      setLines((prev) =>
+        prev.map((l, i) => {
+          const hit = results.find((r) => r.idx === i);
+          if (!hit || !hit.bin_id || l.bin_id) return l;
+          return { ...l, bin_id: hit.bin_id, default_bin_code: hit.bin_code };
+        }),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMinId, returnType, lines.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Supplier flow: default each item's bin to its current allocation ----
+  useEffect(() => {
+    if (returnType !== 'supplier' || !selectedCompany?.id) return;
+    const targets = supplierItems
+      .map((it, idx) => ({ it, idx }))
+      .filter(({ it }) => it.warehouse_item_id && !it.bin_id);
+    if (targets.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const ids = Array.from(new Set(targets.map((t) => t.it.warehouse_item_id)));
+      const { data, error } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('warehouse_item_id, bin_id, allocated_quantity, warehouse_bins!inner(location_id)')
+        .in('warehouse_item_id', ids)
+        .eq('company_id', selectedCompany.id)
+        .order('allocated_quantity', { ascending: false });
+      if (error || !data || cancelled) return;
+      const topByItem = new Map<string, string>();
+      for (const row of data as any[]) {
+        if (locationId && row.warehouse_bins?.location_id !== locationId) continue;
+        if (!topByItem.has(row.warehouse_item_id)) topByItem.set(row.warehouse_item_id, row.bin_id);
+      }
+      setSupplierItems((prev) =>
+        prev.map((it) => {
+          if (it.bin_id || !it.warehouse_item_id) return it;
+          const def = topByItem.get(it.warehouse_item_id);
+          return def ? { ...it, bin_id: def } : it;
+        }),
+      );
+    })();
+    return () => { cancelled = true; };
+  }, [supplierItems.map((i) => i.warehouse_item_id).join('|'), returnType, selectedCompany?.id, locationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const resetAll = () => {
     setReturnDate(format(new Date(), 'yyyy-MM-dd'));
     setReturnedBy('');
