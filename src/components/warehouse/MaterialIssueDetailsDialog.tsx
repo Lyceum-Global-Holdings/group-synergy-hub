@@ -38,6 +38,7 @@ interface MaterialIssueDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   issueId: string | null;
+  onEditDraft?: (issue: MaterialIssueNote) => void;
 }
 
 export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: MaterialIssueDetailsDialogProps) {
