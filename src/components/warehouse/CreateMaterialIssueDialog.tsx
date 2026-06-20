@@ -923,13 +923,20 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
                 <Button
                   variant="outline"
                   onClick={() => handleSubmit('draft')}
-                  disabled={isCreating || isSubmitting}
+                  disabled={isCreating || isUpdating || isReplacing || isSubmitting}
                   title="Save without submitting — no stock impact, can be edited or submitted later."
                 >
-                  {isCreating ? 'Saving…' : 'Save as Draft'}
+                  {(isCreating || isUpdating || isReplacing)
+                    ? 'Saving…'
+                    : isEditMode ? 'Save Changes' : 'Save as Draft'}
                 </Button>
-                <Button onClick={() => handleSubmit('submit')} disabled={isCreating || isSubmitting}>
-                  {isCreating || isSubmitting ? 'Submitting…' : 'Submit for Approval'}
+                <Button
+                  onClick={() => handleSubmit('submit')}
+                  disabled={isCreating || isUpdating || isReplacing || isSubmitting}
+                >
+                  {(isCreating || isUpdating || isReplacing || isSubmitting)
+                    ? 'Submitting…'
+                    : 'Submit for Approval'}
                 </Button>
               </div>
             </div>
