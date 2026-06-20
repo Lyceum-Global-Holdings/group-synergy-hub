@@ -307,13 +307,13 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0);
   }, [returnType, supplierItems]);
 
-  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && !!locationId && internalValid && supplierValid && !isCreating && !loadingLines;
+  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && !!locationId && internalValid && supplierValid && !isCreating && !isUpdatingDraft && !loadingLines;
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedCompany?.id) return;
     try {
       const isInternal = returnType === 'internal';
-      const payload = isInternal
+      const itemsPayload = isInternal
         ? lines
             .filter((l) => l.quantity_returned > 0)
             .map((l) => ({
@@ -333,19 +333,41 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             notes: i.notes || undefined,
           }));
 
-      const newReturn = await createMaterialReturnWithItemsAsync({
-        return_date: returnDate,
-        returned_by: returnedBy,
-        return_type: returnType,
-        reason,
-        reference_type: isInternal ? 'material_issue' : (referenceType ?? 'other'),
-        reference_id: isInternal ? selectedMinId : referenceId || undefined,
-        notes,
-        company_id: selectedCompany.id,
-        location_id: locationId || undefined,
-        srn_number: srnNumber || undefined,
-        items: payload,
-      });
+      let newReturn: MaterialReturnNote | null = null;
+
+      if (isEditMode && editingDraft) {
+        await updateDraftWithItemsAsync({
+          id: editingDraft.id,
+          header: {
+            return_date: returnDate,
+            returned_by: returnedBy,
+            return_type: returnType,
+            reason,
+            reference_type: isInternal ? 'material_issue' : (referenceType ?? 'other'),
+            reference_id: isInternal ? selectedMinId : referenceId || null,
+            notes,
+            location_id: locationId || null,
+            srn_number: srnNumber || null,
+          },
+          items: itemsPayload,
+        });
+        newReturn = editingDraft;
+      } else {
+        newReturn = await createMaterialReturnWithItemsAsync({
+          return_date: returnDate,
+          returned_by: returnedBy,
+          return_type: returnType,
+          reason,
+          reference_type: isInternal ? 'material_issue' : (referenceType ?? 'other'),
+          reference_id: isInternal ? selectedMinId : referenceId || undefined,
+          notes,
+          company_id: selectedCompany.id,
+          location_id: locationId || undefined,
+          srn_number: srnNumber || undefined,
+          items: itemsPayload,
+        });
+      }
+
 
       if (srnDocumentTempPath && newReturn?.id) {
         try {
