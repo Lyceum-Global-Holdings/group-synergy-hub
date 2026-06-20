@@ -382,12 +382,12 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     if (!selectedMinId) return false;
     const withQty = lines.filter((l) => l.quantity_returned > 0);
     if (withQty.length === 0) return false;
-    return withQty.every((l) => l.quantity_returned <= l.remaining);
+    return withQty.every((l) => l.quantity_returned <= l.remaining && !!l.bin_id);
   }, [returnType, selectedMinId, lines]);
 
   const supplierValid = useMemo(() => {
     if (returnType !== 'supplier') return true;
-    return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0);
+    return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0 && !!i.bin_id);
   }, [returnType, supplierItems]);
 
   const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && !!locationId && internalValid && supplierValid && !isCreating && !isUpdatingDraft && !loadingLines;
@@ -406,6 +406,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
               unit_cost: l.unit_cost,
               total_cost: l.quantity_returned * l.unit_cost,
               notes: l.notes || undefined,
+              bin_id: l.bin_id,
             }))
         : supplierItems.map((i) => ({
             item_id: i.warehouse_item_id,
@@ -414,6 +415,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             unit_cost: i.unit_cost,
             total_cost: i.quantity_returned * i.unit_cost,
             notes: i.notes || undefined,
+            bin_id: i.bin_id,
           }));
 
       let newReturn: MaterialReturnNote | null = null;
