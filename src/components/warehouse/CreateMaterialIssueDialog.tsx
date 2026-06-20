@@ -487,8 +487,10 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
         }
       } else {
         toast({
-          title: 'Draft saved',
-          description: 'Material Issue Note saved as draft. Submit it for approval when ready.',
+          title: isEditMode ? 'Draft updated' : 'Draft saved',
+          description: isEditMode
+            ? 'Your changes were saved. Submit it for approval when ready.'
+            : 'Material Issue Note saved as draft. Submit it for approval when ready.',
         });
       }
 
