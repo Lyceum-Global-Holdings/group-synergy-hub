@@ -367,6 +367,17 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                 <Button variant="destructive" onClick={handleDelete}>
                   Delete
                 </Button>
+                {onEditDraft && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onEditDraft(grn);
+                      onOpenChange(false);
+                    }}
+                  >
+                    Edit Draft
+                  </Button>
+                )}
                 <Button onClick={handleSubmit}>
                   Submit for Approval
                 </Button>
