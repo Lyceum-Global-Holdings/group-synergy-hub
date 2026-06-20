@@ -295,17 +295,30 @@ export default function MaterialIssueReturn() {
               <Download className="h-4 w-4" />
             </Button>
             {isDraft && (
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Submit this draft for approval"
-                disabled={busy}
-                onClick={async () => {
-                  try { await submitForApprovalAsync(issue.id); } catch (e) { /* toast handled */ }
-                }}
-              >
-                <Send className="h-4 w-4 text-primary" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Edit this draft"
+                  onClick={() => {
+                    setEditingIssueDraft(issue);
+                    setIssueDialogOpen(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 text-primary" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Submit this draft for approval"
+                  disabled={busy}
+                  onClick={async () => {
+                    try { await submitForApprovalAsync(issue.id); } catch (e) { /* toast handled */ }
+                  }}
+                >
+                  <Send className="h-4 w-4 text-primary" />
+                </Button>
+              </>
             )}
             {isAdmin && isPending && (
               <>
