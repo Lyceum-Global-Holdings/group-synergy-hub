@@ -50,6 +50,7 @@ function GoodsReceiptNote() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedGrn, setSelectedGrn] = useState<string | null>(null);
+  const [editingGrnDraft, setEditingGrnDraft] = useState<any | null>(null);
 
   const filteredGrns = grns.filter(grn => {
     const matchesSearch =
