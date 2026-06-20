@@ -195,6 +195,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, on
                 <TableRow>
                   <TableHead>Item Code</TableHead>
                   <TableHead>Item Name</TableHead>
+                  <TableHead>Bin</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Condition</TableHead>
                   <TableHead>Unit Cost</TableHead>
