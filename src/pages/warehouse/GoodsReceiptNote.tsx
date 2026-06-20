@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign, FileBarChart } from 'lucide-react';
+import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign, FileBarChart, Eye, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
