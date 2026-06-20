@@ -49,6 +49,9 @@ import {
 interface MaterialIssueDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // When provided, the dialog opens in edit mode for a draft MIN.
+  // Only documents with status='draft' should be passed in; the parent guards this.
+  editingDraft?: import('@/types/materialIssueReturn').MaterialIssueNote | null;
 }
 
 interface IssueItem {
