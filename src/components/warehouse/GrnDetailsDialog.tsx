@@ -21,6 +21,7 @@ import {
   useSubmitGoodsReceiptNote,
   useDeleteGoodsReceiptNote,
   useRejectGoodsReceiptNote,
+  useReopenGoodsReceiptNote,
 } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS } from '@/types/grn';
