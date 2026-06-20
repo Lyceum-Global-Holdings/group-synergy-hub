@@ -69,12 +69,17 @@ interface CreateGrnDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   poId?: string;
+  // When provided, the dialog opens in edit mode for a draft GRN.
+  // The parent must only pass GRNs whose status === 'draft'.
+  editingDraft?: (import('@/types/grn').GoodsReceiptNote & { grn_items?: import('@/types/grn').GrnItem[] }) | null;
 }
 
-export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogProps) {
+export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: CreateGrnDialogProps) {
+  const isEditMode = !!editingDraft;
   const { selectedCompany } = useCompany();
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
+  const updateDraftGrn = useUpdateDraftGrnWithItems();
   const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
