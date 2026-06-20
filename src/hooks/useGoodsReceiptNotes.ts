@@ -451,3 +451,30 @@ export const useRejectGoodsReceiptNote = () => {
     },
   });
 };
+
+/**
+ * Send a rejected GRN back to draft so the creator can edit and resubmit.
+ * Follows SAP/Oracle/D365 rework workflow.
+ */
+export const useReopenGoodsReceiptNote = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.rpc('reopen_grn_draft' as any, { p_grn_id: id });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-note'] });
+      queryClient.invalidateQueries({ queryKey: ['grn'] });
+      queryClient.invalidateQueries({ queryKey: ['grn-summary'] });
+      toast({ title: 'Reopened as draft', description: 'You can now edit and resubmit this GRN.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Reopen failed', description: error.message, variant: 'destructive' });
+    },
+  });
+};
