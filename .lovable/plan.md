@@ -1,57 +1,77 @@
-## Why everyone still sees every MRN
+# Draft Workflow for MIN / MRN / GRN
 
-The previous migration added `location_id` and a new SELECT policy, but the policy keeps a fallback clause:
+## Goal
+Let users create, save, and edit documents as **drafts** before committing them to the formal approval / posting workflow — matching the international standard document lifecycle used in SAP, Oracle, and Microsoft Dynamics:
 
+```text
+Draft → Submitted (Pending Approval) → Approved → Posted/Completed
+                                    ↘ Rejected → (back to Draft)
+                                    ↘ Cancelled
 ```
-... AND (location_id IS NULL OR is_admin(...) OR user_has_location_access(...))
-```
 
-Database state right now:
-- All 20 `material_return_notes` rows have `location_id = NULL`
-- 16 of them also have `company_id = NULL` (reference_type = `other`)
-- The 4 rows linked to a Material Issue Note did not get backfilled (prior backfill JOIN didn't match)
+Drafts have no stock impact, no ledger entries, no document number consumption (a temporary `DRAFT-####` number is shown until submission), and are visible only to the creator and admins.
 
-Result: every authenticated user passes the policy via the `location_id IS NULL` branch, so the list is effectively unscoped — exactly what the user is reporting.
+## Scope
+- **GRN** (`goods_receipt_notes`) — already has `draft` in enum.
+- **MIN** (`material_issue_notes`) — already has `draft` in enum.
+- **MRN** (`material_return_notes`) — already has `draft` in enum.
 
-## Fix
+No schema migrations required for the status enum; minor additions for draft metadata + RLS only.
 
-### 1. Migration — backfill + lock down
+## UX Standard
+Every create dialog gets a **three-button footer**:
 
-1. **Backfill `location_id` from MIN** for rows where `reference_type IN ('material_issue','material_issue_note')` and `reference_id` matches a `material_issue_notes.id` (cast safely).
-2. **Backfill `company_id`** the same way (from the linked MIN) for the 4 MIN-linked rows currently NULL.
-3. For remaining legacy rows that still have `location_id IS NULL` after backfill, set `location_id` to the creator's primary accessible location when uniquely determinable (`user_location_assignments` → fall back to the most-used location on `material_issue_notes` by the same `created_by` in the same company). Any row that still can't be resolved is marked admin-only by leaving `location_id` NULL **and** flipping a new behaviour: NULL no longer grants access (see step 5).
-4. **Add NOT NULL guard going forward**: a `BEFORE INSERT` trigger raises if `location_id` is NULL for new rows (we don't add a NOT NULL constraint yet so unresolved legacy rows aren't deleted; admins can repair them via the existing repair dialog).
-5. **Replace the SELECT policy** to drop the `location_id IS NULL` branch:
-   ```
-   USING (
-     can_access_company(company_id)
-     AND (
-       is_admin(auth.uid())
-       OR (location_id IS NOT NULL AND user_has_location_access(auth.uid(), location_id))
-     )
-   )
-   ```
-   Apply the same tightening to UPDATE's USING/CHECK and INSERT's CHECK (remove the NULL escape; admins can still create/edit, others must supply a valid location).
-6. **Tighten `material_return_items` SELECT policy** the same way — currently it inherits visibility from the parent; re-create it so item rows are only visible when the parent MRN passes the new (no-NULL) check, preventing leakage through item-side queries.
-7. Index already exists from prior migration; no change.
+| Button | Action | Status set |
+|---|---|---|
+| Cancel | Close without saving | — |
+| Save as Draft | Persist with minimal validation | `draft` |
+| Submit | Full validation + workflow start | `submitted` / `pending_approval` |
 
-### 2. Frontend (small follow-ups)
+Existing list pages get:
+- A **Status filter** with a "My Drafts" quick chip.
+- A **Draft** badge (amber) and a pencil icon on draft rows that opens the same Create dialog in *edit* mode.
+- A **Delete Draft** action (drafts only, creator/admin only — never on submitted docs).
 
-- `useMaterialReturns.ts`: drop the `.or('location_id.is.null,...')` clause now that NULL is no longer publicly visible — keep only the `location_id = globalLocationId` filter (plus no filter when "All locations" is selected, relying on RLS).
-- `CreateMaterialReturnDialog.tsx`: keep location required (already done); add a clearer inline error if user picks a location they don't have access to (server will also reject).
-- Repair tooling (`BulkRepairMaterialReturnsDialog` / `RepairMaterialReturnDialog`): surface a warning badge for rows still missing `location_id` so admins can re-assign them via a new "Set location" action (uses existing admin-only update policy).
+Details dialog for a draft shows a yellow banner: *"This document is a draft. It will not affect stock or approvals until submitted."* with a **Submit for Approval** primary action.
 
-### 3. Verification
+## Technical Design
 
-- Re-run `SELECT count(*) FROM material_return_notes WHERE location_id IS NULL;` — expect only rows that genuinely couldn't be resolved (admin-visible only).
-- Log in as a non-admin user with access to Location A and confirm rows from Location B no longer appear.
-- Confirm `material_return_items` are also hidden for non-visible parents.
+### 1. Hooks (`useMaterialIssues`, `useMaterialReturns`, `useGoodsReceiptNotes`)
+Refactor the create mutation to accept `{ payload, mode: 'draft' | 'submit' }`:
+- `draft` → skips required-field guards beyond `company_id`+`created_by`, sets `status='draft'`, **does not** call number generator (uses `null` doc number, UI shows `DRAFT-{shortId}`).
+- `submit` → runs full validation, calls existing number generator RPC, sets `status` to the current "new submission" value (`pending_approval` for MIN, `submitted` for GRN, `approved`/workflow-start for MRN per existing logic), and triggers existing side-effects (approval routing, notifications).
 
-## Files
+Add `submitDraft(id)` mutation that re-runs the submit path on an existing draft row (assigns real doc number, flips status, fires side-effects).
 
-- New migration: `..._mrn_location_lockdown.sql` (backfill + policy replacements + insert trigger).
-- `src/hooks/useMaterialReturns.ts` (drop NULL OR clause).
-- `src/components/warehouse/CreateMaterialReturnDialog.tsx` (validation copy).
-- `src/components/warehouse/BulkRepairMaterialReturnsDialog.tsx` + `RepairMaterialReturnDialog.tsx` (optional admin "Set location" affordance).
+Add `deleteDraft(id)` mutation guarded server-side to `status='draft'` only.
 
-No changes to other modules.
+### 2. Dialog components
+`CreateMaterialIssueDialog`, `CreateMaterialReturnDialog`, `CreateGrnDialog`:
+- Accept optional `draftId` prop → loads existing draft into the form.
+- Footer split into `Save as Draft` (secondary) + `Submit` (primary).
+- Item lines persist on draft save (already child tables) — child rows tagged with parent's draft id.
+
+### 3. Migration (single small migration)
+- Add partial unique guard so draft rows skip the doc-number unique index (use `WHERE status <> 'draft'` on the existing unique indexes for `min_number`, `mrn_number`, `grn_number`).
+- Add RLS policy: drafts visible only to `created_by` + company admins; submitted+ rows keep existing visibility.
+- Add `delete` policy restricted to `status='draft' AND created_by = auth.uid()` (plus admin override).
+
+### 4. List pages
+`MaterialIssueReturn.tsx`, `GoodsReceiptNote.tsx`:
+- Add "Drafts" tab / status filter chip.
+- Row click on a draft opens Create dialog in edit mode instead of details dialog.
+
+### 5. Approval / stock side-effects
+No changes — they already trigger only on the submit/approval transitions, so drafts naturally bypass them.
+
+## Out of Scope (can be follow-ups)
+- Auto-save / autosave-on-blur for drafts.
+- Draft expiry / cleanup job.
+- Extending the same pattern to Material Requests, Stock Transfers, Cycle Counts (same template can be reused later).
+
+## Deliverables
+1. One migration (unique-index partial, RLS additions).
+2. Updated hooks for MIN / MRN / GRN with `saveDraft`, `submitDraft`, `deleteDraft`.
+3. Updated Create dialogs (3) with two-action footer + edit-draft mode.
+4. Updated list pages (2) with Drafts filter, edit-on-click for drafts, delete-draft action.
+5. Draft banner + Submit action in the 3 Details dialogs.
