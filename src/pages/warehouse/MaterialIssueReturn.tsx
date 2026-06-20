@@ -55,6 +55,7 @@ export default function MaterialIssueReturn() {
   const [bulkRepairOpen, setBulkRepairOpen] = useState(false);
   const [repairTarget, setRepairTarget] = useState<MaterialReturnNote | null>(null);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [editingIssueDraft, setEditingIssueDraft] = useState<MaterialIssueNote | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
 
