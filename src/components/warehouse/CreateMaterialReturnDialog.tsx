@@ -252,6 +252,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
           condition: (r.condition as 'good' | 'damaged' | 'expired') ?? 'good',
           unit_cost: Number(r.unit_cost ?? 0),
           notes: r.notes ?? '',
+          bin_id: r.bin_id ?? null,
         })),
       );
     })();
