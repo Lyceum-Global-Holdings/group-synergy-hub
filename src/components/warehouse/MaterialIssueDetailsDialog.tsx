@@ -333,6 +333,25 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            {issue.status === 'draft' && onEditDraft && (
+              <Alert>
+                <AlertTitle>This is a draft</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span className="text-xs">Header and line items can still be changed. No stock is reserved or moved until an admin approves it.</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    onClick={() => {
+                      onEditDraft(issue);
+                      onOpenChange(false);
+                    }}
+                  >
+                    Edit Draft
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
             {issue.status === 'rejected' && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
