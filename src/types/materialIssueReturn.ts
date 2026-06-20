@@ -173,6 +173,8 @@ export interface MaterialReturnItem {
   updated_at: string;
   secondary_quantity_returned?: number | null;
   secondary_uom?: string | null;
+  bin_id?: string | null;
+  bin_code?: string | null;
 }
 
 export interface CreateMaterialReturnItemData {
@@ -185,6 +187,7 @@ export interface CreateMaterialReturnItemData {
   notes?: string;
   secondary_quantity_returned?: number | null;
   secondary_uom?: string | null;
+  bin_id?: string | null;
 }
 
 export interface MaterialRequest {

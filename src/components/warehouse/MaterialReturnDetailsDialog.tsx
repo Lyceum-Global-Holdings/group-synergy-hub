@@ -195,6 +195,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, on
                 <TableRow>
                   <TableHead>Item Code</TableHead>
                   <TableHead>Item Name</TableHead>
+                  <TableHead>Bin</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Condition</TableHead>
                   <TableHead>Unit Cost</TableHead>
@@ -205,13 +206,14 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, on
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">Loading items...</TableCell>
+                    <TableCell colSpan={8} className="text-center">Loading items...</TableCell>
                   </TableRow>
                 ) : returnItems && returnItems.length > 0 ? (
-                  returnItems.map((item) => (
+                  returnItems.map((item: any) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.item_code || item.item_id}</TableCell>
                       <TableCell>{item.item_name || `Item #${item.item_id.slice(0, 8)}`}</TableCell>
+                      <TableCell className="font-mono text-xs">{item.bin_code || '—'}</TableCell>
                       <TableCell>{item.quantity_returned}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
@@ -225,7 +227,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, on
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">
+                    <TableCell colSpan={8} className="text-center">
                       No return items were saved for this MRN
                     </TableCell>
                   </TableRow>

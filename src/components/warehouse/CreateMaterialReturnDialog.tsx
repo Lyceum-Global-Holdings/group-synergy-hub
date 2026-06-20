@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useBinsAtLocation } from "@/hooks/warehouse/useBinsAtLocation";
 
 interface ReturnableLine {
   item_id: string;
@@ -35,6 +36,9 @@ interface ReturnableLine {
   quantity_returned: number;
   condition: 'good' | 'damaged' | 'expired';
   notes: string;
+  bin_id: string | null;
+  // metadata for UX hint
+  default_bin_code?: string | null;
 }
 
 interface SupplierReturnItem {
@@ -45,6 +49,7 @@ interface SupplierReturnItem {
   condition: 'good' | 'damaged' | 'expired';
   unit_cost: number;
   notes?: string;
+  bin_id: string | null;
 }
 
 interface Props {
@@ -126,6 +131,8 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
         quantity_returned: 0,
         condition: 'good' as const,
         notes: '',
+        bin_id: null,
+        default_bin_code: null,
       }));
     },
   });
@@ -185,7 +192,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     (async () => {
       const { data, error } = await supabase
         .from('material_return_items')
-        .select('item_id, quantity_returned, condition, unit_cost, notes')
+        .select('item_id, quantity_returned, condition, unit_cost, notes, bin_id')
         .eq('mrn_id', editingDraft.id);
       if (error) {
         console.error('Failed to load draft return items', error);
@@ -206,6 +213,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             condition: (saved?.condition as 'good' | 'damaged' | 'expired') ?? l.condition,
             notes: saved?.notes ?? l.notes,
             unit_cost: Number(saved?.unit_cost ?? l.unit_cost),
+            bin_id: saved?.bin_id ?? l.bin_id ?? null,
           };
         }),
       );
@@ -219,7 +227,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     (async () => {
       const { data, error } = await supabase
         .from('material_return_items')
-        .select('item_id, quantity_returned, condition, unit_cost, notes')
+        .select('item_id, quantity_returned, condition, unit_cost, notes, bin_id')
         .eq('mrn_id', editingDraft.id);
       if (error) {
         console.error('Failed to load draft supplier return items', error);
@@ -245,6 +253,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
           condition: (r.condition as 'good' | 'damaged' | 'expired') ?? 'good',
           unit_cost: Number(r.unit_cost ?? 0),
           notes: r.notes ?? '',
+          bin_id: r.bin_id ?? null,
         })),
       );
     })();
@@ -267,6 +276,80 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     },
   });
 
+  // ---- Bins at the MRN's location (used by the per-line bin picker) ----
+  const { data: binsAtLocation = [] } = useBinsAtLocation(locationId || null);
+
+  // ---- Pre-fill each line's bin from where the MIN issued the stock from ----
+  // Runs whenever the source MIN or its lines change. Only fills lines that
+  // don't already have a bin_id (so user overrides and saved drafts stick).
+  useEffect(() => {
+    if (returnType !== 'internal' || !selectedMinId || lines.length === 0) return;
+    const targets = lines
+      .map((l, idx) => ({ l, idx }))
+      .filter(({ l }) => !l.bin_id);
+    if (targets.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        targets.map(async ({ l, idx }) => {
+          const { data, error } = await supabase.rpc('get_min_issued_bins' as any, {
+            p_min_id: selectedMinId,
+            p_item_id: l.item_id,
+          });
+          if (error || !data || (data as any[]).length === 0) {
+            return { idx, bin_id: null as string | null, bin_code: null as string | null };
+          }
+          const top = (data as any[])[0];
+          return { idx, bin_id: top.bin_id as string, bin_code: top.bin_code as string };
+        }),
+      );
+      if (cancelled) return;
+      setLines((prev) =>
+        prev.map((l, i) => {
+          const hit = results.find((r) => r.idx === i);
+          if (!hit || !hit.bin_id || l.bin_id) return l;
+          return { ...l, bin_id: hit.bin_id, default_bin_code: hit.bin_code };
+        }),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMinId, returnType, lines.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Supplier flow: default each item's bin to its current allocation ----
+  useEffect(() => {
+    if (returnType !== 'supplier' || !selectedCompany?.id) return;
+    const targets = supplierItems
+      .map((it, idx) => ({ it, idx }))
+      .filter(({ it }) => it.warehouse_item_id && !it.bin_id);
+    if (targets.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const ids = Array.from(new Set(targets.map((t) => t.it.warehouse_item_id)));
+      const { data, error } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('warehouse_item_id, bin_id, allocated_quantity, warehouse_bins!inner(location_id)')
+        .in('warehouse_item_id', ids)
+        .eq('company_id', selectedCompany.id)
+        .order('allocated_quantity', { ascending: false });
+      if (error || !data || cancelled) return;
+      const topByItem = new Map<string, string>();
+      for (const row of data as any[]) {
+        if (locationId && row.warehouse_bins?.location_id !== locationId) continue;
+        if (!topByItem.has(row.warehouse_item_id)) topByItem.set(row.warehouse_item_id, row.bin_id);
+      }
+      setSupplierItems((prev) =>
+        prev.map((it) => {
+          if (it.bin_id || !it.warehouse_item_id) return it;
+          const def = topByItem.get(it.warehouse_item_id);
+          return def ? { ...it, bin_id: def } : it;
+        }),
+      );
+    })();
+    return () => { cancelled = true; };
+  }, [supplierItems.map((i) => i.warehouse_item_id).join('|'), returnType, selectedCompany?.id, locationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const resetAll = () => {
     setReturnDate(format(new Date(), 'yyyy-MM-dd'));
     setReturnedBy('');
@@ -288,7 +371,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   const addSupplierItem = () =>
     setSupplierItems((p) => [
       ...p,
-      { warehouse_item_id: '', item_code: '', item_name: '', quantity_returned: 0, condition: 'good', unit_cost: 0, notes: '' },
+      { warehouse_item_id: '', item_code: '', item_name: '', quantity_returned: 0, condition: 'good', unit_cost: 0, notes: '', bin_id: null },
     ]);
   const removeSupplierItem = (i: number) => setSupplierItems((p) => p.filter((_, idx) => idx !== i));
   const patchSupplierItem = (i: number, patch: Partial<SupplierReturnItem>) =>
@@ -299,12 +382,12 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     if (!selectedMinId) return false;
     const withQty = lines.filter((l) => l.quantity_returned > 0);
     if (withQty.length === 0) return false;
-    return withQty.every((l) => l.quantity_returned <= l.remaining);
+    return withQty.every((l) => l.quantity_returned <= l.remaining && !!l.bin_id);
   }, [returnType, selectedMinId, lines]);
 
   const supplierValid = useMemo(() => {
     if (returnType !== 'supplier') return true;
-    return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0);
+    return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0 && !!i.bin_id);
   }, [returnType, supplierItems]);
 
   const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && !!locationId && internalValid && supplierValid && !isCreating && !isUpdatingDraft && !loadingLines;
@@ -323,6 +406,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
               unit_cost: l.unit_cost,
               total_cost: l.quantity_returned * l.unit_cost,
               notes: l.notes || undefined,
+              bin_id: l.bin_id,
             }))
         : supplierItems.map((i) => ({
             item_id: i.warehouse_item_id,
@@ -331,6 +415,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             unit_cost: i.unit_cost,
             total_cost: i.quantity_returned * i.unit_cost,
             notes: i.notes || undefined,
+            bin_id: i.bin_id,
           }));
 
       let newReturn: MaterialReturnNote | null = null;
@@ -549,6 +634,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                         <TableHead className="text-right">Already Returned</TableHead>
                         <TableHead className="text-right">Remaining</TableHead>
                         <TableHead className="w-32">Qty to Return</TableHead>
+                        <TableHead className="w-48">Return to Bin</TableHead>
                         <TableHead className="w-32">Condition</TableHead>
                         <TableHead className="text-right">Unit Cost</TableHead>
                         <TableHead>Notes</TableHead>
@@ -577,6 +663,30 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                                 className={over ? 'border-destructive' : ''}
                                 disabled={l.remaining <= 0}
                               />
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={l.bin_id ?? ''}
+                                onValueChange={(v) => updateLine(idx, { bin_id: v || null })}
+                                disabled={!locationId}
+                              >
+                                <SelectTrigger className={!l.bin_id && l.quantity_returned > 0 ? 'border-destructive' : ''}>
+                                  <SelectValue placeholder={locationId ? 'Select bin' : 'Pick location first'} />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-72">
+                                  {binsAtLocation.map((b) => (
+                                    <SelectItem key={b.id} value={b.id}>
+                                      {b.bin_code}{b.name ? ` · ${b.name}` : ''}
+                                    </SelectItem>
+                                  ))}
+                                  {binsAtLocation.length === 0 && (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground">No bins at this location</div>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              {l.default_bin_code && (
+                                <p className="text-[10px] text-muted-foreground mt-1">Originally issued from {l.default_bin_code}</p>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Select value={l.condition} onValueChange={(v: any) => updateLine(idx, { condition: v })}>
@@ -626,7 +736,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                           })
                         }
                       />
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-4 gap-3">
                         <div>
                           <Label>Quantity</Label>
                           <Input
@@ -634,6 +744,28 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                             value={item.quantity_returned}
                             onChange={(e) => patchSupplierItem(index, { quantity_returned: parseFloat(e.target.value) || 0 })}
                           />
+                        </div>
+                        <div>
+                          <Label>Return to Bin</Label>
+                          <Select
+                            value={item.bin_id ?? ''}
+                            onValueChange={(v) => patchSupplierItem(index, { bin_id: v || null })}
+                            disabled={!locationId}
+                          >
+                            <SelectTrigger className={!item.bin_id && item.quantity_returned > 0 ? 'border-destructive' : ''}>
+                              <SelectValue placeholder={locationId ? 'Select bin' : 'Pick location first'} />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72">
+                              {binsAtLocation.map((b) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                  {b.bin_code}{b.name ? ` · ${b.name}` : ''}
+                                </SelectItem>
+                              ))}
+                              {binsAtLocation.length === 0 && (
+                                <div className="px-3 py-2 text-xs text-muted-foreground">No bins at this location</div>
+                              )}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div>
                           <Label>Condition</Label>

@@ -10999,6 +10999,7 @@ export type Database = {
       }
       material_return_items: {
         Row: {
+          bin_id: string | null
           condition: string | null
           created_at: string
           id: string
@@ -11013,6 +11014,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bin_id?: string | null
           condition?: string | null
           created_at?: string
           id?: string
@@ -11027,6 +11029,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bin_id?: string | null
           condition?: string | null
           created_at?: string
           id?: string
@@ -11041,6 +11044,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "material_return_items_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "material_return_items_item_id_fkey"
             columns: ["item_id"]
@@ -22273,6 +22283,8 @@ export type Database = {
       get_material_return_items: {
         Args: { p_mrn_id: string }
         Returns: {
+          bin_code: string
+          bin_id: string
           condition: string
           created_at: string
           id: string
@@ -22288,6 +22300,15 @@ export type Database = {
           unit_cost: number
           unit_of_measure: string
           updated_at: string
+        }[]
+      }
+      get_min_issued_bins: {
+        Args: { p_item_id: string; p_min_id: string }
+        Returns: {
+          bin_code: string
+          bin_id: string
+          location_id: string
+          quantity: number
         }[]
       }
       get_min_returnable_lines: {
