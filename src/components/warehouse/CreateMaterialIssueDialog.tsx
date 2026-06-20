@@ -528,11 +528,18 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Material Issue Note</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Edit Draft — ${editingDraft?.min_number ?? 'MIN'}`
+              : 'Create Material Issue Note'}
+          </DialogTitle>
           <DialogDescription>
-            Fill in the material issue details in three steps
+            {isEditMode
+              ? 'Update header details and line items, then save or submit for approval.'
+              : 'Fill in the material issue details in three steps'}
           </DialogDescription>
         </DialogHeader>
+
 
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
           <TabsList className="grid w-full grid-cols-3">
