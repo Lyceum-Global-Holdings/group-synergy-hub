@@ -243,7 +243,11 @@ function GoodsReceiptNote() {
 
       <CreateGrnDialog
         open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+        onOpenChange={(o) => {
+          setShowCreateDialog(o);
+          if (!o) setEditingGrnDraft(null);
+        }}
+        editingDraft={editingGrnDraft}
       />
 
       {selectedGrn && (
@@ -251,6 +255,11 @@ function GoodsReceiptNote() {
           grnId={selectedGrn}
           open={!!selectedGrn}
           onOpenChange={(open) => !open && setSelectedGrn(null)}
+          onEditDraft={(grn) => {
+            setEditingGrnDraft(grn);
+            setShowCreateDialog(true);
+            setSelectedGrn(null);
+          }}
         />
       )}
     </div>
