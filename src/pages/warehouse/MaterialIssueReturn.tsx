@@ -58,6 +58,7 @@ export default function MaterialIssueReturn() {
   const [editingIssueDraft, setEditingIssueDraft] = useState<MaterialIssueNote | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
+  const [editingReturnDraft, setEditingReturnDraft] = useState<MaterialReturnNote | null>(null);
 
   const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, submitForApprovalAsync, isApproving, isRejecting, isSubmitting } = useMaterialIssues();
   const { data: isAdmin } = useIsAdmin();
