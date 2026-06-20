@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/command';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
-import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
+import { useCreateGoodsReceiptNote, useUpdateDraftGrnWithItems } from '@/hooks/useGoodsReceiptNotes';
 import { useWarehouseCatalogPage } from '@/hooks/useWarehouseCatalogPage';
 import { useGenerateBatchNumber, BATCH_NUMBER_REGEX } from '@/hooks/useGenerateBatchNumber';
 import { toast } from 'sonner';
@@ -69,12 +69,17 @@ interface CreateGrnDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   poId?: string;
+  // When provided, the dialog opens in edit mode for a draft GRN.
+  // The parent must only pass GRNs whose status === 'draft'.
+  editingDraft?: (import('@/types/grn').GoodsReceiptNote & { grn_items?: import('@/types/grn').GrnItem[] }) | null;
 }
 
-export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogProps) {
+export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: CreateGrnDialogProps) {
+  const isEditMode = !!editingDraft;
   const { selectedCompany } = useCompany();
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
+  const updateDraftGrn = useUpdateDraftGrnWithItems();
   const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
@@ -83,6 +88,61 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
   const [itemComboboxOpen, setItemComboboxOpen] = useState<number | null>(null);
   const [itemSearch, setItemSearch] = useState('');
   const [debouncedItemSearch, setDebouncedItemSearch] = useState('');
+
+  // Tracks whether we've already hydrated the form from `editingDraft` for the
+  // current dialog opening. Lets us skip the PO auto-loader on the first run
+  // (it would clobber the saved line items with PO defaults).
+  const editHydratedRef = useRef(false);
+
+  // Hydrate from editingDraft when the dialog opens
+  useEffect(() => {
+    if (!open) {
+      editHydratedRef.current = false;
+      return;
+    }
+    if (!editingDraft) return;
+    editHydratedRef.current = true;
+    form.reset({
+      grn_date: editingDraft.grn_date,
+      po_id: editingDraft.po_id || '',
+      supplier_name: editingDraft.supplier_name || '',
+      supplier_address: editingDraft.supplier_address || '',
+      invoice_number: editingDraft.invoice_number || '',
+      invoice_date: editingDraft.invoice_date || '',
+      remarks: editingDraft.remarks || '',
+    });
+    setSelectedPoId(editingDraft.po_id || '');
+    setInvoiceDocumentUrl(editingDraft.invoice_document_url || '');
+    const hydratedItems: CreateGrnItemData[] = (editingDraft.grn_items || []).map((row: any) => ({
+      po_item_id: row.po_item_id ?? undefined,
+      warehouse_item_id: row.warehouse_item_id ?? undefined,
+      catalog_item_id: row.catalog_item_id ?? undefined,
+      item_code: row.item_code ?? undefined,
+      item_name: row.item_name ?? '',
+      description: row.description ?? undefined,
+      unit_of_measure: row.unit_of_measure ?? 'pcs',
+      quantity_ordered: row.quantity_ordered ?? undefined,
+      quantity_already_received: 0,
+      quantity_pending_approval: 0,
+      quantity_received: Number(row.quantity_received ?? 0),
+      unit_price: Number(row.unit_price ?? 0),
+      total_cost: Number(row.total_cost ?? 0),
+      quality_status: (row.quality_status ?? 'good') as QualityStatus,
+      remarks: row.remarks ?? undefined,
+      batch_number: row.batch_number ?? '',
+      manufacturing_date: row.manufacturing_date ?? '',
+      expiry_date: row.expiry_date ?? '',
+      serial_numbers: [],
+      is_batch_tracked: !!row.batch_number,
+      is_serialized: false,
+      track_secondary_quantity: !!row.secondary_uom,
+      secondary_uom: row.secondary_uom ?? '',
+      secondary_quantity_received: row.secondary_quantity_received ?? 0,
+      conversion_note: row.conversion_note ?? undefined,
+    }));
+    setItems(hydratedItems);
+  }, [open, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedItemSearch(itemSearch.trim()), 250);
@@ -131,6 +191,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
   useEffect(() => {
     const loadPoWithPendingQuantities = async () => {
       if (!selectedPoId) return;
+      // In edit mode, skip the auto-loader on the initial render so it doesn't
+      // overwrite the saved draft items with PO defaults. User-driven PO
+      // changes after hydration still load normally.
+      if (isEditMode && editingDraft?.po_id === selectedPoId) return;
+
+
       
       const selectedPo = pos.find((po) => po.id === selectedPoId);
       if (!selectedPo) return;
@@ -386,7 +452,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
       if (!proceed) return;
     }
 
-    await createGrn.mutateAsync({
+    const headerPayload = {
       grn_date: values.grn_date || format(new Date(), 'yyyy-MM-dd'),
       po_id: selectedPoId || undefined,
       po_number: pos.find((po) => po.id === selectedPoId)?.po_number,
@@ -396,10 +462,23 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
       invoice_date: values.invoice_date || undefined,
       invoice_document_url: invoiceDocumentUrl || undefined,
       remarks: values.remarks || undefined,
-      status,
       company_id: selectedCompany?.id,
-      items: validItems,
-    });
+    };
+
+    if (isEditMode && editingDraft) {
+      await updateDraftGrn.mutateAsync({
+        id: editingDraft.id,
+        header: { ...headerPayload, status: 'draft' },
+        items: validItems,
+        submit: status === 'submitted',
+      });
+    } else {
+      await createGrn.mutateAsync({
+        ...headerPayload,
+        status,
+        items: validItems,
+      });
+    }
 
     onOpenChange(false);
     form.reset();
@@ -412,8 +491,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] xl:max-w-7xl max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle>Create Goods Receipt Note</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Edit Draft — ${editingDraft?.grn_number ?? 'GRN'}`
+              : 'Create Goods Receipt Note'}
+          </DialogTitle>
         </DialogHeader>
+
 
         <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
           {/* Header Information */}
@@ -879,16 +963,20 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
             type="button"
             variant="outline"
             onClick={() => handleSubmit('draft')}
-            disabled={createGrn.isPending}
+            disabled={createGrn.isPending || updateDraftGrn.isPending}
           >
-            Save as Draft
+            {(createGrn.isPending || updateDraftGrn.isPending)
+              ? 'Saving…'
+              : isEditMode ? 'Save Changes' : 'Save as Draft'}
           </Button>
           <Button
             type="button"
             onClick={() => handleSubmit('submitted')}
-            disabled={createGrn.isPending}
+            disabled={createGrn.isPending || updateDraftGrn.isPending}
           >
-            Submit for Approval
+            {(createGrn.isPending || updateDraftGrn.isPending)
+              ? 'Submitting…'
+              : 'Submit for Approval'}
           </Button>
         </div>
       </DialogContent>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign, FileBarChart } from 'lucide-react';
+import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign, FileBarChart, Eye, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +50,7 @@ function GoodsReceiptNote() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedGrn, setSelectedGrn] = useState<string | null>(null);
+  const [editingGrnDraft, setEditingGrnDraft] = useState<any | null>(null);
 
   const filteredGrns = grns.filter(grn => {
     const matchesSearch =
@@ -210,9 +211,29 @@ function GoodsReceiptNote() {
                 header: 'Actions',
                 className: 'text-right',
                 render: (grn) => (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedGrn(grn.id)}>
-                    View Details
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="View details"
+                      onClick={() => setSelectedGrn(grn.id)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {grn.status === 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Edit this draft"
+                        onClick={() => {
+                          setEditingGrnDraft(grn);
+                          setShowCreateDialog(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4 text-primary" />
+                      </Button>
+                    )}
+                  </div>
                 ),
               },
             ] as DataTableColumn<typeof filteredGrns[number]>[]}
@@ -222,7 +243,11 @@ function GoodsReceiptNote() {
 
       <CreateGrnDialog
         open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+        onOpenChange={(o) => {
+          setShowCreateDialog(o);
+          if (!o) setEditingGrnDraft(null);
+        }}
+        editingDraft={editingGrnDraft}
       />
 
       {selectedGrn && (
@@ -230,6 +255,11 @@ function GoodsReceiptNote() {
           grnId={selectedGrn}
           open={!!selectedGrn}
           onOpenChange={(open) => !open && setSelectedGrn(null)}
+          onEditDraft={(grn) => {
+            setEditingGrnDraft(grn);
+            setShowCreateDialog(true);
+            setSelectedGrn(null);
+          }}
         />
       )}
     </div>

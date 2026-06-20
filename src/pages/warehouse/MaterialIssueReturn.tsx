@@ -58,6 +58,7 @@ export default function MaterialIssueReturn() {
   const [editingIssueDraft, setEditingIssueDraft] = useState<MaterialIssueNote | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
+  const [editingReturnDraft, setEditingReturnDraft] = useState<MaterialReturnNote | null>(null);
 
   const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, submitForApprovalAsync, isApproving, isRejecting, isSubmitting } = useMaterialIssues();
   const { data: isAdmin } = useIsAdmin();
@@ -413,6 +414,19 @@ export default function MaterialIssueReturn() {
             >
               <Eye className="h-4 w-4" />
             </Button>
+            {mrn.status === 'draft' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Edit this draft"
+                onClick={() => {
+                  setEditingReturnDraft(mrn);
+                  setReturnDialogOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4 text-primary" />
+              </Button>
+            )}
             {isEmpty && isAdmin && (
               <Button
                 variant="ghost"
@@ -551,12 +565,20 @@ export default function MaterialIssueReturn() {
       />
       <CreateMaterialReturnDialog
         open={returnDialogOpen}
-        onOpenChange={setReturnDialogOpen}
+        onOpenChange={(o) => {
+          setReturnDialogOpen(o);
+          if (!o) setEditingReturnDraft(null);
+        }}
+        editingDraft={editingReturnDraft}
       />
       <MaterialReturnDetailsDialog
         open={returnDetailsOpen}
         onOpenChange={setReturnDetailsOpen}
         returnNote={selectedReturn}
+        onEditDraft={(mrn) => {
+          setEditingReturnDraft(mrn);
+          setReturnDialogOpen(true);
+        }}
       />
       <RepairMaterialReturnDialog
         open={repairDialogOpen}

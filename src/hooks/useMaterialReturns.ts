@@ -85,6 +85,67 @@ export const useMaterialReturns = () => {
     }
   });
 
+  // Edit-mode helper: atomically update a draft MRN header AND replace its line
+  // items. Drafts have no stock-side dependencies (no stock_transactions or
+  // bin_allocations), so delete + reinsert is safe. We guard with a fresh
+  // status read to defend against the approver-race.
+  const updateDraftWithItemsMutation = useMutation({
+    mutationFn: async ({
+      id,
+      header,
+      items,
+    }: {
+      id: string;
+      header: Partial<MaterialReturnNote>;
+      items: Omit<CreateMaterialReturnItemData, 'mrn_id'>[];
+    }) => {
+      if (!items.length) throw new Error('At least one return item is required');
+
+      const { data: fresh, error: freshErr } = await supabase
+        .from('material_return_notes')
+        .select('status')
+        .eq('id', id)
+        .single();
+      if (freshErr) throw freshErr;
+      if (fresh?.status !== 'draft') {
+        throw new Error(`MRN is no longer a draft (current status: ${fresh?.status}).`);
+      }
+
+      const { error: hdrErr } = await supabase
+        .from('material_return_notes')
+        .update(header as any)
+        .eq('id', id);
+      if (hdrErr) throw hdrErr;
+
+      const { error: delErr } = await supabase
+        .from('material_return_items')
+        .delete()
+        .eq('mrn_id', id);
+      if (delErr) throw delErr;
+
+      const rows = items.map((it) => ({ ...it, mrn_id: id }));
+      const { error: insErr } = await supabase
+        .from('material_return_items')
+        .insert(rows as any);
+      if (insErr) throw insErr;
+
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.invalidateQueries({ queryKey: ['material-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['material-return-items', id] });
+      toast({ title: 'Draft updated', description: 'Your changes were saved.' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Update failed',
+        description: error?.message ?? 'Could not save the draft.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+
   const updateMaterialReturnMutation = useMutation({
     mutationFn: async ({ id, ...returnData }: Partial<MaterialReturnNote> & { id: string }) => {
       const { data, error } = await supabase
@@ -211,10 +272,12 @@ export const useMaterialReturns = () => {
     error,
     createMaterialReturnWithItemsAsync: createMaterialReturnWithItemsMutation.mutateAsync,
     addMissingReturnItemsAsync: addMissingReturnItemsMutation.mutateAsync,
+    updateDraftWithItemsAsync: updateDraftWithItemsMutation.mutateAsync,
     updateMaterialReturn: updateMaterialReturnMutation.mutate,
     approveMaterialReturn: approveMaterialReturnMutation.mutate,
     deleteMaterialReturn: deleteMaterialReturnMutation.mutate,
     isCreating: createMaterialReturnWithItemsMutation.isPending,
+    isUpdatingDraft: updateDraftWithItemsMutation.isPending,
 
     isUpdating: updateMaterialReturnMutation.isPending,
     isApproving: approveMaterialReturnMutation.isPending,

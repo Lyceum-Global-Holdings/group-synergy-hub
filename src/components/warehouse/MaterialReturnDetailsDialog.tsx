@@ -31,6 +31,7 @@ interface MaterialReturnDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   returnNote: MaterialReturnNote | null;
+  onEditDraft?: (returnNote: MaterialReturnNote) => void;
 }
 
 const getStatusColor = (status: string): "default" | "destructive" | "secondary" => {
@@ -46,7 +47,7 @@ const getStatusColor = (status: string): "default" | "destructive" | "secondary"
   }
 };
 
-export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: MaterialReturnDetailsDialogProps) {
+export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, onEditDraft }: MaterialReturnDetailsDialogProps) {
   const { returnItems, isLoading } = useMaterialReturnItems(returnNote?.id);
   const { updateMaterialReturn, approveMaterialReturn, addMissingReturnItemsAsync, isUpdating, isApproving, isRepairing } = useMaterialReturns();
   const { data: userRoles = [] } = useCurrentUserRoles();
@@ -346,6 +347,17 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
             <>
               <Separator />
               <div className="flex justify-end gap-2">
+                {onEditDraft && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onEditDraft(returnNote);
+                      onOpenChange(false);
+                    }}
+                  >
+                    Edit Draft
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={handleCancel}

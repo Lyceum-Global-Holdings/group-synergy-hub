@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
+import { MaterialReturnNote } from "@/types/materialIssueReturn";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUploadField";
@@ -51,12 +52,16 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   referenceId?: string;
   referenceType?: 'material_issue' | 'purchase_order' | 'other';
+  // When provided, opens in edit mode for a draft MRN. Parent must guard
+  // that status === 'draft'.
+  editingDraft?: MaterialReturnNote | null;
 }
 
-export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, referenceType }: Props) {
+export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, referenceType, editingDraft }: Props) {
+  const isEditMode = !!editingDraft;
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
-  const { createMaterialReturnWithItemsAsync, isCreating } = useMaterialReturns();
+  const { createMaterialReturnWithItemsAsync, updateDraftWithItemsAsync, isCreating, isUpdatingDraft } = useMaterialReturns();
 
   const [returnDate, setReturnDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [returnedBy, setReturnedBy] = useState('');
@@ -152,6 +157,101 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     }
   }, [selectedMinId, eligibleMins]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // --- Edit-mode hydration ---
+  // When opened with an existing draft MRN, prefill header + lock the return
+  // type / source MIN, then merge saved line items into the editable rows.
+  useEffect(() => {
+    if (!open || !editingDraft) return;
+    setReturnDate(editingDraft.return_date ?? format(new Date(), 'yyyy-MM-dd'));
+    setReturnedBy(editingDraft.returned_by ?? '');
+    setReturnType((editingDraft.return_type as 'internal' | 'supplier') ?? 'internal');
+    setReason(editingDraft.reason ?? '');
+    setNotes(editingDraft.notes ?? '');
+    setSrnNumber(editingDraft.srn_number ?? '');
+    setLocationId(editingDraft.location_id ?? '');
+    if (editingDraft.return_type === 'internal' && editingDraft.reference_type === 'material_issue') {
+      setSelectedMinId(editingDraft.reference_id ?? '');
+    }
+  }, [open, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Merge saved draft items into the editable rows once both the source-MIN
+  // RPC has resolved AND we have an edit target. We add the draft's own
+  // previously-saved quantity back to `remaining`, because that quantity is
+  // already counted in `qty_returned_prev` (the RPC sees draft items too).
+  useEffect(() => {
+    if (!open || !isEditMode || !editingDraft) return;
+    if (editingDraft.return_type !== 'internal') return;
+    if (!loadedLines || loadedLines.length === 0) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('material_return_items')
+        .select('item_id, quantity_returned, condition, unit_cost, notes')
+        .eq('mrn_id', editingDraft.id);
+      if (error) {
+        console.error('Failed to load draft return items', error);
+        return;
+      }
+      const savedByItem = new Map(
+        (data ?? []).map((r: any) => [r.item_id, r]),
+      );
+      setLines(
+        loadedLines.map((l) => {
+          const saved = savedByItem.get(l.item_id);
+          const savedQty = Number(saved?.quantity_returned ?? 0);
+          return {
+            ...l,
+            // restore editable cap to include the saved qty
+            remaining: l.remaining + savedQty,
+            quantity_returned: savedQty,
+            condition: (saved?.condition as 'good' | 'damaged' | 'expired') ?? l.condition,
+            notes: saved?.notes ?? l.notes,
+            unit_cost: Number(saved?.unit_cost ?? l.unit_cost),
+          };
+        }),
+      );
+    })();
+  }, [open, isEditMode, editingDraft?.id, loadedLines]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Supplier-flow edit hydration
+  useEffect(() => {
+    if (!open || !isEditMode || !editingDraft) return;
+    if (editingDraft.return_type !== 'supplier') return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('material_return_items')
+        .select('item_id, quantity_returned, condition, unit_cost, notes')
+        .eq('mrn_id', editingDraft.id);
+      if (error) {
+        console.error('Failed to load draft supplier return items', error);
+        return;
+      }
+      const itemIds = Array.from(new Set((data ?? []).map((r: any) => r.item_id).filter(Boolean)));
+      let nameByItemId: Record<string, { item_code: string; name: string }> = {};
+      if (itemIds.length) {
+        const { data: wiRows } = await supabase
+          .from('warehouse_items_full')
+          .select('id, item_code, name')
+          .in('id', itemIds);
+        nameByItemId = Object.fromEntries(
+          (wiRows ?? []).map((w: any) => [w.id, { item_code: w.item_code ?? '', name: w.name ?? '' }]),
+        );
+      }
+      setSupplierItems(
+        (data ?? []).map((r: any) => ({
+          warehouse_item_id: r.item_id,
+          item_code: nameByItemId[r.item_id]?.item_code ?? '',
+          item_name: nameByItemId[r.item_id]?.name ?? '',
+          quantity_returned: Number(r.quantity_returned ?? 0),
+          condition: (r.condition as 'good' | 'damaged' | 'expired') ?? 'good',
+          unit_cost: Number(r.unit_cost ?? 0),
+          notes: r.notes ?? '',
+        })),
+      );
+    })();
+  }, [open, isEditMode, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+
   // ---- User-accessible locations for the selected company (RLS scoped) ----
   const { data: accessibleLocations = [] } = useQuery({
     queryKey: ['user-accessible-locations', selectedCompany?.id],
@@ -207,13 +307,13 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     return supplierItems.length > 0 && supplierItems.every((i) => i.warehouse_item_id && i.quantity_returned > 0);
   }, [returnType, supplierItems]);
 
-  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && !!locationId && internalValid && supplierValid && !isCreating && !loadingLines;
+  const canSubmit = !!selectedCompany?.id && !!returnedBy && !!reason && !!locationId && internalValid && supplierValid && !isCreating && !isUpdatingDraft && !loadingLines;
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedCompany?.id) return;
     try {
       const isInternal = returnType === 'internal';
-      const payload = isInternal
+      const itemsPayload = isInternal
         ? lines
             .filter((l) => l.quantity_returned > 0)
             .map((l) => ({
@@ -233,19 +333,41 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             notes: i.notes || undefined,
           }));
 
-      const newReturn = await createMaterialReturnWithItemsAsync({
-        return_date: returnDate,
-        returned_by: returnedBy,
-        return_type: returnType,
-        reason,
-        reference_type: isInternal ? 'material_issue' : (referenceType ?? 'other'),
-        reference_id: isInternal ? selectedMinId : referenceId || undefined,
-        notes,
-        company_id: selectedCompany.id,
-        location_id: locationId || undefined,
-        srn_number: srnNumber || undefined,
-        items: payload,
-      });
+      let newReturn: MaterialReturnNote | null = null;
+
+      if (isEditMode && editingDraft) {
+        await updateDraftWithItemsAsync({
+          id: editingDraft.id,
+          header: {
+            return_date: returnDate,
+            returned_by: returnedBy,
+            return_type: returnType,
+            reason,
+            reference_type: isInternal ? 'material_issue' : (referenceType ?? 'other'),
+            reference_id: isInternal ? selectedMinId : referenceId || null,
+            notes,
+            location_id: locationId || null,
+            srn_number: srnNumber || null,
+          },
+          items: itemsPayload,
+        });
+        newReturn = editingDraft;
+      } else {
+        newReturn = await createMaterialReturnWithItemsAsync({
+          return_date: returnDate,
+          returned_by: returnedBy,
+          return_type: returnType,
+          reason,
+          reference_type: isInternal ? 'material_issue' : (referenceType ?? 'other'),
+          reference_id: isInternal ? selectedMinId : referenceId || undefined,
+          notes,
+          company_id: selectedCompany.id,
+          location_id: locationId || undefined,
+          srn_number: srnNumber || undefined,
+          items: itemsPayload,
+        });
+      }
+
 
       if (srnDocumentTempPath && newReturn?.id) {
         try {
@@ -285,17 +407,25 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) resetAll(); onOpenChange(o); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !isEditMode) resetAll(); onOpenChange(o); }}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Material Return Note</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Edit Draft — ${editingDraft?.mrn_number ?? 'MRN'}`
+              : 'Create Material Return Note'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Return Type</Label>
-              <Select value={returnType} onValueChange={(v: any) => { setReturnType(v); setLines([]); setSelectedMinId(''); }}>
+              <Select
+                value={returnType}
+                onValueChange={(v: any) => { setReturnType(v); setLines([]); setSelectedMinId(''); }}
+                disabled={isEditMode}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="internal">Internal Return (from MIN)</SelectItem>
@@ -312,7 +442,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
           {returnType === 'internal' && (
             <div>
               <Label>Source Material Issue Note (MIN) *</Label>
-              <Select value={selectedMinId} onValueChange={setSelectedMinId} disabled={loadingMins}>
+              <Select value={selectedMinId} onValueChange={setSelectedMinId} disabled={loadingMins || isEditMode}>
                 <SelectTrigger>
                   <SelectValue placeholder={loadingMins ? 'Loading…' : 'Select a MIN to return against'} />
                 </SelectTrigger>
@@ -329,6 +459,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
               </Select>
             </div>
           )}
+
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -545,7 +676,9 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button onClick={handleSubmit} disabled={!canSubmit}>
-                {isCreating ? 'Saving…' : 'Save as Draft'}
+                {(isCreating || isUpdatingDraft)
+                  ? 'Saving…'
+                  : isEditMode ? 'Save Changes' : 'Save as Draft'}
               </Button>
             </div>
           </div>
