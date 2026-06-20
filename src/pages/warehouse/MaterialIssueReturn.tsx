@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Download, Check, X, Wrench, Send } from "lucide-react";
+import { Plus, Eye, Download, Check, X, Wrench, Send, Pencil } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -55,6 +55,7 @@ export default function MaterialIssueReturn() {
   const [bulkRepairOpen, setBulkRepairOpen] = useState(false);
   const [repairTarget, setRepairTarget] = useState<MaterialReturnNote | null>(null);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [editingIssueDraft, setEditingIssueDraft] = useState<MaterialIssueNote | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
 
@@ -294,17 +295,30 @@ export default function MaterialIssueReturn() {
               <Download className="h-4 w-4" />
             </Button>
             {isDraft && (
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Submit this draft for approval"
-                disabled={busy}
-                onClick={async () => {
-                  try { await submitForApprovalAsync(issue.id); } catch (e) { /* toast handled */ }
-                }}
-              >
-                <Send className="h-4 w-4 text-primary" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Edit this draft"
+                  onClick={() => {
+                    setEditingIssueDraft(issue);
+                    setIssueDialogOpen(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 text-primary" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Submit this draft for approval"
+                  disabled={busy}
+                  onClick={async () => {
+                    try { await submitForApprovalAsync(issue.id); } catch (e) { /* toast handled */ }
+                  }}
+                >
+                  <Send className="h-4 w-4 text-primary" />
+                </Button>
+              </>
             )}
             {isAdmin && isPending && (
               <>
@@ -520,12 +534,20 @@ export default function MaterialIssueReturn() {
       />
       <CreateMaterialIssueDialog
         open={issueDialogOpen}
-        onOpenChange={setIssueDialogOpen}
+        onOpenChange={(o) => {
+          setIssueDialogOpen(o);
+          if (!o) setEditingIssueDraft(null);
+        }}
+        editingDraft={editingIssueDraft}
       />
       <MaterialIssueDetailsDialog
         open={detailsDialogOpen}
         onOpenChange={setDetailsDialogOpen}
         issueId={selectedIssueId}
+        onEditDraft={(issue) => {
+          setEditingIssueDraft(issue);
+          setIssueDialogOpen(true);
+        }}
       />
       <CreateMaterialReturnDialog
         open={returnDialogOpen}

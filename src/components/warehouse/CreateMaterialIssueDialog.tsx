@@ -49,6 +49,9 @@ import {
 interface MaterialIssueDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // When provided, the dialog opens in edit mode for a draft MIN.
+  // Only documents with status='draft' should be passed in; the parent guards this.
+  editingDraft?: import('@/types/materialIssueReturn').MaterialIssueNote | null;
 }
 
 interface IssueItem {
@@ -69,7 +72,8 @@ interface IssueItem {
   secondary_quantity_issued?: number;
 }
 
-export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueDialogProps) {
+export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: MaterialIssueDialogProps) {
+  const isEditMode = !!editingDraft;
   const [currentTab, setCurrentTab] = useState('header');
   const [formData, setFormData] = useState({
     requested_by: '',
@@ -99,8 +103,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const { items: warehouseItems } = useWarehouseItems();
   
-  const { createMaterialIssueAsync, submitForApprovalAsync, isCreating, isSubmitting } = useMaterialIssues();
-  const { createItems } = useMaterialIssueItems();
+  const { createMaterialIssueAsync, updateMaterialIssueAsync, submitForApprovalAsync, isCreating, isUpdating, isSubmitting } = useMaterialIssues();
+  const { createItems, replaceItemsForMinAsync, isReplacing } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
@@ -151,6 +155,55 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     setBrowseOpen(false);
     setCurrentTab('header');
   }, [open]);
+
+  // Hydrate form + items when opened in edit mode for an existing draft.
+  // Runs once per open/editingDraft.id change so user edits aren't clobbered.
+  useEffect(() => {
+    if (!open || !editingDraft) return;
+    setFormData({
+      requested_by: editingDraft.requested_by ?? editingDraft.issued_to ?? '',
+      contact_number: editingDraft.contact_number ?? '',
+      epf_number: editingDraft.epf_number ?? '',
+      department: editingDraft.department ?? '',
+      job_number: editingDraft.job_number ?? '',
+      issue_date: editingDraft.issue_date ?? new Date().toISOString().split('T')[0],
+      items_required_date: editingDraft.items_required_date ?? new Date().toISOString().split('T')[0],
+      purpose: editingDraft.purpose ?? '',
+      pr_number: editingDraft.pr_number ?? '',
+      po_number: editingDraft.po_number ?? '',
+      notes: editingDraft.notes ?? '',
+      cpo_id: editingDraft.cpo_id ?? '',
+      cpo_number: editingDraft.cpo_number ?? '',
+      srn_number: editingDraft.srn_number ?? '',
+      location_id: editingDraft.location_id ?? '',
+    });
+    setLocationTouched(true); // prevent auto-default effect from overwriting saved location
+    (async () => {
+      const { data, error } = await supabase
+        .from('material_issue_items')
+        .select('*')
+        .eq('min_id', editingDraft.id)
+        .order('line_number', { ascending: true });
+      if (error) {
+        console.error('Failed to load draft items', error);
+        return;
+      }
+      const loaded: IssueItem[] = (data ?? []).map((r: any) => ({
+        item_id: r.item_id,
+        item_code: r.item_code ?? '',
+        description: r.description ?? '',
+        unit_of_measure: r.unit_of_measure ?? '',
+        quantity_required: Number(r.quantity_required ?? r.quantity_issued ?? 0),
+        purpose: r.purpose ?? '',
+        reservation_id: r.reservation_id ?? undefined,
+        from_reservation: !!r.from_reservation,
+        track_secondary_quantity: !!r.secondary_uom,
+        secondary_uom: r.secondary_uom ?? null,
+        secondary_quantity_issued: r.secondary_quantity_issued ?? undefined,
+      }));
+      setItems(loaded);
+    })();
+  }, [open, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Fetch confirmed CPOs
@@ -323,7 +376,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     }
 
     try {
-      const issueNote = await createMaterialIssueAsync({
+      const headerPayload = {
         issue_date: formData.issue_date,
         issued_to: formData.requested_by,
         department: formData.department || undefined,
@@ -341,9 +394,31 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         location_id: formData.location_id,
         company_id: selectedCompany.id,
         srn_number: formData.srn_number || undefined,
-      });
+      } as const;
 
-      // Move SRN document from temp/ folder into the new MIN folder, then persist column.
+      let issueNote: any;
+      if (isEditMode && editingDraft) {
+        // Guard: refuse to update if status changed under us (e.g. admin approved meanwhile).
+        const { data: fresh, error: freshErr } = await supabase
+          .from('material_issue_notes')
+          .select('status')
+          .eq('id', editingDraft.id)
+          .single();
+        if (freshErr) throw freshErr;
+        if (fresh?.status !== 'draft') {
+          toast({
+            title: 'Cannot edit',
+            description: `This MIN is no longer a draft (current status: ${fresh?.status}). Refresh the list.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        issueNote = await updateMaterialIssueAsync({ id: editingDraft.id, ...headerPayload } as any);
+      } else {
+        issueNote = await createMaterialIssueAsync(headerPayload);
+      }
+
+      // Move SRN document from temp/ folder into the MIN folder, then persist column.
       if (srnDocumentTempPath && issueNote?.id && selectedCompany?.id) {
         try {
           const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
@@ -375,8 +450,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         }
       }
 
-      // Create items with reservation linkage
-      const itemsToCreate = items.map((item, index) => ({
+      // Build items payload (shared between create + replace)
+      const itemsPayload = items.map((item, index) => ({
         min_id: issueNote.id,
         item_id: item.item_id,
         quantity_issued: item.quantity_required,
@@ -394,7 +469,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         secondary_uom: item.track_secondary_quantity ? (item.secondary_uom ?? null) : null,
       }));
 
-      await createItems(itemsToCreate);
+      if (isEditMode) {
+        await replaceItemsForMinAsync({ minId: issueNote.id, items: itemsPayload });
+      } else {
+        await createItems(itemsPayload);
+      }
+
 
       // Only auto-submit when the user picked "Submit for Approval".
       // "Save as Draft" leaves the MIN in 'draft' status with no stock impact —
@@ -407,8 +487,10 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         }
       } else {
         toast({
-          title: 'Draft saved',
-          description: 'Material Issue Note saved as draft. Submit it for approval when ready.',
+          title: isEditMode ? 'Draft updated' : 'Draft saved',
+          description: isEditMode
+            ? 'Your changes were saved. Submit it for approval when ready.'
+            : 'Material Issue Note saved as draft. Submit it for approval when ready.',
         });
       }
 
@@ -446,11 +528,18 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Material Issue Note</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Edit Draft — ${editingDraft?.min_number ?? 'MIN'}`
+              : 'Create Material Issue Note'}
+          </DialogTitle>
           <DialogDescription>
-            Fill in the material issue details in three steps
+            {isEditMode
+              ? 'Update header details and line items, then save or submit for approval.'
+              : 'Fill in the material issue details in three steps'}
           </DialogDescription>
         </DialogHeader>
+
 
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
           <TabsList className="grid w-full grid-cols-3">
@@ -834,13 +923,20 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 <Button
                   variant="outline"
                   onClick={() => handleSubmit('draft')}
-                  disabled={isCreating || isSubmitting}
+                  disabled={isCreating || isUpdating || isReplacing || isSubmitting}
                   title="Save without submitting — no stock impact, can be edited or submitted later."
                 >
-                  {isCreating ? 'Saving…' : 'Save as Draft'}
+                  {(isCreating || isUpdating || isReplacing)
+                    ? 'Saving…'
+                    : isEditMode ? 'Save Changes' : 'Save as Draft'}
                 </Button>
-                <Button onClick={() => handleSubmit('submit')} disabled={isCreating || isSubmitting}>
-                  {isCreating || isSubmitting ? 'Submitting…' : 'Submit for Approval'}
+                <Button
+                  onClick={() => handleSubmit('submit')}
+                  disabled={isCreating || isUpdating || isReplacing || isSubmitting}
+                >
+                  {(isCreating || isUpdating || isReplacing || isSubmitting)
+                    ? 'Submitting…'
+                    : 'Submit for Approval'}
                 </Button>
               </div>
             </div>

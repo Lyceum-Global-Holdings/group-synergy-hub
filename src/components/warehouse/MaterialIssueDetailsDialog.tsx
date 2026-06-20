@@ -38,9 +38,10 @@ interface MaterialIssueDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   issueId: string | null;
+  onEditDraft?: (issue: MaterialIssueNote) => void;
 }
 
-export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: MaterialIssueDetailsDialogProps) {
+export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEditDraft }: MaterialIssueDetailsDialogProps) {
   const [issue, setIssue] = useState<MaterialIssueNote | null>(null);
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
   const [itemNames, setItemNames] = useState<Record<string, string>>({});
@@ -332,6 +333,25 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            {issue.status === 'draft' && onEditDraft && (
+              <Alert>
+                <AlertTitle>This is a draft</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span className="text-xs">Header and line items can still be changed. No stock is reserved or moved until an admin approves it.</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    onClick={() => {
+                      onEditDraft(issue);
+                      onOpenChange(false);
+                    }}
+                  >
+                    Edit Draft
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
             {issue.status === 'rejected' && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
