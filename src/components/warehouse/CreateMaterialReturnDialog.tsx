@@ -52,12 +52,16 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   referenceId?: string;
   referenceType?: 'material_issue' | 'purchase_order' | 'other';
+  // When provided, opens in edit mode for a draft MRN. Parent must guard
+  // that status === 'draft'.
+  editingDraft?: MaterialReturnNote | null;
 }
 
-export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, referenceType }: Props) {
+export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, referenceType, editingDraft }: Props) {
+  const isEditMode = !!editingDraft;
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
-  const { createMaterialReturnWithItemsAsync, isCreating } = useMaterialReturns();
+  const { createMaterialReturnWithItemsAsync, updateDraftWithItemsAsync, isCreating, isUpdatingDraft } = useMaterialReturns();
 
   const [returnDate, setReturnDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [returnedBy, setReturnedBy] = useState('');
