@@ -30,6 +30,9 @@ import { MaterialAttachmentsPanel } from './MaterialAttachmentsPanel';
 import { downloadMaterialIssuePdf } from '@/utils/materialIssuePdfExport';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
+import { useMaterialIssues } from '@/hooks/useMaterialIssues';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RotateCcw, AlertTriangle } from 'lucide-react';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
