@@ -272,10 +272,12 @@ export const useMaterialReturns = () => {
     error,
     createMaterialReturnWithItemsAsync: createMaterialReturnWithItemsMutation.mutateAsync,
     addMissingReturnItemsAsync: addMissingReturnItemsMutation.mutateAsync,
+    updateDraftWithItemsAsync: updateDraftWithItemsMutation.mutateAsync,
     updateMaterialReturn: updateMaterialReturnMutation.mutate,
     approveMaterialReturn: approveMaterialReturnMutation.mutate,
     deleteMaterialReturn: deleteMaterialReturnMutation.mutate,
     isCreating: createMaterialReturnWithItemsMutation.isPending,
+    isUpdatingDraft: updateDraftWithItemsMutation.isPending,
 
     isUpdating: updateMaterialReturnMutation.isPending,
     isApproving: approveMaterialReturnMutation.isPending,
