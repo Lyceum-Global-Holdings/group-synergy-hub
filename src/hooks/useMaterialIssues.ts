@@ -216,6 +216,8 @@ export const useMaterialIssues = () => {
     approveMaterialIssueAsync: approveMaterialIssueMutation.mutateAsync,
     rejectMaterialIssue: rejectMaterialIssueMutation.mutate,
     rejectMaterialIssueAsync: rejectMaterialIssueMutation.mutateAsync,
+    reopenDraftAsync: reopenDraftMutation.mutateAsync,
+    isReopening: reopenDraftMutation.isPending,
     isCreating: createMaterialIssueMutation.isPending,
     isUpdating: updateMaterialIssueMutation.isPending,
     isDeleting: deleteMaterialIssueMutation.isPending,
