@@ -407,17 +407,25 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) resetAll(); onOpenChange(o); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !isEditMode) resetAll(); onOpenChange(o); }}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Material Return Note</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Edit Draft — ${editingDraft?.mrn_number ?? 'MRN'}`
+              : 'Create Material Return Note'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Return Type</Label>
-              <Select value={returnType} onValueChange={(v: any) => { setReturnType(v); setLines([]); setSelectedMinId(''); }}>
+              <Select
+                value={returnType}
+                onValueChange={(v: any) => { setReturnType(v); setLines([]); setSelectedMinId(''); }}
+                disabled={isEditMode}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="internal">Internal Return (from MIN)</SelectItem>
@@ -434,7 +442,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
           {returnType === 'internal' && (
             <div>
               <Label>Source Material Issue Note (MIN) *</Label>
-              <Select value={selectedMinId} onValueChange={setSelectedMinId} disabled={loadingMins}>
+              <Select value={selectedMinId} onValueChange={setSelectedMinId} disabled={loadingMins || isEditMode}>
                 <SelectTrigger>
                   <SelectValue placeholder={loadingMins ? 'Loading…' : 'Select a MIN to return against'} />
                 </SelectTrigger>
@@ -451,6 +459,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
               </Select>
             </div>
           )}
+
 
           <div className="grid grid-cols-2 gap-4">
             <div>
