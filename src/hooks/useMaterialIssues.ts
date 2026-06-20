@@ -210,6 +210,7 @@ export const useMaterialIssues = () => {
     createMaterialIssue: createMaterialIssueMutation.mutate,
     createMaterialIssueAsync: createMaterialIssueMutation.mutateAsync,
     updateMaterialIssue: updateMaterialIssueMutation.mutate,
+    updateMaterialIssueAsync: updateMaterialIssueMutation.mutateAsync,
     deleteMaterialIssue: deleteMaterialIssueMutation.mutate,
     submitForApprovalAsync: submitForApprovalMutation.mutateAsync,
     approveMaterialIssue: approveMaterialIssueMutation.mutate,
