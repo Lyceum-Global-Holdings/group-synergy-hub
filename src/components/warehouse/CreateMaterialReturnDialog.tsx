@@ -676,7 +676,9 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button onClick={handleSubmit} disabled={!canSubmit}>
-                {isCreating ? 'Saving…' : 'Save as Draft'}
+                {(isCreating || isUpdatingDraft)
+                  ? 'Saving…'
+                  : isEditMode ? 'Save Changes' : 'Save as Draft'}
               </Button>
             </div>
           </div>
