@@ -30,6 +30,9 @@ import { MaterialAttachmentsPanel } from './MaterialAttachmentsPanel';
 import { downloadMaterialIssuePdf } from '@/utils/materialIssuePdfExport';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
+import { useMaterialIssues } from '@/hooks/useMaterialIssues';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RotateCcw, AlertTriangle } from 'lucide-react';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
@@ -51,6 +54,24 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const { data: userRoles = [] } = useCurrentUserRoles();
   const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
+  const { reopenDraftAsync, isReopening } = useMaterialIssues();
+
+  const handleReopen = async () => {
+    if (!issue) return;
+    try {
+      await reopenDraftAsync(issue.id);
+      // Refresh local view
+      const { data } = await supabase
+        .from('material_issue_notes')
+        .select('*')
+        .eq('id', issue.id)
+        .single();
+      if (data) setIssue(data as any);
+    } catch (e) {
+      // toast handled inside hook
+    }
+  };
+
 
   const handleDownloadPdf = async () => {
     if (!issue) return;
@@ -311,6 +332,25 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            {issue.status === 'rejected' && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>This MIN was rejected</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  <span className="text-xs">Reopen it as a draft to edit the lines and resubmit for approval.</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleReopen}
+                    disabled={isReopening}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    {isReopening ? 'Reopening…' : 'Reopen as Draft'}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="border rounded-lg p-4 space-y-2">
                 <h3 className="font-semibold">Requester Information</h3>

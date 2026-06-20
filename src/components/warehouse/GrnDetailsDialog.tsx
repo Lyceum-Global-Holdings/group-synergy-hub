@@ -21,6 +21,7 @@ import {
   useSubmitGoodsReceiptNote,
   useDeleteGoodsReceiptNote,
   useRejectGoodsReceiptNote,
+  useReopenGoodsReceiptNote,
 } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS } from '@/types/grn';
@@ -65,6 +66,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const submitGrn = useSubmitGoodsReceiptNote();
   const deleteGrn = useDeleteGoodsReceiptNote();
   const rejectGrn = useRejectGoodsReceiptNote();
+  const reopenGrn = useReopenGoodsReceiptNote();
   const [showDocument, setShowDocument] = useState(false);
   const [showBinAllocation, setShowBinAllocation] = useState(false);
   const [showReject, setShowReject] = useState(false);
@@ -274,6 +276,17 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                       {format(new Date((grn as any).rejected_date), 'PPpp')}
                     </p>
                   )}
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => reopenGrn.mutate(grn.id)}
+                    disabled={reopenGrn.isPending}
+                  >
+                    {reopenGrn.isPending ? 'Reopening…' : 'Reopen as Draft'}
+                  </Button>
                 </div>
               </div>
             )}

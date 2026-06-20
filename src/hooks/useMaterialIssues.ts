@@ -173,6 +173,21 @@ export const useMaterialIssues = () => {
     },
   });
 
+  const reopenDraftMutation = useMutation({
+    mutationFn: async (minId: string) => {
+      const { data, error } = await supabase.rpc('reopen_material_issue_draft' as any, { p_min_id: minId });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidateAfterApproval();
+      toast({ title: 'Reopened as draft', description: 'You can now edit and resubmit this MIN.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Reopen failed', description: error?.message ?? 'Could not reopen MIN.', variant: 'destructive' });
+    },
+  });
+
   const rejectMaterialIssueMutation = useMutation({
     mutationFn: async ({ minId, reason }: { minId: string; reason: string }) => {
       const { data, error } = await supabase.rpc('reject_material_issue', { p_min_id: minId, p_reason: reason });
@@ -201,6 +216,8 @@ export const useMaterialIssues = () => {
     approveMaterialIssueAsync: approveMaterialIssueMutation.mutateAsync,
     rejectMaterialIssue: rejectMaterialIssueMutation.mutate,
     rejectMaterialIssueAsync: rejectMaterialIssueMutation.mutateAsync,
+    reopenDraftAsync: reopenDraftMutation.mutateAsync,
+    isReopening: reopenDraftMutation.isPending,
     isCreating: createMaterialIssueMutation.isPending,
     isUpdating: updateMaterialIssueMutation.isPending,
     isDeleting: deleteMaterialIssueMutation.isPending,
