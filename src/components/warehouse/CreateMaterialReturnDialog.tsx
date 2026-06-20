@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
+import { MaterialReturnNote } from "@/types/materialIssueReturn";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { SrnDocumentUploadField } from "@/components/warehouse/SrnDocumentUploadField";
