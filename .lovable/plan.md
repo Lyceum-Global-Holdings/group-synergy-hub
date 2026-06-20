@@ -72,13 +72,19 @@ In scope: MIN, MRN, GRN — header edits, line add/update/remove, resubmit, reop
 
 ## Implementation Status (this turn)
 
-**Shipped:**
-- Migration `reopen_material_issue_draft` + `reopen_grn_draft` RPCs (security definer, creator-or-admin guard, only from `rejected`).
-- `useMaterialIssues.reopenDraftAsync` + `useReopenGoodsReceiptNote` hooks.
-- "Reopen as Draft" banner in `MaterialIssueDetailsDialog` (rejected MIN) and inline button in `GrnDetailsDialog` rejection panel.
-- Existing RLS already permits draft owners to UPDATE their drafts for MIN/MRN/GRN, so reopening + existing edit paths already work.
+**Shipped (MIN edit-mode, end-to-end):**
+- `useMaterialIssueItems.replaceItemsForMinAsync` — atomic delete + reinsert of draft lines (drafts have no stock-side deps).
+- `useMaterialIssues.updateMaterialIssueAsync` exposed.
+- `CreateMaterialIssueDialog` now accepts an `editingDraft` prop. When present it pre-fills header + line items from `material_issue_notes` + `material_issue_items`, retitles to "Edit Draft — {min_number}", and routes Save/Submit through `updateMaterialIssueAsync` + `replaceItemsForMinAsync` (with a status-still-draft guard against the approver-race). Submit-for-approval then runs the existing RPC.
+- List page (`MaterialIssueReturn.tsx`): drafts get a Pencil "Edit" button alongside Send; clicking it opens the create dialog in edit mode.
+- `MaterialIssueDetailsDialog` shows a Draft banner with an "Edit Draft" button when status='draft'; clicking closes details and opens the editor.
 
 **Follow-up (next turn):**
+- Apply the same pattern to `CreateMaterialReturnDialog` (MRN). Trickier because internal returns are derived from a MIN via `get_min_returnable_lines` RPC — edit mode needs to load the saved `material_return_items` directly instead of re-running the RPC.
+- Apply to `CreateGrnDialog` (GRN). Largest file (~900 lines); also needs to handle batch tracking fields on edit.
+- Optional hardening: wrap delete+insert in a SECURITY DEFINER `replace_draft_items` RPC if race conditions appear under multi-tab editing.
+
+
 - Add `editingDraft` prop to `CreateMaterialIssueDialog` / `CreateMaterialReturnDialog` / `CreateGrnDialog` so draft lines can be edited in the same UI as creation. Each is 500–900 lines and warrants a focused pass.
 - Wire list-page row click on `status='draft'` to open the create dialog in edit mode.
 - Add a server-side `replace_draft_items` RPC per module to atomically delete+reinsert line items.
