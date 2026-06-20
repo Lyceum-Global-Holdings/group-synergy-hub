@@ -665,6 +665,30 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                               />
                             </TableCell>
                             <TableCell>
+                              <Select
+                                value={l.bin_id ?? ''}
+                                onValueChange={(v) => updateLine(idx, { bin_id: v || null })}
+                                disabled={!locationId}
+                              >
+                                <SelectTrigger className={!l.bin_id && l.quantity_returned > 0 ? 'border-destructive' : ''}>
+                                  <SelectValue placeholder={locationId ? 'Select bin' : 'Pick location first'} />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-72">
+                                  {binsAtLocation.map((b) => (
+                                    <SelectItem key={b.id} value={b.id}>
+                                      {b.bin_code}{b.name ? ` · ${b.name}` : ''}
+                                    </SelectItem>
+                                  ))}
+                                  {binsAtLocation.length === 0 && (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground">No bins at this location</div>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              {l.default_bin_code && (
+                                <p className="text-[10px] text-muted-foreground mt-1">Originally issued from {l.default_bin_code}</p>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <Select value={l.condition} onValueChange={(v: any) => updateLine(idx, { condition: v })}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
