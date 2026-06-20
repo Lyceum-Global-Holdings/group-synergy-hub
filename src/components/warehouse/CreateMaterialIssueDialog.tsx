@@ -288,7 +288,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   };
 
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (mode: 'draft' | 'submit' = 'submit') => {
     if (!formData.requested_by || items.length === 0) return;
     if (!formData.location_id) {
       toast({
@@ -396,11 +396,20 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
       await createItems(itemsToCreate);
 
-      // Submit the MIN for admin approval (stock is deducted only on approval).
-      try {
-        await submitForApprovalAsync(issueNote.id);
-      } catch (e) {
-        console.error('Failed to submit MIN for approval', e);
+      // Only auto-submit when the user picked "Submit for Approval".
+      // "Save as Draft" leaves the MIN in 'draft' status with no stock impact —
+      // standard ERP document lifecycle (SAP/Oracle/D365 style).
+      if (mode === 'submit') {
+        try {
+          await submitForApprovalAsync(issueNote.id);
+        } catch (e) {
+          console.error('Failed to submit MIN for approval', e);
+        }
+      } else {
+        toast({
+          title: 'Draft saved',
+          description: 'Material Issue Note saved as draft. Submit it for approval when ready.',
+        });
       }
 
       // Reset form
@@ -821,9 +830,19 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               <Button variant="outline" onClick={() => setCurrentTab('items')}>
                 Back
               </Button>
-              <Button onClick={handleSubmit} disabled={isCreating || isSubmitting}>
-                {isCreating || isSubmitting ? 'Submitting…' : 'Submit for Approval'}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleSubmit('draft')}
+                  disabled={isCreating || isSubmitting}
+                  title="Save without submitting — no stock impact, can be edited or submitted later."
+                >
+                  {isCreating ? 'Saving…' : 'Save as Draft'}
+                </Button>
+                <Button onClick={() => handleSubmit('submit')} disabled={isCreating || isSubmitting}>
+                  {isCreating || isSubmitting ? 'Submitting…' : 'Submit for Approval'}
+                </Button>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
