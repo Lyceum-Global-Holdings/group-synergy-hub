@@ -736,7 +736,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                           })
                         }
                       />
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-4 gap-3">
                         <div>
                           <Label>Quantity</Label>
                           <Input
@@ -744,6 +744,28 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                             value={item.quantity_returned}
                             onChange={(e) => patchSupplierItem(index, { quantity_returned: parseFloat(e.target.value) || 0 })}
                           />
+                        </div>
+                        <div>
+                          <Label>Return to Bin</Label>
+                          <Select
+                            value={item.bin_id ?? ''}
+                            onValueChange={(v) => patchSupplierItem(index, { bin_id: v || null })}
+                            disabled={!locationId}
+                          >
+                            <SelectTrigger className={!item.bin_id && item.quantity_returned > 0 ? 'border-destructive' : ''}>
+                              <SelectValue placeholder={locationId ? 'Select bin' : 'Pick location first'} />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72">
+                              {binsAtLocation.map((b) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                  {b.bin_code}{b.name ? ` · ${b.name}` : ''}
+                                </SelectItem>
+                              ))}
+                              {binsAtLocation.length === 0 && (
+                                <div className="px-3 py-2 text-xs text-muted-foreground">No bins at this location</div>
+                              )}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div>
                           <Label>Condition</Label>
