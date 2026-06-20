@@ -534,7 +534,11 @@ export default function MaterialIssueReturn() {
       />
       <CreateMaterialIssueDialog
         open={issueDialogOpen}
-        onOpenChange={setIssueDialogOpen}
+        onOpenChange={(o) => {
+          setIssueDialogOpen(o);
+          if (!o) setEditingIssueDraft(null);
+        }}
+        editingDraft={editingIssueDraft}
       />
       <MaterialIssueDetailsDialog
         open={detailsDialogOpen}
