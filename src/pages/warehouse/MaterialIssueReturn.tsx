@@ -414,6 +414,19 @@ export default function MaterialIssueReturn() {
             >
               <Eye className="h-4 w-4" />
             </Button>
+            {mrn.status === 'draft' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Edit this draft"
+                onClick={() => {
+                  setEditingReturnDraft(mrn);
+                  setReturnDialogOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4 text-primary" />
+              </Button>
+            )}
             {isEmpty && isAdmin && (
               <Button
                 variant="ghost"
