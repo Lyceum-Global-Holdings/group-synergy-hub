@@ -1,97 +1,58 @@
 ## Goal
 
-Let creators edit their own MIN/MRN/GRN drafts (header + line items) and resubmit them for approval, following SAP/Oracle/D365 norms: drafts are mutable by the owner, locked once submitted, and rejected documents return to `draft` for rework.
+Let users pick a destination **Bin per return line** in the MRN Create / Edit Draft dialog, with the bin **pre-filled** from where the stock was originally issued (internal returns) or where it currently lives (supplier returns). Approval then posts the return back into that exact bin, instead of the current "pick any bin allocation, LIMIT 1" fallback.
 
-## Standards alignment
+This matches SAP EWM "Return to Storage Bin" (movement type 653/655) and Oracle WMS RMA put-away — return stock must be addressed at an exact bin, not just an item.
 
-- **SAP MM / Oracle iProcurement / D365 SCM**: Documents in `Draft` are fully editable by the creator. Once submitted, the document is locked (read-only) pending approval. On **Reject**, the document is sent back to `Draft` with the rejection reason persisted, and the creator may revise + resubmit. Approved/Posted documents are immutable (only reversal allowed). ISO 9001 §8.5.1 segregation of duties is preserved: edits never touch stock — stock movement only happens at approval.
+## Behaviour
 
-## Lifecycle (unchanged states, clarified transitions)
+**Internal return (against a MIN):**
+- For each line, look up the bin(s) the stock was issued from via `stock_transactions` where `reference_type='min'`, `reference_id = source_min_id`, `item_id = line.item_id`.
+- Default the line's bin to the most recent issuing bin. If the MIN consumed multiple bins, default to the largest-qty one and surface the rest in the picker as "Originally issued from".
+- User can override via a bin picker scoped to the MRN's location (`useBinsAtLocation`).
 
-```text
-Draft ──edit──► Draft
-Draft ──submit──► Pending Approval ──approve──► Approved/Posted
-                                  └─reject──► Draft (with reason)
-Draft ──cancel/delete──► (gone)
-```
+**Supplier return:**
+- Default to the line's current `warehouse_bin_allocations` row for that (item, company, location). If multiple, prefer the one with the largest on-hand qty.
+- User can override via the same bin picker.
 
-## Scope
+**Validation:**
+- Bin is **required** before "Save as Draft" can submit lines with `qty_to_return > 0`.
+- Selected bin must belong to the MRN's location (existing `useBinsAtLocation` already enforces exact-node lookup — no ancestor inheritance, per project rule).
+- Edit-Draft flow re-hydrates the saved `bin_id` per line.
 
-In scope: MIN, MRN, GRN — header edits, line add/update/remove, resubmit, reopen-on-reject. Out of scope: edits after approval, audit-trail UI redesign, auto-save, version history (DB already stamps `updated_at`).
+**Approval:**
+- `approve_material_return` uses `line.bin_id` to resolve the exact `warehouse_bin_allocations` row (creating one via existing upsert if none exists yet for that bin), and passes it into `process_material_return_stock_update`. The current LIMIT-1 fallback is removed and becomes an error if `bin_id` is null on any non-zero line.
 
-## Frontend changes
+## Technical changes
 
-1. **`CreateMaterialIssueDialog` / `CreateMaterialReturnDialog` / GRN create dialog**
-   - Accept optional `editingDraft` prop. When present:
-     - Title becomes "Edit Draft — {doc number or DRAFT-xxx}".
-     - Pre-fill header form + existing line items via existing hooks.
-     - On `Save as Draft` → call update hook (not create) to upsert header + replace child rows in a transaction-style flow (delete removed lines, update existing, insert new).
-     - On `Submit for Approval` → same update flow, then call existing `submitForApprovalAsync(id)`.
-   - Buttons disabled when status ≠ `draft`.
+### Database (one migration)
+1. `ALTER TABLE public.material_return_items ADD COLUMN bin_id uuid REFERENCES public.warehouse_bins(id);` (nullable for back-compat with existing rows).
+2. New helper RPC `get_min_issued_bins(p_min_id uuid, p_item_id uuid)` → returns `[{bin_id, bin_code, location_id, quantity}]` aggregated from `stock_transactions` where `reference_type='min' AND reference_id=p_min_id AND item_id=p_item_id AND quantity_change < 0`. SECURITY DEFINER, `can_access_company` gate, GRANT EXECUTE to authenticated.
+3. Replace `approve_material_return`:
+   - Resolve `v_bin_allocation_id` from `v_item.bin_id` (find-or-create allocation row via existing pattern for that bin + item + company).
+   - Reject approval if any line has `quantity_returned > 0 AND bin_id IS NULL` (ISO 9001 §8.5.4 traceability).
+4. Extend `get_material_return_items` to return `bin_id` and `bin_code`.
 
-2. **List pages (`MaterialIssueReturn.tsx`, `MaterialReturn` page, `GoodsReceiptNote.tsx`)**
-   - Row click on a `draft` row opens the create dialog in edit mode (instead of the read-only details dialog).
-   - Add an "Edit Draft" action in the row menu for clarity.
-   - Keep existing "Delete Draft" action.
+### Frontend
+- **`src/hooks/warehouse/useMinIssuedBins.ts`** (new) — React Query hook wrapping the new RPC, keyed by (min_id, item_id).
+- **`CreateMaterialReturnDialog.tsx`**:
+  - Add a **Bin** column to the Return Items table between "Qty to Return" and "Condition".
+  - Internal flow: when a MIN + line is loaded, call `useMinIssuedBins` and prefill `line.bin_id` with the top bin; remember user overrides.
+  - Supplier flow: prefill from existing `warehouse_bin_allocations` for that item.
+  - Bin picker uses `useBinsAtLocation(mrn.location_id)`; show "Originally issued from {bin_code}" hint under the picker when default came from MIN history.
+  - Save path includes `bin_id` in `CreateMaterialReturnItemData` / update payload.
+- **`MaterialReturnDetailsDialog.tsx`** — show the per-line bin under the item name.
+- **`src/types/materialIssueReturn.ts`** — add `bin_id?: string | null` to `MaterialReturnItem` and `CreateMaterialReturnItemData`.
 
-3. **Details dialogs (MIN/MRN/GRN)**
-   - When status = `draft`: show banner "This is a draft. [Edit] [Submit for Approval] [Delete]".
-   - When status = `rejected`: show rejection reason banner + "Reopen as Draft" button (calls a new hook that flips status back to `draft`, clears `approved_by`/`approved_date`, preserves rejection reason in notes/audit).
+### Caching
+After approval / draft save, invalidate via existing `useInvalidateWarehouseStock` (already wired) so bin allocations refresh.
 
-## Backend changes
+## Out of scope
+- MIN/GRN bin selection — GRN already has its own approve-time bin allocation dialog; MIN consumes bins via FIFO at approval. Both stay unchanged unless you ask separately.
+- Splitting one return line across multiple bins. If users need that we'd add a "split line" affordance — happy to layer it in a follow-up.
 
-1. **Hooks (`useMaterialIssues`, `useMaterialReturns`, `useGoodsReceiptNotes`)**
-   - Add `updateDraftAsync({ id, header, items })` that:
-     - Verifies row is still in `draft` (guard against race with approver).
-     - Updates header columns.
-     - Reconciles `*_items` child table: delete removed, update changed, insert new — all scoped by parent id.
-   - Add `reopenRejectedAsync(id)` for MIN/MRN/GRN that calls a new RPC.
-
-2. **Child-item hooks**
-   - Already support insert; add `replaceItemsForParent(parentId, items[])` helper that wraps delete-missing + upsert-present.
-
-3. **DB migration**
-   - RLS: tighten `UPDATE` on `material_issue_notes`, `material_return_notes`, `goods_receipt_notes` and their `*_items` tables so non-admin users can update **only** when `status = 'draft'` AND `created_by = auth.uid()`. Admins/approvers keep full update rights for status transitions.
-   - Three new SECURITY DEFINER RPCs: `reopen_material_issue_draft(p_min_id)`, `reopen_material_return_draft(p_mrn_id)`, `reopen_grn_draft(p_grn_id)` — allowed only when current status is `rejected` and caller is `created_by` or admin; sets status back to `draft`, nulls approver fields, appends rejection reason to internal notes, logs to existing audit table.
-   - Confirm partial unique index already excludes drafts from doc-number uniqueness (added in prior draft migration); extend to GRN/MRN if missing.
-
-## Technical notes
-
-- Line reconciliation runs client-side via 3 supabase calls (delete by id-not-in, update by id, insert new) because Supabase has no client-side transaction; an RPC wrapper is optional follow-up if race conditions appear.
-- No new statuses, no new tables — purely policy + RPC + UI wiring.
-- Stock impact remains gated by existing `approve_*` RPCs; edits never write to `warehouse_bin_allocations` or `stock_transactions`.
-
-## Deliverables
-
-- 1 migration (RLS tightening + 3 reopen RPCs).
-- Updated `useMaterialIssues`, `useMaterialReturns`, `useGoodsReceiptNotes` with `updateDraftAsync` + `reopenRejectedAsync`.
-- 3 create dialogs gain edit-mode support.
-- 3 list pages route draft clicks to edit dialog; details dialogs gain Edit / Reopen buttons.
-
----
-
-## Implementation Status
-
-**Shipped (MIN + MRN + GRN edit-mode, end-to-end):**
-
-- **MIN**:
-  - `useMaterialIssueItems.replaceItemsForMinAsync` (delete + reinsert draft lines).
-  - `useMaterialIssues.updateMaterialIssueAsync` exposed.
-  - `CreateMaterialIssueDialog` accepts `editingDraft`; pre-fills header + lines, retitles, status-still-draft guard, Save Changes / Submit for Approval.
-  - List page: Pencil "Edit" button on draft rows + `MaterialIssueDetailsDialog` "Edit Draft" banner.
-
-- **MRN**:
-  - `useMaterialReturns.updateDraftWithItemsAsync` (status guard, header update, delete + reinsert items).
-  - `CreateMaterialReturnDialog` accepts `editingDraft`; locks Return Type + Source MIN, hydrates header + existing line quantities for internal flows (merges with `get_min_returnable_lines` so `remaining` = rpc + saved-qty, letting the user increase up to the true cap), hydrates supplier items via two-step item-master lookup, Save Changes button.
-  - List page: Pencil "Edit" button on draft rows + `MaterialReturnDetailsDialog` "Edit Draft" button.
-
-- **GRN**:
-  - `useUpdateDraftGrnWithItems` (status guard, header update, delete + reinsert items, optional submit transition).
-  - `CreateGrnDialog` accepts `editingDraft`; hydrates form + line items, gates the PO auto-loader so it doesn't clobber the saved lines on first render (changes to PO mid-edit still load normally), retitles, supports Save Changes and Submit for Approval (writes draft → submitted in one shot).
-  - List page actions split into Eye + Pencil; `GrnDetailsDialog` gains "Edit Draft" button next to Submit/Delete.
-
-**Known limitations / follow-up:**
-- MRN internal edit assumes `get_min_returnable_lines.qty_returned_prev` includes draft items; if the RPC excludes drafts the `remaining + saved_qty` adjustment double-counts. Verify against live data.
-- Line reconciliation is client-side (delete + reinsert in two calls). If concurrent-edit races appear, wrap each module's update in a SECURITY DEFINER `replace_draft_*` RPC.
-- Editing a MIN/GRN draft does not re-validate against stock availability — that happens at approval time, which is consistent with SAP/Oracle/D365 norms.
-
+## Acceptance
+- New MRN draft against a MIN auto-fills the bin each line was issued from; the user can change it; saving persists `bin_id` per line.
+- Editing a draft re-hydrates the saved bin.
+- Approval posts the return into the chosen bin (verifiable in Bin Allocations + Stock Ledger).
+- Approval is blocked with a clear error if any returnable line has no bin selected.
