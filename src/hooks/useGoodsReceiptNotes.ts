@@ -279,6 +279,103 @@ export const useUpdateGoodsReceiptNote = () => {
   });
 };
 
+/**
+ * Atomically update a draft GRN header AND replace its line items.
+ * Drafts have not yet been approved so there are no `stock_transactions` or
+ * `warehouse_bin_allocations` referencing the items — delete + reinsert is safe.
+ * Guards against the approver-race by re-checking status='draft' first.
+ */
+export const useUpdateDraftGrnWithItems = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      header,
+      items,
+      submit,
+    }: {
+      id: string;
+      header: Partial<CreateGrnData>;
+      items: import('@/types/grn').CreateGrnItemData[];
+      submit?: boolean; // if true, also flips status to 'submitted'
+    }) => {
+      const { data: fresh, error: freshErr } = await supabase
+        .from('goods_receipt_notes')
+        .select('status, company_id')
+        .eq('id', id)
+        .single();
+      if (freshErr) throw freshErr;
+      if (fresh?.status !== 'draft') {
+        throw new Error(`GRN is no longer a draft (current status: ${fresh?.status}).`);
+      }
+
+      const { error: hdrErr } = await supabase
+        .from('goods_receipt_notes')
+        .update({
+          grn_date: header.grn_date,
+          po_id: header.po_id ?? null,
+          po_number: header.po_number ?? null,
+          supplier_name: header.supplier_name ?? null,
+          supplier_address: header.supplier_address ?? null,
+          invoice_number: header.invoice_number ?? null,
+          invoice_date: header.invoice_date ?? null,
+          invoice_document_url: header.invoice_document_url ?? null,
+          remarks: header.remarks ?? null,
+          status: submit ? 'submitted' : 'draft',
+        } as any)
+        .eq('id', id);
+      if (hdrErr) throw hdrErr;
+
+      const { error: delErr } = await supabase
+        .from('grn_items')
+        .delete()
+        .eq('grn_id', id);
+      if (delErr) throw delErr;
+
+      const rows = items.map((item) => ({
+        grn_id: id,
+        po_item_id: item.po_item_id ?? null,
+        warehouse_item_id: item.warehouse_item_id ?? null,
+        catalog_item_id: item.catalog_item_id ?? null,
+        item_code: item.item_code ?? null,
+        item_name: item.item_name,
+        description: item.description ?? null,
+        unit_of_measure: item.unit_of_measure,
+        quantity_ordered: item.quantity_ordered ?? null,
+        quantity_received: item.quantity_received,
+        unit_price: item.unit_price,
+        total_cost: item.total_cost,
+        quality_status: item.quality_status,
+        remarks: item.remarks ?? null,
+        batch_number: item.batch_number || null,
+        manufacturing_date: item.manufacturing_date || null,
+        expiry_date: item.expiry_date || null,
+        secondary_quantity_received: item.secondary_quantity_received ?? null,
+        secondary_uom: item.secondary_uom || null,
+        conversion_note: item.conversion_note || null,
+      }));
+
+      if (rows.length) {
+        const { error: insErr } = await supabase.from('grn_items').insert(rows as any);
+        if (insErr) throw insErr;
+      }
+
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-note'] });
+      queryClient.invalidateQueries({ queryKey: ['grn-summary'] });
+      toast({ title: 'Draft updated', description: 'Your changes were saved.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    },
+  });
+};
+
 export const useSubmitGoodsReceiptNote = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
