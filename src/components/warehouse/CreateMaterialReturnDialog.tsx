@@ -634,6 +634,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
                         <TableHead className="text-right">Already Returned</TableHead>
                         <TableHead className="text-right">Remaining</TableHead>
                         <TableHead className="w-32">Qty to Return</TableHead>
+                        <TableHead className="w-48">Return to Bin</TableHead>
                         <TableHead className="w-32">Condition</TableHead>
                         <TableHead className="text-right">Unit Cost</TableHead>
                         <TableHead>Notes</TableHead>
