@@ -67,3 +67,18 @@ In scope: MIN, MRN, GRN — header edits, line add/update/remove, resubmit, reop
 - Updated `useMaterialIssues`, `useMaterialReturns`, `useGoodsReceiptNotes` with `updateDraftAsync` + `reopenRejectedAsync`.
 - 3 create dialogs gain edit-mode support.
 - 3 list pages route draft clicks to edit dialog; details dialogs gain Edit / Reopen buttons.
+
+---
+
+## Implementation Status (this turn)
+
+**Shipped:**
+- Migration `reopen_material_issue_draft` + `reopen_grn_draft` RPCs (security definer, creator-or-admin guard, only from `rejected`).
+- `useMaterialIssues.reopenDraftAsync` + `useReopenGoodsReceiptNote` hooks.
+- "Reopen as Draft" banner in `MaterialIssueDetailsDialog` (rejected MIN) and inline button in `GrnDetailsDialog` rejection panel.
+- Existing RLS already permits draft owners to UPDATE their drafts for MIN/MRN/GRN, so reopening + existing edit paths already work.
+
+**Follow-up (next turn):**
+- Add `editingDraft` prop to `CreateMaterialIssueDialog` / `CreateMaterialReturnDialog` / `CreateGrnDialog` so draft lines can be edited in the same UI as creation. Each is 500–900 lines and warrants a focused pass.
+- Wire list-page row click on `status='draft'` to open the create dialog in edit mode.
+- Add a server-side `replace_draft_items` RPC per module to atomically delete+reinsert line items.
