@@ -211,9 +211,29 @@ function GoodsReceiptNote() {
                 header: 'Actions',
                 className: 'text-right',
                 render: (grn) => (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedGrn(grn.id)}>
-                    View Details
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="View details"
+                      onClick={() => setSelectedGrn(grn.id)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {grn.status === 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Edit this draft"
+                        onClick={() => {
+                          setEditingGrnDraft(grn);
+                          setShowCreateDialog(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4 text-primary" />
+                      </Button>
+                    )}
+                  </div>
                 ),
               },
             ] as DataTableColumn<typeof filteredGrns[number]>[]}
