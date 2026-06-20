@@ -277,6 +277,17 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                     </p>
                   )}
                 </div>
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => reopenGrn.mutate(grn.id)}
+                    disabled={reopenGrn.isPending}
+                  >
+                    {reopenGrn.isPending ? 'Reopening…' : 'Reopen as Draft'}
+                  </Button>
+                </div>
               </div>
             )}
           </TabsContent>
