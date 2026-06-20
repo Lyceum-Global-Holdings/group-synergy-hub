@@ -72,7 +72,8 @@ interface IssueItem {
   secondary_quantity_issued?: number;
 }
 
-export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueDialogProps) {
+export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: MaterialIssueDialogProps) {
+  const isEditMode = !!editingDraft;
   const [currentTab, setCurrentTab] = useState('header');
   const [formData, setFormData] = useState({
     requested_by: '',
