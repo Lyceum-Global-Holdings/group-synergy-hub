@@ -83,8 +83,3 @@ In scope: MIN, MRN, GRN — header edits, line add/update/remove, resubmit, reop
 - Apply the same pattern to `CreateMaterialReturnDialog` (MRN). Trickier because internal returns are derived from a MIN via `get_min_returnable_lines` RPC — edit mode needs to load the saved `material_return_items` directly instead of re-running the RPC.
 - Apply to `CreateGrnDialog` (GRN). Largest file (~900 lines); also needs to handle batch tracking fields on edit.
 - Optional hardening: wrap delete+insert in a SECURITY DEFINER `replace_draft_items` RPC if race conditions appear under multi-tab editing.
-
-
-- Add `editingDraft` prop to `CreateMaterialIssueDialog` / `CreateMaterialReturnDialog` / `CreateGrnDialog` so draft lines can be edited in the same UI as creation. Each is 500–900 lines and warrants a focused pass.
-- Wire list-page row click on `status='draft'` to open the create dialog in edit mode.
-- Add a server-side `replace_draft_items` RPC per module to atomically delete+reinsert line items.
