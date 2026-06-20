@@ -31,6 +31,7 @@ interface MaterialReturnDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   returnNote: MaterialReturnNote | null;
+  onEditDraft?: (returnNote: MaterialReturnNote) => void;
 }
 
 const getStatusColor = (status: string): "default" | "destructive" | "secondary" => {
