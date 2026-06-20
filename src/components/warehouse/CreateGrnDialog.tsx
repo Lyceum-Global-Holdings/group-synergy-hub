@@ -89,6 +89,61 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   const [itemSearch, setItemSearch] = useState('');
   const [debouncedItemSearch, setDebouncedItemSearch] = useState('');
 
+  // Tracks whether we've already hydrated the form from `editingDraft` for the
+  // current dialog opening. Lets us skip the PO auto-loader on the first run
+  // (it would clobber the saved line items with PO defaults).
+  const editHydratedRef = useRef(false);
+
+  // Hydrate from editingDraft when the dialog opens
+  useEffect(() => {
+    if (!open) {
+      editHydratedRef.current = false;
+      return;
+    }
+    if (!editingDraft) return;
+    editHydratedRef.current = true;
+    form.reset({
+      grn_date: editingDraft.grn_date,
+      po_id: editingDraft.po_id || '',
+      supplier_name: editingDraft.supplier_name || '',
+      supplier_address: editingDraft.supplier_address || '',
+      invoice_number: editingDraft.invoice_number || '',
+      invoice_date: editingDraft.invoice_date || '',
+      remarks: editingDraft.remarks || '',
+    });
+    setSelectedPoId(editingDraft.po_id || '');
+    setInvoiceDocumentUrl(editingDraft.invoice_document_url || '');
+    const hydratedItems: CreateGrnItemData[] = (editingDraft.grn_items || []).map((row: any) => ({
+      po_item_id: row.po_item_id ?? undefined,
+      warehouse_item_id: row.warehouse_item_id ?? undefined,
+      catalog_item_id: row.catalog_item_id ?? undefined,
+      item_code: row.item_code ?? undefined,
+      item_name: row.item_name ?? '',
+      description: row.description ?? undefined,
+      unit_of_measure: row.unit_of_measure ?? 'pcs',
+      quantity_ordered: row.quantity_ordered ?? undefined,
+      quantity_already_received: 0,
+      quantity_pending_approval: 0,
+      quantity_received: Number(row.quantity_received ?? 0),
+      unit_price: Number(row.unit_price ?? 0),
+      total_cost: Number(row.total_cost ?? 0),
+      quality_status: (row.quality_status ?? 'good') as QualityStatus,
+      remarks: row.remarks ?? undefined,
+      batch_number: row.batch_number ?? '',
+      manufacturing_date: row.manufacturing_date ?? '',
+      expiry_date: row.expiry_date ?? '',
+      serial_numbers: [],
+      is_batch_tracked: !!row.batch_number,
+      is_serialized: false,
+      track_secondary_quantity: !!row.secondary_uom,
+      secondary_uom: row.secondary_uom ?? '',
+      secondary_quantity_received: row.secondary_quantity_received ?? 0,
+      conversion_note: row.conversion_note ?? undefined,
+    }));
+    setItems(hydratedItems);
+  }, [open, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedItemSearch(itemSearch.trim()), 250);
     return () => clearTimeout(t);
