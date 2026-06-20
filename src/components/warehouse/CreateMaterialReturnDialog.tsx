@@ -157,6 +157,96 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     }
   }, [selectedMinId, eligibleMins]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // --- Edit-mode hydration ---
+  // When opened with an existing draft MRN, prefill header + lock the return
+  // type / source MIN, then merge saved line items into the editable rows.
+  useEffect(() => {
+    if (!open || !editingDraft) return;
+    setReturnDate(editingDraft.return_date ?? format(new Date(), 'yyyy-MM-dd'));
+    setReturnedBy(editingDraft.returned_by ?? '');
+    setReturnType((editingDraft.return_type as 'internal' | 'supplier') ?? 'internal');
+    setReason(editingDraft.reason ?? '');
+    setNotes(editingDraft.notes ?? '');
+    setSrnNumber(editingDraft.srn_number ?? '');
+    setLocationId(editingDraft.location_id ?? '');
+    if (editingDraft.return_type === 'internal' && editingDraft.reference_type === 'material_issue') {
+      setSelectedMinId(editingDraft.reference_id ?? '');
+    }
+  }, [open, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Merge saved draft items into the editable rows once both the source-MIN
+  // RPC has resolved AND we have an edit target. We add the draft's own
+  // previously-saved quantity back to `remaining`, because that quantity is
+  // already counted in `qty_returned_prev` (the RPC sees draft items too).
+  useEffect(() => {
+    if (!open || !isEditMode || !editingDraft) return;
+    if (editingDraft.return_type !== 'internal') return;
+    if (!loadedLines || loadedLines.length === 0) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('material_return_items')
+        .select('item_id, quantity_returned, condition, unit_cost, notes')
+        .eq('mrn_id', editingDraft.id);
+      if (error) {
+        console.error('Failed to load draft return items', error);
+        return;
+      }
+      const savedByItem = new Map(
+        (data ?? []).map((r: any) => [r.item_id, r]),
+      );
+      setLines(
+        loadedLines.map((l) => {
+          const saved = savedByItem.get(l.item_id);
+          const savedQty = Number(saved?.quantity_returned ?? 0);
+          return {
+            ...l,
+            // restore editable cap to include the saved qty
+            remaining: l.remaining + savedQty,
+            quantity_returned: savedQty,
+            condition: (saved?.condition as 'good' | 'damaged' | 'expired') ?? l.condition,
+            notes: saved?.notes ?? l.notes,
+            unit_cost: Number(saved?.unit_cost ?? l.unit_cost),
+          };
+        }),
+      );
+    })();
+  }, [open, isEditMode, editingDraft?.id, loadedLines]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Supplier-flow edit hydration
+  useEffect(() => {
+    if (!open || !isEditMode || !editingDraft) return;
+    if (editingDraft.return_type !== 'supplier') return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('material_return_items')
+        .select(`
+          item_id,
+          quantity_returned,
+          condition,
+          unit_cost,
+          notes,
+          warehouse_item:warehouse_items_full!material_return_items_item_id_fkey(item_code, name)
+        `)
+        .eq('mrn_id', editingDraft.id);
+      if (error) {
+        console.error('Failed to load draft supplier return items', error);
+        return;
+      }
+      setSupplierItems(
+        (data ?? []).map((r: any) => ({
+          warehouse_item_id: r.item_id,
+          item_code: r.warehouse_item?.item_code ?? '',
+          item_name: r.warehouse_item?.name ?? '',
+          quantity_returned: Number(r.quantity_returned ?? 0),
+          condition: (r.condition as 'good' | 'damaged' | 'expired') ?? 'good',
+          unit_cost: Number(r.unit_cost ?? 0),
+          notes: r.notes ?? '',
+        })),
+      );
+    })();
+  }, [open, isEditMode, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
   // ---- User-accessible locations for the selected company (RLS scoped) ----
   const { data: accessibleLocations = [] } = useQuery({
     queryKey: ['user-accessible-locations', selectedCompany?.id],
