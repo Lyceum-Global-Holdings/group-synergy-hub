@@ -227,7 +227,7 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
     (async () => {
       const { data, error } = await supabase
         .from('material_return_items')
-        .select('item_id, quantity_returned, condition, unit_cost, notes')
+        .select('item_id, quantity_returned, condition, unit_cost, notes, bin_id')
         .eq('mrn_id', editingDraft.id);
       if (error) {
         console.error('Failed to load draft supplier return items', error);
