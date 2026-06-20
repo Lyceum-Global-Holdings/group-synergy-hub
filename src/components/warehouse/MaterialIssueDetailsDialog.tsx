@@ -41,7 +41,7 @@ interface MaterialIssueDetailsDialogProps {
   onEditDraft?: (issue: MaterialIssueNote) => void;
 }
 
-export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: MaterialIssueDetailsDialogProps) {
+export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEditDraft }: MaterialIssueDetailsDialogProps) {
   const [issue, setIssue] = useState<MaterialIssueNote | null>(null);
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
   const [itemNames, setItemNames] = useState<Record<string, string>>({});
