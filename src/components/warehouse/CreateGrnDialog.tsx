@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/command';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
-import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
+import { useCreateGoodsReceiptNote, useUpdateDraftGrnWithItems } from '@/hooks/useGoodsReceiptNotes';
 import { useWarehouseCatalogPage } from '@/hooks/useWarehouseCatalogPage';
 import { useGenerateBatchNumber, BATCH_NUMBER_REGEX } from '@/hooks/useGenerateBatchNumber';
 import { toast } from 'sonner';
