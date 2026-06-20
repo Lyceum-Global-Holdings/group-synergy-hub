@@ -538,11 +538,16 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={!canSubmit}>
-              {isCreating ? 'Creating…' : 'Create Return'}
-            </Button>
+          <div className="flex items-center justify-between gap-2 pt-4 border-t">
+            <p className="text-xs text-muted-foreground">
+              Returns are saved as <strong>drafts</strong> and have no stock impact until an admin approves them.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={handleSubmit} disabled={!canSubmit}>
+                {isCreating ? 'Saving…' : 'Save as Draft'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
