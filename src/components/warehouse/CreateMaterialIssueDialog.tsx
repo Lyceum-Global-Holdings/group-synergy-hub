@@ -156,6 +156,55 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
     setCurrentTab('header');
   }, [open]);
 
+  // Hydrate form + items when opened in edit mode for an existing draft.
+  // Runs once per open/editingDraft.id change so user edits aren't clobbered.
+  useEffect(() => {
+    if (!open || !editingDraft) return;
+    setFormData({
+      requested_by: editingDraft.requested_by ?? editingDraft.issued_to ?? '',
+      contact_number: editingDraft.contact_number ?? '',
+      epf_number: editingDraft.epf_number ?? '',
+      department: editingDraft.department ?? '',
+      job_number: editingDraft.job_number ?? '',
+      issue_date: editingDraft.issue_date ?? new Date().toISOString().split('T')[0],
+      items_required_date: editingDraft.items_required_date ?? new Date().toISOString().split('T')[0],
+      purpose: editingDraft.purpose ?? '',
+      pr_number: editingDraft.pr_number ?? '',
+      po_number: editingDraft.po_number ?? '',
+      notes: editingDraft.notes ?? '',
+      cpo_id: editingDraft.cpo_id ?? '',
+      cpo_number: editingDraft.cpo_number ?? '',
+      srn_number: editingDraft.srn_number ?? '',
+      location_id: editingDraft.location_id ?? '',
+    });
+    setLocationTouched(true); // prevent auto-default effect from overwriting saved location
+    (async () => {
+      const { data, error } = await supabase
+        .from('material_issue_items')
+        .select('*')
+        .eq('min_id', editingDraft.id)
+        .order('line_number', { ascending: true });
+      if (error) {
+        console.error('Failed to load draft items', error);
+        return;
+      }
+      const loaded: IssueItem[] = (data ?? []).map((r: any) => ({
+        item_id: r.item_id,
+        item_code: r.item_code ?? '',
+        description: r.description ?? '',
+        unit_of_measure: r.unit_of_measure ?? '',
+        quantity_required: Number(r.quantity_required ?? r.quantity_issued ?? 0),
+        purpose: r.purpose ?? '',
+        reservation_id: r.reservation_id ?? undefined,
+        from_reservation: !!r.from_reservation,
+        track_secondary_quantity: !!r.secondary_uom,
+        secondary_uom: r.secondary_uom ?? null,
+        secondary_quantity_issued: r.secondary_quantity_issued ?? undefined,
+      }));
+      setItems(loaded);
+    })();
+  }, [open, editingDraft?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs = [] } = useQuery({
