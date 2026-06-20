@@ -56,9 +56,10 @@ interface GrnDetailsDialogProps {
   grnId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEditDraft?: (grn: any) => void;
 }
 
-export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialogProps) {
+export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: GrnDetailsDialogProps) {
   const { data: grn } = useGrnById(grnId);
   const { data: userRoles = [] } = useCurrentUserRoles();
   const isAdmin = userRoles.some(role => role.role === 'admin' || role.role === 'super_admin');
