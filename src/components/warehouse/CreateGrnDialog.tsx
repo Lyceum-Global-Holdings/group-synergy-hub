@@ -452,7 +452,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       if (!proceed) return;
     }
 
-    await createGrn.mutateAsync({
+    const headerPayload = {
       grn_date: values.grn_date || format(new Date(), 'yyyy-MM-dd'),
       po_id: selectedPoId || undefined,
       po_number: pos.find((po) => po.id === selectedPoId)?.po_number,
@@ -462,10 +462,23 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       invoice_date: values.invoice_date || undefined,
       invoice_document_url: invoiceDocumentUrl || undefined,
       remarks: values.remarks || undefined,
-      status,
       company_id: selectedCompany?.id,
-      items: validItems,
-    });
+    };
+
+    if (isEditMode && editingDraft) {
+      await updateDraftGrn.mutateAsync({
+        id: editingDraft.id,
+        header: { ...headerPayload, status: 'draft' },
+        items: validItems,
+        submit: status === 'submitted',
+      });
+    } else {
+      await createGrn.mutateAsync({
+        ...headerPayload,
+        status,
+        items: validItems,
+      });
+    }
 
     onOpenChange(false);
     form.reset();
@@ -478,8 +491,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] xl:max-w-7xl max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle>Create Goods Receipt Note</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Edit Draft — ${editingDraft?.grn_number ?? 'GRN'}`
+              : 'Create Goods Receipt Note'}
+          </DialogTitle>
         </DialogHeader>
+
 
         <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
           {/* Header Information */}
