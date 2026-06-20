@@ -376,7 +376,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
     }
 
     try {
-      const issueNote = await createMaterialIssueAsync({
+      const headerPayload = {
         issue_date: formData.issue_date,
         issued_to: formData.requested_by,
         department: formData.department || undefined,
@@ -394,9 +394,31 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
         location_id: formData.location_id,
         company_id: selectedCompany.id,
         srn_number: formData.srn_number || undefined,
-      });
+      } as const;
 
-      // Move SRN document from temp/ folder into the new MIN folder, then persist column.
+      let issueNote: any;
+      if (isEditMode && editingDraft) {
+        // Guard: refuse to update if status changed under us (e.g. admin approved meanwhile).
+        const { data: fresh, error: freshErr } = await supabase
+          .from('material_issue_notes')
+          .select('status')
+          .eq('id', editingDraft.id)
+          .single();
+        if (freshErr) throw freshErr;
+        if (fresh?.status !== 'draft') {
+          toast({
+            title: 'Cannot edit',
+            description: `This MIN is no longer a draft (current status: ${fresh?.status}). Refresh the list.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        issueNote = await updateMaterialIssueAsync({ id: editingDraft.id, ...headerPayload } as any);
+      } else {
+        issueNote = await createMaterialIssueAsync(headerPayload);
+      }
+
+      // Move SRN document from temp/ folder into the MIN folder, then persist column.
       if (srnDocumentTempPath && issueNote?.id && selectedCompany?.id) {
         try {
           const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
@@ -428,8 +450,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
         }
       }
 
-      // Create items with reservation linkage
-      const itemsToCreate = items.map((item, index) => ({
+      // Build items payload (shared between create + replace)
+      const itemsPayload = items.map((item, index) => ({
         min_id: issueNote.id,
         item_id: item.item_id,
         quantity_issued: item.quantity_required,
@@ -447,7 +469,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
         secondary_uom: item.track_secondary_quantity ? (item.secondary_uom ?? null) : null,
       }));
 
-      await createItems(itemsToCreate);
+      if (isEditMode) {
+        await replaceItemsForMinAsync({ minId: issueNote.id, items: itemsPayload });
+      } else {
+        await createItems(itemsPayload);
+      }
+
 
       // Only auto-submit when the user picked "Submit for Approval".
       // "Save as Draft" leaves the MIN in 'draft' status with no stock impact —
