@@ -191,6 +191,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   useEffect(() => {
     const loadPoWithPendingQuantities = async () => {
       if (!selectedPoId) return;
+      // In edit mode, skip the auto-loader on the initial render so it doesn't
+      // overwrite the saved draft items with PO defaults. User-driven PO
+      // changes after hydration still load normally.
+      if (isEditMode && editingDraft?.po_id === selectedPoId) return;
+
+
       
       const selectedPo = pos.find((po) => po.id === selectedPoId);
       if (!selectedPo) return;
