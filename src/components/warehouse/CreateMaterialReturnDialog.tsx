@@ -131,6 +131,8 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
         quantity_returned: 0,
         condition: 'good' as const,
         notes: '',
+        bin_id: null,
+        default_bin_code: null,
       }));
     },
   });
