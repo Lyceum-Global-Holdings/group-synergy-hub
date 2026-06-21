@@ -174,6 +174,66 @@ export default function MaterialIssueReturn() {
     }
   };
 
+  const handleDownloadReturnPdf = async (mrn: MaterialReturnNote) => {
+    setPdfLoadingId(mrn.id);
+    try {
+      const { data: items } = await supabase.rpc('get_material_return_items' as any, {
+        p_mrn_id: mrn.id,
+      });
+
+      const company =
+        companies?.find((c) => c.id === mrn.company_id) ?? selectedCompany ?? null;
+
+      let referenceNumber: string | null = null;
+      if (mrn.reference_type === 'material_issue' && mrn.reference_id) {
+        const { data: srcMin } = await supabase
+          .from('material_issue_notes')
+          .select('min_number')
+          .eq('id', mrn.reference_id)
+          .maybeSingle();
+        referenceNumber = (srcMin as any)?.min_number ?? null;
+      } else if (mrn.reference_type === 'purchase_order' && mrn.reference_id) {
+        const { data: po } = await supabase
+          .from('purchase_orders')
+          .select('po_number')
+          .eq('id', mrn.reference_id)
+          .maybeSingle();
+        referenceNumber = (po as any)?.po_number ?? null;
+      }
+
+      const approverIds = [mrn.approved_by, mrn.created_by].filter(Boolean) as string[];
+      let nameById: Record<string, string> = {};
+      if (approverIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', approverIds);
+        nameById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.full_name ?? '']));
+      }
+
+      await downloadMaterialReturnPdf({
+        returnNote: mrn as any,
+        items: (items ?? []) as any,
+        company,
+        referenceNumber,
+        approverNames: {
+          returnedBy: mrn.returned_by,
+          preparedBy: mrn.created_by ? nameById[mrn.created_by] : null,
+          approved: mrn.approved_by ? nameById[mrn.approved_by] : null,
+        },
+      });
+    } catch (err) {
+      console.error('MRN PDF download failed', err);
+      toast({
+        title: 'PDF download failed',
+        description: 'Could not generate the Material Return Note PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPdfLoadingId(null);
+    }
+  };
+
   const handleViewDetails = (issueId: string) => {
     setSelectedIssueId(issueId);
     setDetailsDialogOpen(true);
