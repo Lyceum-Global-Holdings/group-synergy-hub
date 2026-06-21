@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, Download, Check, X, Wrench, Send, Pencil } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
+import { downloadMaterialReturnPdf } from "@/utils/materialReturnPdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
@@ -166,6 +167,66 @@ export default function MaterialIssueReturn() {
       toast({
         title: 'PDF download failed',
         description: 'Could not generate the Material Issue Note PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPdfLoadingId(null);
+    }
+  };
+
+  const handleDownloadReturnPdf = async (mrn: MaterialReturnNote) => {
+    setPdfLoadingId(mrn.id);
+    try {
+      const { data: items } = await supabase.rpc('get_material_return_items' as any, {
+        p_mrn_id: mrn.id,
+      });
+
+      const company =
+        companies?.find((c) => c.id === mrn.company_id) ?? selectedCompany ?? null;
+
+      let referenceNumber: string | null = null;
+      if (mrn.reference_type === 'material_issue' && mrn.reference_id) {
+        const { data: srcMin } = await supabase
+          .from('material_issue_notes')
+          .select('min_number')
+          .eq('id', mrn.reference_id)
+          .maybeSingle();
+        referenceNumber = (srcMin as any)?.min_number ?? null;
+      } else if (mrn.reference_type === 'purchase_order' && mrn.reference_id) {
+        const { data: po } = await supabase
+          .from('purchase_orders')
+          .select('po_number')
+          .eq('id', mrn.reference_id)
+          .maybeSingle();
+        referenceNumber = (po as any)?.po_number ?? null;
+      }
+
+      const approverIds = [mrn.approved_by, mrn.created_by].filter(Boolean) as string[];
+      let nameById: Record<string, string> = {};
+      if (approverIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', approverIds);
+        nameById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.full_name ?? '']));
+      }
+
+      await downloadMaterialReturnPdf({
+        returnNote: mrn as any,
+        items: (items ?? []) as any,
+        company,
+        referenceNumber,
+        approverNames: {
+          returnedBy: mrn.returned_by,
+          preparedBy: mrn.created_by ? nameById[mrn.created_by] : null,
+          approved: mrn.approved_by ? nameById[mrn.approved_by] : null,
+        },
+      });
+    } catch (err) {
+      console.error('MRN PDF download failed', err);
+      toast({
+        title: 'PDF download failed',
+        description: 'Could not generate the Material Return Note PDF.',
         variant: 'destructive',
       });
     } finally {
@@ -414,6 +475,15 @@ export default function MaterialIssueReturn() {
             >
               <Eye className="h-4 w-4" />
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Download PDF"
+              disabled={pdfLoadingId === mrn.id}
+              onClick={() => handleDownloadReturnPdf(mrn)}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
             {mrn.status === 'draft' && (
               <Button
                 variant="ghost"
@@ -579,6 +649,8 @@ export default function MaterialIssueReturn() {
           setEditingReturnDraft(mrn);
           setReturnDialogOpen(true);
         }}
+        onDownloadPdf={(mrn) => handleDownloadReturnPdf(mrn)}
+        isDownloadingPdf={!!selectedReturn && pdfLoadingId === selectedReturn.id}
       />
       <RepairMaterialReturnDialog
         open={repairDialogOpen}
