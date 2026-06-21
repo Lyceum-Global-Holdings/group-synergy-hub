@@ -49,7 +49,7 @@ const getStatusColor = (status: string): "default" | "destructive" | "secondary"
   }
 };
 
-export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, onEditDraft }: MaterialReturnDetailsDialogProps) {
+export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, onEditDraft, onDownloadPdf, isDownloadingPdf }: MaterialReturnDetailsDialogProps) {
   const { returnItems, isLoading } = useMaterialReturnItems(returnNote?.id);
   const { updateMaterialReturn, approveMaterialReturn, addMissingReturnItemsAsync, isUpdating, isApproving, isRepairing } = useMaterialReturns();
   const { data: userRoles = [] } = useCurrentUserRoles();
