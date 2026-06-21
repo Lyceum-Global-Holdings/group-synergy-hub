@@ -475,6 +475,15 @@ export default function MaterialIssueReturn() {
             >
               <Eye className="h-4 w-4" />
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Download PDF"
+              disabled={pdfLoadingId === mrn.id}
+              onClick={() => handleDownloadReturnPdf(mrn)}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
             {mrn.status === 'draft' && (
               <Button
                 variant="ghost"
