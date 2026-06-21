@@ -32,6 +32,8 @@ interface MaterialReturnDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   returnNote: MaterialReturnNote | null;
   onEditDraft?: (returnNote: MaterialReturnNote) => void;
+  onDownloadPdf?: (returnNote: MaterialReturnNote) => void;
+  isDownloadingPdf?: boolean;
 }
 
 const getStatusColor = (status: string): "default" | "destructive" | "secondary" => {
