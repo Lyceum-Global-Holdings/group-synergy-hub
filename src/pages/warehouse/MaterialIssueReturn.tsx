@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, Download, Check, X, Wrench, Send, Pencil } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
+import { downloadMaterialReturnPdf } from "@/utils/materialReturnPdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
