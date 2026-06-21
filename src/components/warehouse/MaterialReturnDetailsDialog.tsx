@@ -10,7 +10,7 @@ import { MaterialReturnNote } from "@/types/materialIssueReturn";
 import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { format } from "date-fns";
-import { CheckCircle, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle, Download, Plus, Trash2, XCircle } from "lucide-react";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 import { useEffect, useState } from "react";
 import { MaterialAttachmentsPanel } from "./MaterialAttachmentsPanel";
