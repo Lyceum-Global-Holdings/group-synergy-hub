@@ -649,6 +649,8 @@ export default function MaterialIssueReturn() {
           setEditingReturnDraft(mrn);
           setReturnDialogOpen(true);
         }}
+        onDownloadPdf={(mrn) => handleDownloadReturnPdf(mrn)}
+        isDownloadingPdf={!!selectedReturn && pdfLoadingId === selectedReturn.id}
       />
       <RepairMaterialReturnDialog
         open={repairDialogOpen}
