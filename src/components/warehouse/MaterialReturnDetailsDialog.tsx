@@ -133,7 +133,21 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote, on
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Material Return Note Details</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle>Material Return Note Details</DialogTitle>
+            {onDownloadPdf && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDownloadPdf(returnNote)}
+                disabled={!!isDownloadingPdf}
+                className="mr-6"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isDownloadingPdf ? 'Preparing…' : 'Download PDF'}
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">
