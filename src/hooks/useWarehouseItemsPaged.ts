@@ -52,6 +52,10 @@ type CatalogPageRow = {
   supplier_id: string | null;
   supplier_name: string | null;
   created_at: string;
+  last_purchase_price: number | null;
+  last_purchase_date: string | null;
+  last_purchase_supplier_name: string | null;
+  last_purchase_grn_number: string | null;
 };
 
 function mapRow(row: CatalogPageRow): CatalogItem {
@@ -62,6 +66,7 @@ function mapRow(row: CatalogPageRow): CatalogItem {
     supplier: supplier_id ? { id: supplier_id, name: supplier_name ?? '' } : null,
   } as unknown as CatalogItem;
 }
+
 
 /**
  * Infinite-scroll hook with server-side sort. The keyset cursor advances on

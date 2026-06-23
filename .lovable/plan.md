@@ -1,44 +1,62 @@
 ## Goal
-Add a "Download PDF" action for Material Return Notes (MRN) that mirrors the existing MIN PDF layout, adapted for return-specific fields and aligned with international document standards (ISO 9001 traceability, SAP-style return note presentation).
 
-## What gets built
+Make the **Item Master** the single source of truth for **Unit Cost**, and ensure every approved GRN refreshes that master price (so the value the user sees on `/warehouse/item-bin-master` always reflects the most recent purchase, regardless of which company received it).
 
-### 1. New util: `src/utils/materialReturnPdfExport.ts`
-Mirror of `src/utils/materialIssuePdfExport.ts`, adapted for MRN:
+## Current state
 
-- **Header**: Company logo + name + address (left). Document title **"MATERIAL RETURN NOTE"** + MRN No + Return Date + Status (right). QR code encoding `MRN:${id}` for traceability.
-- **Meta grid** (2 columns):
-  - Returned By, Return Type (Internal / Supplier), Reason
-  - Reference Type + Reference No (source MIN / PO)
-  - Location, SRN No, Approved By, Approved Date
-- **Line items table** with international return-note columns:
-  `#`, `Item Code`, `Description`, `UOM`, `Qty Returned`, `Bin` (destination bin from new per-line bin feature), `Condition` (Good / Damaged / Expired), `Unit Cost`, `Total Value`.
-  Footer row with grand total.
-- **Notes** block.
-- **Signature block** (4 columns): Returned By, Prepared By, Approved By, Warehouse Receiver — with name + date lines.
-- **Document control footer** on every page: MRN number, generated-at UTC, generated-by, "Confidential — Internal Use · Source: Lyceum ERP · Page X of Y".
-- Same fonts, colors, spacing, jsPDF + autoTable + qrcode dependencies as MIN — no new packages.
+- `warehouse_item_catalog.unit_cost` — master price (one row per item, global).
+- `warehouse_items.unit_cost` — per-company cached copy.
+- `warehouse_item_price_history` + trigger `sync_item_price_on_grn_approval` already write the GRN unit price to **both** the catalog and the per-company `warehouse_items` row on GRN approval/completion.
+- The Item Master tab reads via RPC `list_warehouse_inventory`, which currently returns `wi.unit_cost` (per-company only). So items that were never received by the active company show "—" even when the master has a price. That is the gap visible in the screenshot.
 
-### 2. Wire the action into the UI
+## Plan
 
-**`src/components/warehouse/MaterialReturnDetailsDialog.tsx`**
-- Add a **"Download PDF"** button in the dialog header (next to existing Edit Draft / Close actions), available for any status (draft, approved, returned).
-- On click: fetch the active company from `useCompany`, fetch MRN line items (already loaded in the dialog via `useMaterialReturnItems`), resolve approver display names via `profiles` lookup, then call `downloadMaterialReturnPdf(...)`.
+### 1. Make Item Master read the master price (one DB migration)
 
-**`src/pages/warehouse/MaterialIssueReturn.tsx`** (MRN tab table)
-- Add a Download icon button in the Actions column for every MRN row (same pattern as the existing Edit button), so users can export without opening the dialog.
+Update `public.list_warehouse_inventory` so the returned `unit_cost` is:
 
-### 3. No DB / schema / RLS changes
-All data needed (header, items with `bin_code`, approver IDs, company info) is already exposed by current hooks/RPCs. Pure frontend addition.
+```
+COALESCE(NULLIF(cat.unit_cost, 0), NULLIF(wi.unit_cost, 0), 0)
+```
 
-## Technical notes
-- Filename: `MRN-{mrn_number}.pdf`.
-- Currency formatting via existing `formatCurrency` helper, using the company's currency.
-- Status badge in header uses uppercase plain text (matches MIN) — no colored chip in PDF.
-- QR payload `MRN:{id}` keeps the same scheme as `MIN:{id}` so scanners route consistently.
-- Reuses `urlToDataUrl` helper pattern (copy from MIN util) for logo loading.
+- Master (`catalog.unit_cost`) wins.
+- Falls back to the per-company cached cost for legacy rows where the master is still empty.
+- Same change applied to `selling_price` for consistency (catalog already holds the master selling price).
+- No signature change, no client change required — the column just starts showing the master value.
+
+### 2. Strengthen the GRN → master sync trigger
+
+Tighten `sync_item_price_on_grn_approval` (same file pattern as `20260611040647`):
+
+- Use the **latest GRN line** per `catalog_item_id` within the batch (currently it just loops, so the last one wins — make that explicit and ordered by `grn_date, created_at` so behaviour is deterministic when one GRN has multiple lines for the same item).
+- Always set `warehouse_item_catalog.last_purchase_price`, `last_purchase_date`, `last_purchase_supplier_id`, `last_purchase_grn_id` (new columns) **in addition to** `unit_cost`. Keeping `unit_cost` as the working master price and `last_purchase_*` as audit-friendly metadata matches SAP MM "Moving Avg / Last PO Price" pattern.
+- Continue to mirror `unit_cost` onto `warehouse_items` for any code that still reads it (FIFO valuation, MIN PDF, stock reconciliation).
+
+### 3. Backfill
+
+Inside the same migration:
+
+- Refresh `warehouse_item_catalog.unit_cost` + `last_purchase_*` from the most recent row in `warehouse_item_price_history` per `catalog_item_id`.
+- Refresh `warehouse_items.unit_cost` from the catalog where it is currently NULL/0.
+
+### 4. UI touch-ups (Item Master tab only)
+
+`src/pages/warehouse/ItemBinMaster.tsx` / list cell:
+
+- Tooltip on the Unit Cost cell: "Last purchase price — GRN <grn_number> on <date> from <supplier>". Data already returned by the RPC after step 2 (add `last_purchase_date`, `last_purchase_supplier_name`, `last_purchase_grn_number` to the RETURNS TABLE; thread through `useWarehouseInventoryPage`).
+- No other surfaces change. MIN/GRN/MRN PDFs, valuation reports, and three-way match continue to use the per-company `warehouse_items.unit_cost` they already use.
 
 ## Out of scope
-- No changes to MIN or GRN PDFs.
-- No bulk/multi-MRN export.
-- No e-signature embedding (deferred).
+
+- Switching valuation method (FIFO / moving-average) — not requested.
+- Editing master price manually from the inventory tab (already possible via "Edit item" dialog which writes to the catalog).
+- Selling price workflow.
+
+## Technical notes
+
+- Files touched:
+  - **New migration** `supabase/migrations/<ts>_item_master_unit_cost_source_of_truth.sql` — adds `last_purchase_*` columns to `warehouse_item_catalog`, updates the trigger, updates `list_warehouse_inventory`, backfills.
+  - `src/hooks/warehouse/useWarehouseInventoryPage.ts` — extend row type with new fields.
+  - `src/pages/warehouse/ItemBinMaster.tsx` (Unit Cost cell) — tooltip.
+- No RLS / grant changes (no new tables).
+- Respects existing memories: `warehouse-catalog-source-of-truth`, `warehouse-inventory-server-pagination`, `list-rpc-pattern`.

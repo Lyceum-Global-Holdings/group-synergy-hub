@@ -19931,6 +19931,10 @@ export type Database = {
           is_serialized: boolean
           item_code: string
           item_type: string
+          last_purchase_date: string | null
+          last_purchase_grn_id: string | null
+          last_purchase_price: number | null
+          last_purchase_supplier_id: string | null
           location_id: string | null
           manufacturer: string | null
           max_stock_level: number | null
@@ -19959,6 +19963,10 @@ export type Database = {
           is_serialized?: boolean
           item_code: string
           item_type?: string
+          last_purchase_date?: string | null
+          last_purchase_grn_id?: string | null
+          last_purchase_price?: number | null
+          last_purchase_supplier_id?: string | null
           location_id?: string | null
           manufacturer?: string | null
           max_stock_level?: number | null
@@ -19987,6 +19995,10 @@ export type Database = {
           is_serialized?: boolean
           item_code?: string
           item_type?: string
+          last_purchase_date?: string | null
+          last_purchase_grn_id?: string | null
+          last_purchase_price?: number | null
+          last_purchase_supplier_id?: string | null
           location_id?: string | null
           manufacturer?: string | null
           max_stock_level?: number | null
@@ -22511,6 +22523,10 @@ export type Database = {
           id: string
           image_url: string
           item_code: string
+          last_purchase_date: string
+          last_purchase_grn_number: string
+          last_purchase_price: number
+          last_purchase_supplier_name: string
           name: string
           reorder_level: number
           selling_price: number
@@ -22880,6 +22896,10 @@ export type Database = {
           id: string
           image_url: string
           item_code: string
+          last_purchase_date: string
+          last_purchase_grn_number: string
+          last_purchase_price: number
+          last_purchase_supplier_name: string
           manufacturer: string
           max_stock_level: number
           min_stock_level: number

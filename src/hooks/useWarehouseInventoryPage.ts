@@ -32,7 +32,12 @@ export interface InventoryPageRow {
   updated_at: string;
   bins: Array<{ id: string; bin_code: string; name: string; quantity: number }>;
   stock_owners: string[] | null;
+  last_purchase_price: number | null;
+  last_purchase_date: string | null;
+  last_purchase_supplier_name: string | null;
+  last_purchase_grn_number: string | null;
 }
+
 
 interface Params {
   search?: string;

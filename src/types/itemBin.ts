@@ -187,7 +187,12 @@ export interface CatalogItem {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  last_purchase_price?: number | null;
+  last_purchase_date?: string | null;
+  last_purchase_supplier_name?: string | null;
+  last_purchase_grn_number?: string | null;
 }
+
 
 export interface CreateCatalogItemData {
   item_code: string;

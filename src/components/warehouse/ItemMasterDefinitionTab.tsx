@@ -279,7 +279,34 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </TableCell>
         {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
         {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
-        {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
+        {col('unit_cost') && (
+          <TableCell className="text-right">
+            {item.unit_cost != null ? (
+              item.last_purchase_date ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help underline decoration-dotted">
+                        {item.unit_cost.toFixed(2)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="text-xs">
+                      <div className="font-medium">Last purchase price</div>
+                      <div>{new Date(item.last_purchase_date).toLocaleDateString()}</div>
+                      {item.last_purchase_grn_number && <div>GRN: {item.last_purchase_grn_number}</div>}
+                      {item.last_purchase_supplier_name && <div>Supplier: {item.last_purchase_supplier_name}</div>}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                item.unit_cost.toFixed(2)
+              )
+            ) : (
+              '-'
+            )}
+          </TableCell>
+        )}
+
         {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
         {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
         {col('status') && (
