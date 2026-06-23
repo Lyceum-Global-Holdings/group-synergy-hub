@@ -22523,6 +22523,10 @@ export type Database = {
           id: string
           image_url: string
           item_code: string
+          last_purchase_date: string
+          last_purchase_grn_number: string
+          last_purchase_price: number
+          last_purchase_supplier_name: string
           name: string
           reorder_level: number
           selling_price: number
