@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, Calendar, AlertTriangle } from 'lucide-react';
 import { ItemBatch } from '@/types/batch';
 import { format, differenceInDays, parseISO } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 interface BatchInfoCardProps {
   batch: ItemBatch;
