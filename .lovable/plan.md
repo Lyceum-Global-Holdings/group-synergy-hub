@@ -1,53 +1,54 @@
-# Fix: "Insufficient Batch Stock" when on-hand exists
+# Issue materials from the location-scoped FIFO batches
 
-## Root cause (verified in DB)
+## Why
 
-The three items in the screenshot are flagged `is_batch_tracked = true`, and the bin allocations hold the full quantity — but `item_batches` is missing (or short of) matching lots:
-
-| Item | Bin qty | Active batch qty |
-|---|---|---|
-| INV-PNT-000-0078 (Horizon) | 50 | **0** |
-| INV-PNT-000-0083 (Mellow) | 15 | **4** |
-| INV-PNT-000-0085 (Moorland) | 10 | **0** |
-
-The MIN FIFO preview only allocates from `item_batches`, so even though the bin shows stock, it reports "0 batches" / "Insufficient Batch Stock". This happens whenever stock enters a batch-tracked item without a lot — opening stock, bulk stock upload, manual bin adjustments, or items that were toggled to batch-tracked *after* receiving stock. Per GS1 AI(10), every batch-tracked unit must carry a lot — so the right fix is to make sure one always exists.
+The MIN issue dialog (and its `issue_material` / `process_fifo_batch_issue` RPCs) consumes batches globally for `(company, item)` — it ignores the MIN's location. When INV-PNT-000-0083 is issued from one warehouse, the FIFO preview/posting can pick batches whose physical stock sits in a bin at a *different* location. International convention (WMS/SAP, ISO 9001 §8.5.1, GS1) is that a goods issue movement (type 261) must consume the lot **at the same physical site/storage location** as the issue document. We already deduct bin allocations by location — batches must follow the same rule and the `batch_stock_allocations` row must be decremented in lockstep with the bin allocation.
 
 ## Plan
 
-### 1. Backfill — one migration
+### 1. Migration — location-aware FIFO + batch/bin linkage
 
-For every batch-tracked `warehouse_items` row where `SUM(bin_allocations.allocated_quantity) > SUM(active item_batches.quantity_remaining)`:
+Replace `process_fifo_batch_issue` with a new signature that takes `p_location_id`:
 
-- Create a synthetic opening lot per (company, item, location, bin):
-  - `batch_number = OPEN-{item_code}-{YYYYMMDD}-{NNNN}` (GS1-safe, ≤20 chars, `[A-Z0-9./-]`).
-  - `quantity_received = quantity_remaining = (bin_qty − already_batched_qty)`.
-  - `unit_cost = warehouse_item_catalog.unit_cost` (master), `status = 'active'`, `notes = 'Auto-created opening lot — pre-existing stock reconciliation'`.
-  - `grn_item_id = NULL`, `manufacturing_date = NULL`, `expiry_date = NULL`.
-- Insert matching `batch_stock_allocations` rows tying the new lot to the existing `warehouse_bin_allocations` so FIFO and the bin views agree.
-- Wrap in a single transaction; idempotent (guarded by the delta check).
+```text
+process_fifo_batch_issue(p_issue_item_id, p_item_id, p_quantity_issued, p_company_id, p_location_id)
+```
 
-### 2. Prevent recurrence — same migration
+Behaviour:
 
-Add a trigger `ensure_opening_batch_on_allocation` on `warehouse_bin_allocations` (AFTER INSERT/UPDATE) that, when the item is batch-tracked and the bin's allocated qty exceeds the sum of its `batch_stock_allocations`, auto-creates a `OPEN-…` lot for the delta. Same logic also fires when `warehouse_items.is_batch_tracked` is flipped from `false` → `true` and existing stock has no lots.
+- Recursive `loc_tree` from `p_location_id` (same pattern as `process_material_issue_stock_update`) so sub-locations roll up.
+- Availability = `SUM(batch_stock_allocations.allocated_quantity)` joined to `item_batches` (active, `quantity_remaining > 0`, same company) and `warehouse_bins.location_id IN loc_tree`. Reject if < requested.
+- FIFO loop iterates `batch_stock_allocations` (joined to `item_batches`) ordered by `item_batches.created_at ASC, expiry_date NULLS LAST` per row, taking `LEAST(bsa.allocated_quantity, batch.quantity_remaining, remaining)`. For each take:
+  - `UPDATE batch_stock_allocations SET allocated_quantity = allocated_quantity - take` (per bin/location).
+  - `UPDATE item_batches SET quantity_remaining = quantity_remaining - take`; flip `status='depleted'` when it reaches 0.
+  - `INSERT batch_issue_details (issue_item_id, batch_id, quantity_from_batch, bin_id)` — adds a `bin_id` column (NULL-safe additive) for audit traceability.
+- Backwards-compat shim: old 4-arg overload remains and raises a clear "location required" error so any forgotten caller fails loudly instead of silently going global.
 
-Bulk stock upload, opening-stock entry, and manual bin adjustments all funnel through `warehouse_bin_allocations`, so this single trigger closes every entry path without changing each caller.
+Update `issue_material` to:
 
-### 3. UI — small clarity tweak
+- Use the new location-scoped availability check (instead of the current global sum) so it only invokes FIFO when batched stock exists at the MIN's location.
+- Pass `v_min.location_id` into `process_fifo_batch_issue`.
 
-In `ConvertToIssueDialog` FIFO preview, when an item has bin stock but zero batch coverage, change the banner from "Insufficient Batch Stock" to "No batch assigned — open a lot in Batch Management" and link to `/warehouse/batches?item={id}`. Purely informational; not needed once the trigger is live, but useful while the backfill runs and for any future edge case.
+`process_material_issue_stock_update` is unchanged — it already deducts bins inside `loc_tree`. The two functions now match.
+
+Add `bin_id uuid NULL REFERENCES warehouse_bins(id)` to `batch_issue_details` (additive).
+
+### 2. UI — `IssueItemsDialog` preview
+
+Fetch the MIN's `location_id` once, then for each line query batches joined to `batch_stock_allocations` and `warehouse_bins` filtered to that location tree (small RPC `get_location_fifo_preview(item_id, company_id, location_id, qty)` or a single PostgREST embed with `bin_allocations:batch_stock_allocations!inner(allocated_quantity, warehouse_bins!inner(bin_code, location_id, warehouse_locations(name)))` filtered by location). Show per row: `lot · bin · location · take · (available at bin)`. Insufficient badge fires only when location-scoped batched stock < qty.
+
+### 3. Memory
+
+Update `mem://architecture/warehouse-batch-fifo-logic` to record the rule: FIFO MUST scope by `(company, item, location_tree)` and decrement both `item_batches` and `batch_stock_allocations`.
 
 ## Technical details
 
-- **New migration** `…_auto_opening_batches_for_unbatched_stock.sql`:
-  - Backfill CTE: `delta = bin_alloc − active_batch_alloc` per (company, warehouse_item, location, bin).
-  - `generate_batch_number(company_id, warehouse_item_id)` is reused for the lot number (existing RPC).
-  - Trigger function `public.ensure_opening_batch_on_allocation()` — SECURITY DEFINER, `SET search_path = public`.
-- **No schema changes** to `item_batches` / `warehouse_bin_allocations`.
-- **No RLS changes**; the trigger runs in DB context.
-- **Frontend**: only `src/components/warehouse/ConvertToIssueDialog.tsx` (banner text + link).
+- New migration `…_location_scoped_fifo_issue.sql` contains: `ALTER TABLE batch_issue_details ADD COLUMN bin_id`, drop+recreate `process_fifo_batch_issue` with the new signature, rewrite the body, recreate `issue_material` to pass the location. All wrapped in one transaction.
+- No RLS changes; RPCs stay `SECURITY DEFINER`, `SET search_path = public`.
+- Preview hook lives inside `IssueItemsDialog.tsx` — no new shared hook needed for one screen.
 
 ## Out of scope
 
-- Cost layer rework (FIFO costing already reads `unit_cost` from the lot — opening lots use the catalog master price set in the recent unit-cost work).
-- Switching valuation method, manual lot edits, or expiry assignment for legacy stock (lots created here have NULL expiry/mfg — user can edit in Batch Management).
-- GRN trigger — already creates lots correctly; untouched.
+- Cross-location stock transfers (separate STO/MIN flow).
+- Manual lot selection in the dialog (FIFO stays automatic per the existing design).
+- Changing how non-batched items are deducted (already location-scoped).
