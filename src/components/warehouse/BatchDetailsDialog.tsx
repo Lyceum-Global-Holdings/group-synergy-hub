@@ -299,12 +299,13 @@ export function BatchDetailsDialog({ batch, open, onOpenChange }: BatchDetailsDi
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Unit Cost:</span>
-                <span className="font-medium">${batch.unit_cost?.toFixed(2) || '0.00'}</span>
+                <span className="font-medium">{formatCurrency(batch.unit_cost || 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Value (Remaining):</span>
                 <span className="font-medium">
-                  ${((batch.unit_cost || 0) * batch.quantity_remaining).toFixed(2)}
+                  {formatCurrency((batch.unit_cost || 0) * batch.quantity_remaining)}
+
                 </span>
               </div>
             </div>
