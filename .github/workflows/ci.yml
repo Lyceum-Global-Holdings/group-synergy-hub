@@ -126,6 +126,9 @@ jobs:
       - name: Build production bundle
         run: npm run build
         env:
+          # Heavy vendor chunks (three.js, excel, pdf, mermaid) blow past Node's
+          # default heap on CI runners → OOM (exit 134). Raise the limit.
+          NODE_OPTIONS: --max-old-space-size=4096
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-key' }}
 
