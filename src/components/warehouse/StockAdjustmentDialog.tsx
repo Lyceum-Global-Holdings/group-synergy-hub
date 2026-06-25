@@ -25,6 +25,7 @@ import { StockTransactionType } from '@/types/stockTransaction';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { supabase } from '@/integrations/supabase/client';
 import { Building2, MapPin } from 'lucide-react';
 
 interface StockAdjustmentDialogProps {
