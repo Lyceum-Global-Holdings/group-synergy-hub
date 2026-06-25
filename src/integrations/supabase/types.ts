@@ -1881,6 +1881,7 @@ export type Database = {
       batch_issue_details: {
         Row: {
           batch_id: string
+          bin_id: string | null
           created_at: string | null
           id: string
           issue_item_id: string
@@ -1888,6 +1889,7 @@ export type Database = {
         }
         Insert: {
           batch_id: string
+          bin_id?: string | null
           created_at?: string | null
           id?: string
           issue_item_id: string
@@ -1895,6 +1897,7 @@ export type Database = {
         }
         Update: {
           batch_id?: string
+          bin_id?: string | null
           created_at?: string | null
           id?: string
           issue_item_id?: string
@@ -1906,6 +1909,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "item_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_issue_details_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
             referencedColumns: ["id"]
           },
           {
@@ -22957,15 +22967,48 @@ export type Database = {
         Args: { p_company_id: string; p_parent_item_id: string }
         Returns: string
       }
-      process_fifo_batch_issue: {
+      preview_fifo_batch_issue: {
         Args: {
           p_company_id: string
-          p_issue_item_id: string
           p_item_id: string
-          p_quantity_issued: number
+          p_location_id: string
+          p_quantity: number
         }
-        Returns: undefined
+        Returns: {
+          available: number
+          batch_available: number
+          batch_created_at: string
+          batch_id: string
+          batch_number: string
+          bin_available: number
+          bin_code: string
+          bin_id: string
+          expiry_date: string
+          location_id: string
+          location_name: string
+          take: number
+        }[]
       }
+      process_fifo_batch_issue:
+        | {
+            Args: {
+              p_company_id: string
+              p_issue_item_id: string
+              p_item_id: string
+              p_quantity_issued: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_company_id: string
+              p_issue_item_id: string
+              p_item_id: string
+              p_location_id: string
+              p_quantity_issued: number
+            }
+            Returns: undefined
+          }
       process_material_issue_stock_update:
         | {
             Args: {
