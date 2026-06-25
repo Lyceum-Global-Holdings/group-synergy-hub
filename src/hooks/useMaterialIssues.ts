@@ -203,6 +203,55 @@ export const useMaterialIssues = () => {
     },
   });
 
+  // Soft-allocate (reserve) stock at bin level. Idempotent; returns a shortfall
+  // report for any line that could not be fully reserved.
+  type ReserveShortfall = {
+    item_code?: string | null;
+    description?: string | null;
+    requested: number;
+    reserved: number;
+    shortfall: number;
+  };
+  const reserveMaterialIssueMutation = useMutation({
+    mutationFn: async (minId: string) => {
+      const { data, error } = await supabase.rpc('reserve_material_issue' as any, { p_min_id: minId });
+      if (error) throw error;
+      return data as { min_id: string; min_number: string; shortfalls: ReserveShortfall[] };
+    },
+    onSuccess: (data) => {
+      invalidateAfterApproval();
+      const shortfalls = data?.shortfalls ?? [];
+      if (shortfalls.length > 0) {
+        const lines = shortfalls
+          .map((s) => `${s.item_code ?? s.description ?? 'Item'}: short ${s.shortfall}`)
+          .join('; ');
+        toast({
+          title: 'Reserved with shortfalls',
+          description: `Some lines could not be fully reserved — ${lines}`,
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: 'Reservation failed', description: error?.message ?? 'Could not reserve stock.', variant: 'destructive' });
+    },
+  });
+
+  const cancelMaterialIssueMutation = useMutation({
+    mutationFn: async ({ minId, reason }: { minId: string; reason?: string }) => {
+      const { data, error } = await supabase.rpc('cancel_material_issue' as any, { p_min_id: minId, p_reason: reason ?? null });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      invalidateAfterApproval();
+      toast({ title: 'Cancelled', description: 'The MIN was cancelled and any reserved stock released.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Cancel failed', description: error?.message ?? 'Could not cancel MIN.', variant: 'destructive' });
+    },
+  });
+
   return {
     materialIssues,
     isLoading,
@@ -219,6 +268,10 @@ export const useMaterialIssues = () => {
     rejectMaterialIssueAsync: rejectMaterialIssueMutation.mutateAsync,
     reopenDraftAsync: reopenDraftMutation.mutateAsync,
     isReopening: reopenDraftMutation.isPending,
+    reserveMaterialIssueAsync: reserveMaterialIssueMutation.mutateAsync,
+    isReserving: reserveMaterialIssueMutation.isPending,
+    cancelMaterialIssueAsync: cancelMaterialIssueMutation.mutateAsync,
+    isCancelling: cancelMaterialIssueMutation.isPending,
     isCreating: createMaterialIssueMutation.isPending,
     isUpdating: updateMaterialIssueMutation.isPending,
     isDeleting: deleteMaterialIssueMutation.isPending,

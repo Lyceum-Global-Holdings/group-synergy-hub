@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Download, Check, X, Wrench, Send, Pencil } from "lucide-react";
+import { Plus, Eye, Download, Check, X, Wrench, Send, Pencil, Ban } from "lucide-react";
 import { downloadMaterialIssuePdf } from "@/utils/materialIssuePdfExport";
 import { downloadMaterialReturnPdf } from "@/utils/materialReturnPdfExport";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,7 +61,7 @@ export default function MaterialIssueReturn() {
   const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
   const [editingReturnDraft, setEditingReturnDraft] = useState<MaterialReturnNote | null>(null);
 
-  const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, submitForApprovalAsync, isApproving, isRejecting, isSubmitting } = useMaterialIssues();
+  const { materialIssues, isLoading: isLoadingIssues, approveMaterialIssueAsync, rejectMaterialIssueAsync, submitForApprovalAsync, cancelMaterialIssueAsync, isApproving, isRejecting, isSubmitting, isCancelling } = useMaterialIssues();
   const { data: isAdmin } = useIsAdmin();
   const { materialReturns, isLoading: isLoadingReturns } = useMaterialReturns();
   const { materialRequests, isLoading: isLoadingRequests } = useMaterialRequests();
@@ -341,7 +341,9 @@ export default function MaterialIssueReturn() {
         const issue = row.original;
         const isPending = issue.status === 'pending_approval';
         const isDraft = issue.status === 'draft';
-        const busy = isApproving || isRejecting || isSubmitting;
+        const busy = isApproving || isRejecting || isSubmitting || isCancelling;
+        // Cancellable while no physical stock has moved (releases any reservation).
+        const canCancel = ['draft', 'pending_approval', 'approved', 'rejected'].includes(issue.status);
         return (
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="sm" onClick={() => handleViewDetails(issue.id)}>
@@ -409,6 +411,21 @@ export default function MaterialIssueReturn() {
                   <X className="h-4 w-4 text-destructive" />
                 </Button>
               </>
+            )}
+            {canCancel && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Cancel this MIN and release any reserved stock"
+                disabled={busy}
+                onClick={async () => {
+                  const reason = window.prompt('Reason for cancellation (optional):') ?? undefined;
+                  if (!window.confirm('Cancel this Material Issue Note? Any reserved stock will be released.')) return;
+                  try { await cancelMaterialIssueAsync({ minId: issue.id, reason }); } catch (e) { /* toast handled */ }
+                }}
+              >
+                <Ban className="h-4 w-4 text-destructive" />
+              </Button>
             )}
           </div>
         );

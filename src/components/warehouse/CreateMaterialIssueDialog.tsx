@@ -103,7 +103,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
 
   const { items: warehouseItems } = useWarehouseItems();
   
-  const { createMaterialIssueAsync, updateMaterialIssueAsync, submitForApprovalAsync, isCreating, isUpdating, isSubmitting } = useMaterialIssues();
+  const { createMaterialIssueAsync, updateMaterialIssueAsync, submitForApprovalAsync, reserveMaterialIssueAsync, isCreating, isUpdating, isSubmitting } = useMaterialIssues();
   const { createItems, replaceItemsForMinAsync, isReplacing } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
@@ -481,9 +481,13 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
       // standard ERP document lifecycle (SAP/Oracle/D365 style).
       if (mode === 'submit') {
         try {
+          // Soft-allocate (reserve) stock at bin level before the note enters the
+          // approval queue. Non-blocking: shortfalls are reported via toast, the
+          // note still submits, and physical availability is re-checked at approval.
+          await reserveMaterialIssueAsync(issueNote.id);
           await submitForApprovalAsync(issueNote.id);
         } catch (e) {
-          console.error('Failed to submit MIN for approval', e);
+          console.error('Failed to reserve stock / submit MIN for approval', e);
         }
       } else {
         toast({
