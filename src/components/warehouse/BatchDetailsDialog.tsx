@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ItemBatch, BatchStatus } from "@/types/batch";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 import { 
   Package, 
   Calendar, 
