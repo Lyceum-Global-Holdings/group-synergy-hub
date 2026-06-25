@@ -9,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -86,6 +87,7 @@ import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { writeExcelFromJSON } from '@/utils/excelUtils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { useManagedColumns } from '@/hooks/useManagedColumns';
 
 const INV_COLUMN_DEFS = [
   { key: 'photo', label: 'Photo', fixed: false },
@@ -141,7 +143,20 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [isStockMovementReportOpen, setIsStockMovementReportOpen] = useState(false);
   
   const [isBulkStockUploadOpen, setIsBulkStockUploadOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
+  const {
+    visibleColumns,
+    toggleColumn,
+    col,
+    resetToSystemDefault,
+    applySystemWide,
+    isApplying: isApplyingColumns,
+    isSuperAdmin: canManageColumnsSystemWide,
+    hasSystemDefault: hasSystemColumnDefault,
+  } = useManagedColumns<InvColumnKey>({
+    viewKey: 'warehouse_inventory_columns',
+    defs: INV_COLUMN_DEFS,
+    defaultVisible: INV_DEFAULT_VISIBLE,
+  });
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
   const [isBulkChangeOwnerOpen, setIsBulkChangeOwnerOpen] = useState(false);
@@ -177,11 +192,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       : <ArrowDown className="ml-1 inline h-3.5 w-3.5" />;
   };
 
-  const toggleColumn = (key: InvColumnKey) => {
-    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const col = (key: InvColumnKey) => visibleColumns[key];
   const visibleCount = Object.values(visibleColumns).filter(Boolean).length;
 
   // Debounce search
@@ -524,7 +534,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   Columns
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 p-2 space-y-1">
+              <DropdownMenuContent align="end" className="w-56 p-2 space-y-1">
                 {INV_COLUMN_DEFS.filter(c => !c.fixed).map(colDef => (
                   <label key={colDef.key} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded">
                     <Checkbox
@@ -534,6 +544,40 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                     {colDef.label}
                   </label>
                 ))}
+                <DropdownMenuSeparator />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  onClick={(e) => { e.preventDefault(); resetToSystemDefault(); }}
+                >
+                  Reset to system default
+                </Button>
+                {canManageColumnsSystemWide && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start text-xs"
+                    disabled={isApplyingColumns}
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      try {
+                        await applySystemWide();
+                        toast.success('Column layout applied system-wide for all users.');
+                      } catch (err: any) {
+                        toast.error(err?.message ?? 'Failed to apply system-wide.');
+                      }
+                    }}
+                  >
+                    <Settings className="mr-2 h-3.5 w-3.5" />
+                    {isApplyingColumns ? 'Applying…' : 'Apply to everyone (system-wide)'}
+                  </Button>
+                )}
+                {hasSystemColumnDefault && (
+                  <p className="px-2 pt-1 text-[10px] text-muted-foreground">
+                    A system-wide default is set by an admin.
+                  </p>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
             {canDelete && (
