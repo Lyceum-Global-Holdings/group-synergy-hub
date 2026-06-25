@@ -98,12 +98,17 @@ export function StockAdjustmentDialog({
       .sort((a, b) => a[1].locationName.localeCompare(b[1].locationName));
   }, [bins, locations]);
 
-  // Load allocations for this item when dialog opens
+  // Load ALL allocations for this item (including zero-qty rows) so we
+  // detect an existing (item, bin) row and UPDATE it instead of inserting
+  // a duplicate that violates unique_item_bin_company_location.
   useEffect(() => {
     const loadAllocations = async () => {
       if (open && itemId) {
-        const allocations = await getAllocationsForItem(itemId);
-        setItemAllocations(allocations);
+        const { data, error } = await supabase
+          .from('warehouse_bin_allocations')
+          .select('id, bin_id, allocated_quantity')
+          .eq('warehouse_item_id', itemId);
+        if (!error) setItemAllocations(data || []);
       }
     };
     loadAllocations();
