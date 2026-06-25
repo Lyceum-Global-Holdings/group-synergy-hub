@@ -26,7 +26,9 @@ interface BatchPreview {
   batch_number: string;
   quantity_from_batch: number;
   expiry_date?: string;
-  quantity_remaining: number;
+  bin_code?: string;
+  location_name?: string;
+  bin_available: number;
 }
 
 interface ItemBatchPreview {
@@ -35,6 +37,7 @@ interface ItemBatchPreview {
   quantity_issued: number;
   batches: BatchPreview[];
   insufficient: boolean;
+  hasAnyBatchedStock: boolean;
 }
 
 interface IssueItemsDialogProps {
@@ -89,49 +92,54 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
     try {
       const { data: issueNote } = await supabase
         .from('material_issue_notes')
-        .select('company_id')
+        .select('company_id, location_id')
         .eq('id', issueId)
         .single();
 
       const companyId = issueNote?.company_id;
+      const locationId = issueNote?.location_id;
       const previews: ItemBatchPreview[] = [];
 
       for (const item of issueItems) {
         const qtyToIssue = item.quantity_issued || item.quantity_required;
-        const { data: batches } = await supabase
-          .from('item_batches')
-          .select('id, batch_number, quantity_remaining, expiry_date')
-          .eq('warehouse_item_id', item.item_id)
-          .eq('company_id', companyId)
-          .eq('status', 'active')
-          .gt('quantity_remaining', 0)
-          .order('created_at', { ascending: true });
 
-        const allocated: BatchPreview[] = [];
-        let remaining = qtyToIssue;
+        // Location-scoped FIFO preview (server-side, matches the RPC used on confirm)
+        const { data: rows, error: rpcErr } = await supabase.rpc(
+          'preview_fifo_batch_issue',
+          {
+            p_item_id: item.item_id,
+            p_company_id: companyId,
+            p_location_id: locationId,
+            p_quantity: qtyToIssue,
+          } as any,
+        );
+        if (rpcErr) console.error('FIFO preview error:', rpcErr);
 
-        for (const batch of (batches || [])) {
-          if (remaining <= 0) break;
-          const take = Math.min(batch.quantity_remaining, remaining);
-          allocated.push({
-            batch_id: batch.id,
-            batch_number: batch.batch_number,
-            quantity_from_batch: take,
-            expiry_date: batch.expiry_date || undefined,
-            quantity_remaining: batch.quantity_remaining,
-          });
-          remaining -= take;
-        }
+        const list = (rows as any[]) || [];
+        const allocated: BatchPreview[] = list
+          .filter((r) => Number(r.take) > 0)
+          .map((r) => ({
+            batch_id: r.batch_id,
+            batch_number: r.batch_number,
+            quantity_from_batch: Number(r.take),
+            expiry_date: r.expiry_date || undefined,
+            bin_code: r.bin_code || undefined,
+            location_name: r.location_name || undefined,
+            bin_available: Number(r.available),
+          }));
 
-        // If the item has no batches at all, treat it as a non-batch-tracked item
-        // (stock will be deducted from bin/location directly by the server RPC).
-        const hasAnyBatch = (batches || []).length > 0;
+        const totalTaken = allocated.reduce((s, b) => s + b.quantity_from_batch, 0);
+        const hasAnyBatchedStock = list.length > 0;
+
         previews.push({
           item_id: item.item_id,
           item_code: item.item_code || '',
           quantity_issued: qtyToIssue,
           batches: allocated,
-          insufficient: hasAnyBatch && remaining > 0,
+          // Only flag insufficient when batched stock exists at this location but cannot cover the qty.
+          // Items without any batch rows fall back to bin/location deduction by the RPC.
+          insufficient: hasAnyBatchedStock && totalTaken < qtyToIssue,
+          hasAnyBatchedStock,
         });
       }
 
