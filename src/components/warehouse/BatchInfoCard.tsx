@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, Calendar, AlertTriangle } from 'lucide-react';
 import { ItemBatch } from '@/types/batch';
 import { format, differenceInDays, parseISO } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 interface BatchInfoCardProps {
   batch: ItemBatch;
@@ -100,7 +101,7 @@ export function BatchInfoCard({ batch, showActions = false }: BatchInfoCardProps
         {batch.unit_cost > 0 && (
           <div className="text-sm pt-2 border-t">
             <span className="text-muted-foreground">Unit Cost:</span>{' '}
-            <span className="font-medium">${batch.unit_cost.toFixed(2)}</span>
+            <span className="font-medium">{formatCurrency(batch.unit_cost)}</span>
           </div>
         )}
       </CardContent>

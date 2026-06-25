@@ -37,6 +37,7 @@ import { BatchDetailsDialog } from "@/components/warehouse/BatchDetailsDialog";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/utils";
 
 const statusConfig: Record<BatchStatus, { label: string; color: string; icon: React.ReactNode }> = {
   active: { 
@@ -344,7 +345,7 @@ export default function BatchManagement() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          ${batch.unit_cost?.toFixed(2) || '0.00'}
+                          {formatCurrency(batch.unit_cost || 0)}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={config.color}>
