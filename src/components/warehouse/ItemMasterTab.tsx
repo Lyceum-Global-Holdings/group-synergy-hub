@@ -526,7 +526,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Column visibility toggle */}
+            {/* Column management — super admins only */}
+            {canManageColumnsSystemWide && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -580,6 +581,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            )}
             {canDelete && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
