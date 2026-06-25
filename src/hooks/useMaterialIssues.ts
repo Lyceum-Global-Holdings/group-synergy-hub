@@ -166,7 +166,7 @@ export const useMaterialIssues = () => {
     },
     onSuccess: () => {
       invalidateAfterApproval();
-      toast({ title: 'Approved', description: 'Stock has been issued.' });
+      toast({ title: 'Approved', description: 'Stock is reserved until you issue the items.' });
     },
     onError: (error: any) => {
       toast({ title: 'Approval failed', description: error?.message ?? 'Could not approve MIN.', variant: 'destructive' });

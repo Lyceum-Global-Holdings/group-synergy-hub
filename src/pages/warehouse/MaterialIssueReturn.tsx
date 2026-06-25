@@ -389,7 +389,7 @@ export default function MaterialIssueReturn() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  title="Approve & issue stock"
+                  title="Approve (reserves stock; issue later)"
                   disabled={busy}
                   onClick={async () => {
                     try { await approveMaterialIssueAsync(issue.id); } catch (e) { /* toast handled */ }

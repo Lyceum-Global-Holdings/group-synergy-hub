@@ -96,6 +96,8 @@ const INV_COLUMN_DEFS = [
   { key: 'bin', label: 'Bin', fixed: false },
   { key: 'stock_owner', label: 'Stock Owner', fixed: false },
   { key: 'current_stock', label: 'Current Stock', fixed: false },
+  { key: 'reserved', label: 'Reserved', fixed: false },
+  { key: 'available', label: 'Available', fixed: false },
   { key: 'unit_cost', label: 'Unit Cost', fixed: false },
   { key: 'status', label: 'Status', fixed: false },
   { key: 'actions', label: 'Actions', fixed: true },
@@ -653,6 +655,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   </button>
                 </TableHead>
               )}
+              {col('reserved') && <TableHead className="text-right">Reserved</TableHead>}
+              {col('available') && <TableHead className="text-right">Available</TableHead>}
               {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
               {col('status') && <TableHead>Status</TableHead>}
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -751,20 +755,27 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       {item.bins && item.bins.length > 0 ? (
                         <TooltipProvider>
                           <div className="flex flex-wrap gap-1">
-                            {item.bins.slice(0, 2).map(bin => (
-                              <Tooltip key={bin.id}>
-                                <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="text-xs cursor-help">
-                                    <Package className="h-3 w-3 mr-1" />
-                                    {bin.bin_code}
-                                    <span className="ml-1 text-muted-foreground">({bin.quantity})</span>
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{bin.name} - Qty: {bin.quantity}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            ))}
+                            {item.bins.slice(0, 2).map(bin => {
+                              const reserved = Number(bin.reserved_quantity ?? 0);
+                              const allocated = Number(bin.allocated_quantity ?? bin.quantity);
+                              return (
+                                <Tooltip key={bin.id}>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="text-xs cursor-help">
+                                      <Package className="h-3 w-3 mr-1" />
+                                      {bin.bin_code}
+                                      <span className="ml-1 text-muted-foreground">({bin.quantity})</span>
+                                      {reserved > 0 && (
+                                        <span className="ml-1 text-amber-600">· {reserved} resv</span>
+                                      )}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{bin.name} — Allocated: {allocated}, Reserved: {reserved}, Available: {bin.quantity}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
                             {item.bins.length > 2 && (
                               <span className="text-xs text-muted-foreground">
                                 +{item.bins.length - 2} more
@@ -892,6 +903,31 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                           </Button>
                         </div>
                       </div>
+                    </TableCell>
+                  )}
+                  {col('reserved') && (
+                    <TableCell className="text-right">
+                      {(() => {
+                        const reserved = Number(item.reserved_quantity ?? 0);
+                        return (
+                          <span className={reserved > 0 ? 'font-medium text-amber-600' : 'text-muted-foreground'}>
+                            {reserved.toFixed(2)}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
+                  )}
+                  {col('available') && (
+                    <TableCell className="text-right">
+                      {(() => {
+                        const available = Number(
+                          item.available_quantity ??
+                          ((item.current_stock || 0) - Number(item.reserved_quantity ?? 0))
+                        );
+                        return (
+                          <span className="font-medium text-green-600">{available.toFixed(2)}</span>
+                        );
+                      })()}
                     </TableCell>
                   )}
                   {col('unit_cost') && <TableCell>{item.unit_cost ? `LKR ${item.unit_cost}` : '-'}</TableCell>}

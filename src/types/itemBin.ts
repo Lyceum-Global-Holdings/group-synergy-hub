@@ -62,6 +62,8 @@ export interface WarehouseItem {
   max_stock_level: number | null;
   min_stock_level: number | null;
   current_stock: number;
+  reserved_quantity?: number;
+  available_quantity?: number;
   unit_cost: number | null;
   selling_price: number | null;
   barcode: string | null;
@@ -78,6 +80,8 @@ export interface WarehouseItem {
     bin_code: string;
     name: string;
     quantity: number;
+    allocated_quantity?: number;
+    reserved_quantity?: number;
   }> | null;
   stock_owners?: string[] | null;
   status: 'active' | 'inactive' | 'discontinued';

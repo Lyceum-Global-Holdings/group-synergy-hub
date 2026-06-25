@@ -134,6 +134,10 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
     queryClient.invalidateQueries({ queryKey: ['cpo-material-issues'] });
     queryClient.invalidateQueries({ queryKey: ['daily-material-issues'] });
     if (issueId) queryClient.invalidateQueries({ queryKey: ['material-issue', issueId] });
+    // Issuing/receiving moves stock and reservations — refresh inventory views.
+    queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-reservations'] });
   };
 
   useEffect(() => {
