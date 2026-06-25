@@ -21929,6 +21929,10 @@ export type Database = {
       }
       current_supplier_ids: { Args: never; Returns: string[] }
       delete_partial_piece: { Args: { p_id: string }; Returns: undefined }
+      ensure_opening_batch_for_bin_allocation: {
+        Args: { _allocation_id: string }
+        Returns: string
+      }
       ensure_partial_piece_parent_item: {
         Args: { p_catalog_item_id: string; p_company_id: string }
         Returns: string
