@@ -37,6 +37,7 @@ import { BatchDetailsDialog } from "@/components/warehouse/BatchDetailsDialog";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/utils";
 
 const statusConfig: Record<BatchStatus, { label: string; color: string; icon: React.ReactNode }> = {
   active: { 
