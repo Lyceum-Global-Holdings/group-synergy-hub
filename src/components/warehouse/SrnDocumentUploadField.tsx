@@ -254,7 +254,6 @@ export function SrnDocumentUploadField({
       {documentPath ? (
         <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/40">
           {previewUrl ? (
-            // eslint-disable-next-line jsx-a11y/alt-text
             <img
               src={previewUrl}
               alt="SRN preview"
@@ -328,7 +327,6 @@ export function SrnDocumentUploadField({
           {fallbackDocumentUrl && (
             <div className="flex items-center gap-3 p-3 border border-dashed rounded-lg bg-muted/30">
               {fallbackPreviewUrl ? (
-                // eslint-disable-next-line jsx-a11y/alt-text
                 <img
                   src={fallbackPreviewUrl}
                   alt="SRN evidence (from attachments)"

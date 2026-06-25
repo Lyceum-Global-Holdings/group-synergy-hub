@@ -618,7 +618,7 @@ export function ImportFromItemMasterDialog({
       .sort((a: any, b: any) => a.name.localeCompare(b.name))
       .map((c: any) => ({
         category: { id: c.id, name: c.name, code: c.code } as any,
-        depth: 0 as 0,
+        depth: 0 as const,
       }));
   }, [sourceScope, categoryOptions, items, categoryNameById]);
 
