@@ -1,62 +1,53 @@
-## Goal
+# Fix: "Insufficient Batch Stock" when on-hand exists
 
-Make the **Item Master** the single source of truth for **Unit Cost**, and ensure every approved GRN refreshes that master price (so the value the user sees on `/warehouse/item-bin-master` always reflects the most recent purchase, regardless of which company received it).
+## Root cause (verified in DB)
 
-## Current state
+The three items in the screenshot are flagged `is_batch_tracked = true`, and the bin allocations hold the full quantity — but `item_batches` is missing (or short of) matching lots:
 
-- `warehouse_item_catalog.unit_cost` — master price (one row per item, global).
-- `warehouse_items.unit_cost` — per-company cached copy.
-- `warehouse_item_price_history` + trigger `sync_item_price_on_grn_approval` already write the GRN unit price to **both** the catalog and the per-company `warehouse_items` row on GRN approval/completion.
-- The Item Master tab reads via RPC `list_warehouse_inventory`, which currently returns `wi.unit_cost` (per-company only). So items that were never received by the active company show "—" even when the master has a price. That is the gap visible in the screenshot.
+| Item | Bin qty | Active batch qty |
+|---|---|---|
+| INV-PNT-000-0078 (Horizon) | 50 | **0** |
+| INV-PNT-000-0083 (Mellow) | 15 | **4** |
+| INV-PNT-000-0085 (Moorland) | 10 | **0** |
+
+The MIN FIFO preview only allocates from `item_batches`, so even though the bin shows stock, it reports "0 batches" / "Insufficient Batch Stock". This happens whenever stock enters a batch-tracked item without a lot — opening stock, bulk stock upload, manual bin adjustments, or items that were toggled to batch-tracked *after* receiving stock. Per GS1 AI(10), every batch-tracked unit must carry a lot — so the right fix is to make sure one always exists.
 
 ## Plan
 
-### 1. Make Item Master read the master price (one DB migration)
+### 1. Backfill — one migration
 
-Update `public.list_warehouse_inventory` so the returned `unit_cost` is:
+For every batch-tracked `warehouse_items` row where `SUM(bin_allocations.allocated_quantity) > SUM(active item_batches.quantity_remaining)`:
 
-```
-COALESCE(NULLIF(cat.unit_cost, 0), NULLIF(wi.unit_cost, 0), 0)
-```
+- Create a synthetic opening lot per (company, item, location, bin):
+  - `batch_number = OPEN-{item_code}-{YYYYMMDD}-{NNNN}` (GS1-safe, ≤20 chars, `[A-Z0-9./-]`).
+  - `quantity_received = quantity_remaining = (bin_qty − already_batched_qty)`.
+  - `unit_cost = warehouse_item_catalog.unit_cost` (master), `status = 'active'`, `notes = 'Auto-created opening lot — pre-existing stock reconciliation'`.
+  - `grn_item_id = NULL`, `manufacturing_date = NULL`, `expiry_date = NULL`.
+- Insert matching `batch_stock_allocations` rows tying the new lot to the existing `warehouse_bin_allocations` so FIFO and the bin views agree.
+- Wrap in a single transaction; idempotent (guarded by the delta check).
 
-- Master (`catalog.unit_cost`) wins.
-- Falls back to the per-company cached cost for legacy rows where the master is still empty.
-- Same change applied to `selling_price` for consistency (catalog already holds the master selling price).
-- No signature change, no client change required — the column just starts showing the master value.
+### 2. Prevent recurrence — same migration
 
-### 2. Strengthen the GRN → master sync trigger
+Add a trigger `ensure_opening_batch_on_allocation` on `warehouse_bin_allocations` (AFTER INSERT/UPDATE) that, when the item is batch-tracked and the bin's allocated qty exceeds the sum of its `batch_stock_allocations`, auto-creates a `OPEN-…` lot for the delta. Same logic also fires when `warehouse_items.is_batch_tracked` is flipped from `false` → `true` and existing stock has no lots.
 
-Tighten `sync_item_price_on_grn_approval` (same file pattern as `20260611040647`):
+Bulk stock upload, opening-stock entry, and manual bin adjustments all funnel through `warehouse_bin_allocations`, so this single trigger closes every entry path without changing each caller.
 
-- Use the **latest GRN line** per `catalog_item_id` within the batch (currently it just loops, so the last one wins — make that explicit and ordered by `grn_date, created_at` so behaviour is deterministic when one GRN has multiple lines for the same item).
-- Always set `warehouse_item_catalog.last_purchase_price`, `last_purchase_date`, `last_purchase_supplier_id`, `last_purchase_grn_id` (new columns) **in addition to** `unit_cost`. Keeping `unit_cost` as the working master price and `last_purchase_*` as audit-friendly metadata matches SAP MM "Moving Avg / Last PO Price" pattern.
-- Continue to mirror `unit_cost` onto `warehouse_items` for any code that still reads it (FIFO valuation, MIN PDF, stock reconciliation).
+### 3. UI — small clarity tweak
 
-### 3. Backfill
+In `ConvertToIssueDialog` FIFO preview, when an item has bin stock but zero batch coverage, change the banner from "Insufficient Batch Stock" to "No batch assigned — open a lot in Batch Management" and link to `/warehouse/batches?item={id}`. Purely informational; not needed once the trigger is live, but useful while the backfill runs and for any future edge case.
 
-Inside the same migration:
+## Technical details
 
-- Refresh `warehouse_item_catalog.unit_cost` + `last_purchase_*` from the most recent row in `warehouse_item_price_history` per `catalog_item_id`.
-- Refresh `warehouse_items.unit_cost` from the catalog where it is currently NULL/0.
-
-### 4. UI touch-ups (Item Master tab only)
-
-`src/pages/warehouse/ItemBinMaster.tsx` / list cell:
-
-- Tooltip on the Unit Cost cell: "Last purchase price — GRN <grn_number> on <date> from <supplier>". Data already returned by the RPC after step 2 (add `last_purchase_date`, `last_purchase_supplier_name`, `last_purchase_grn_number` to the RETURNS TABLE; thread through `useWarehouseInventoryPage`).
-- No other surfaces change. MIN/GRN/MRN PDFs, valuation reports, and three-way match continue to use the per-company `warehouse_items.unit_cost` they already use.
+- **New migration** `…_auto_opening_batches_for_unbatched_stock.sql`:
+  - Backfill CTE: `delta = bin_alloc − active_batch_alloc` per (company, warehouse_item, location, bin).
+  - `generate_batch_number(company_id, warehouse_item_id)` is reused for the lot number (existing RPC).
+  - Trigger function `public.ensure_opening_batch_on_allocation()` — SECURITY DEFINER, `SET search_path = public`.
+- **No schema changes** to `item_batches` / `warehouse_bin_allocations`.
+- **No RLS changes**; the trigger runs in DB context.
+- **Frontend**: only `src/components/warehouse/ConvertToIssueDialog.tsx` (banner text + link).
 
 ## Out of scope
 
-- Switching valuation method (FIFO / moving-average) — not requested.
-- Editing master price manually from the inventory tab (already possible via "Edit item" dialog which writes to the catalog).
-- Selling price workflow.
-
-## Technical notes
-
-- Files touched:
-  - **New migration** `supabase/migrations/<ts>_item_master_unit_cost_source_of_truth.sql` — adds `last_purchase_*` columns to `warehouse_item_catalog`, updates the trigger, updates `list_warehouse_inventory`, backfills.
-  - `src/hooks/warehouse/useWarehouseInventoryPage.ts` — extend row type with new fields.
-  - `src/pages/warehouse/ItemBinMaster.tsx` (Unit Cost cell) — tooltip.
-- No RLS / grant changes (no new tables).
-- Respects existing memories: `warehouse-catalog-source-of-truth`, `warehouse-inventory-server-pagination`, `list-rpc-pattern`.
+- Cost layer rework (FIFO costing already reads `unit_cost` from the lot — opening lots use the catalog master price set in the recent unit-cost work).
+- Switching valuation method, manual lot edits, or expiry assignment for legacy stock (lots created here have NULL expiry/mfg — user can edit in Batch Management).
+- GRN trigger — already creates lots correctly; untouched.
