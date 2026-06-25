@@ -260,11 +260,13 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
                   </div>
                   {preview.batches.length > 0 && (
                     <div className="text-xs text-muted-foreground space-y-1 pl-2">
-                      {preview.batches.map((b) => (
-                        <div key={b.batch_id} className="flex gap-4">
+                      {preview.batches.map((b, idx) => (
+                        <div key={`${b.batch_id}-${idx}`} className="flex flex-wrap gap-4">
                           <span className="font-mono">{b.batch_number}</span>
+                          {b.bin_code && <span>Bin: {b.bin_code}</span>}
+                          {b.location_name && <span>Loc: {b.location_name}</span>}
                           <span>Take: {b.quantity_from_batch}</span>
-                          <span>(Available: {b.quantity_remaining})</span>
+                          <span>(Available: {b.bin_available})</span>
                           {b.expiry_date && <span>Exp: {b.expiry_date}</span>}
                         </div>
                       ))}
