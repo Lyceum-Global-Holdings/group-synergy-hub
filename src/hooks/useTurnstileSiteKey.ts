@@ -9,6 +9,9 @@ interface TurnstileConfig {
 /**
  * Loads the Cloudflare Turnstile site key from the public `turnstile-config`
  * edge function. Cached indefinitely; the key only changes on rotation.
+ *
+ * `localhost` is whitelisted on the real site key in the Cloudflare dashboard,
+ * so the production key renders and verifies in local dev too — no override.
  */
 export function useTurnstileSiteKey() {
   return useQuery<TurnstileConfig>({
