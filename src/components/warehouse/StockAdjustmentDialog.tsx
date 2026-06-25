@@ -54,7 +54,7 @@ export function StockAdjustmentDialog({
   const { createTransaction, isCreating } = useStockTransactions();
   // skipLocationFilter: all users see all bins/locations for stock adjustments (ISO 55001)
   const { bins } = useWarehouseBins({ skipLocationFilter: true });
-  const { createAllocation, adjustAllocation, getAllocationsForItem } = useWarehouseBinAllocations();
+  const { createAllocation, adjustAllocation } = useWarehouseBinAllocations();
   const { locations } = useWarehouseLocations();
   const [itemAllocations, setItemAllocations] = useState<any[]>([]);
 
