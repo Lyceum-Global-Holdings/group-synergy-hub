@@ -344,7 +344,7 @@ export default function BatchManagement() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          ${batch.unit_cost?.toFixed(2) || '0.00'}
+                          {formatCurrency(batch.unit_cost || 0)}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={config.color}>
