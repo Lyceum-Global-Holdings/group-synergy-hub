@@ -205,7 +205,14 @@ export const useAllBatches = (filters?: BatchFilters, companyId?: string) => {
         .from('item_batches')
         .select(`
           *,
-          warehouse_items!inner(name, item_code, is_batch_tracked)
+          warehouse_items!inner(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(
+              name,
+              item_code,
+              is_batch_tracked
+            )
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -227,12 +234,23 @@ export const useAllBatches = (filters?: BatchFilters, companyId?: string) => {
       const { data, error } = await query;
       if (error) throw error;
 
-      let filteredData = data as ItemBatch[];
+      // Flatten catalog onto warehouse_item for legacy consumers
+      let filteredData = (data ?? []).map((b: any) => {
+        const cat = Array.isArray(b.warehouse_items?.catalog)
+          ? b.warehouse_items.catalog[0]
+          : b.warehouse_items?.catalog;
+        return {
+          ...b,
+          warehouse_item: cat
+            ? { name: cat.name, item_code: cat.item_code, is_batch_tracked: cat.is_batch_tracked }
+            : undefined,
+        };
+      }) as ItemBatch[];
 
       // Apply search filter (client-side for batch_number and item name)
       if (filters?.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
-        filteredData = filteredData.filter(batch => 
+        filteredData = filteredData.filter(batch =>
           batch.batch_number.toLowerCase().includes(searchLower) ||
           batch.warehouse_item?.name?.toLowerCase().includes(searchLower) ||
           batch.warehouse_item?.item_code?.toLowerCase().includes(searchLower)
@@ -249,9 +267,9 @@ export const useAllBatches = (filters?: BatchFilters, companyId?: string) => {
             return !batch.expiry_date;
           }
           if (!batch.expiry_date) return false;
-          
+
           const expiryDate = parseISO(batch.expiry_date);
-          
+
           if (filters.expiryFilter === 'expired') {
             return isBefore(expiryDate, today);
           }
@@ -266,6 +284,7 @@ export const useAllBatches = (filters?: BatchFilters, companyId?: string) => {
     },
   });
 };
+
 
 // Get batch summary statistics
 export const useBatchSummary = () => {
