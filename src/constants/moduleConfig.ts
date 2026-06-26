@@ -112,7 +112,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'customer-master', name: 'Customer Master', description: 'Customer profiles and details', url: '/tuh-modules/customer-master' },
       { key: 'customer-po', name: 'Customer PO', description: 'Customer purchase order management', url: '/tuh-modules/customer-po' },
       { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/tuh-modules/bill-of-materials' },
-      { key: 'finished-goods', name: 'Finished Goods', description: 'Finished goods inventory management', url: '/tuh-modules/finished-goods' }
+      { key: 'finished-goods', name: 'Finished Goods', description: 'Finished goods inventory management', url: '/tuh-modules/finished-goods' },
+      { key: 'costume-catalog', name: 'Costume Catalog', description: 'Rental costume catalog and units', url: '/tuh-modules/costume-catalog' }
     ]
   },
   management: {
