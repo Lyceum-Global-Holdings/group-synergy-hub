@@ -66,6 +66,7 @@ import { SupplierProvider } from "@/contexts/SupplierContext";
 import { SupplierRoute } from "@/components/portal/SupplierRoute";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LocationFilterProvider } from "@/contexts/LocationFilterContext";
+import { CostumeCartProvider } from "@/contexts/CostumeCartContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
@@ -234,13 +235,15 @@ const ProtectedLayout = () => (
     <ProtectedRoute>
       <CompanyProvider>
         <LocationFilterProvider>
-          <AppLayout>
-            <MfaEnforcementGate>
-              <Suspense fallback={<RouteSkeleton />}>
-                <Outlet />
-              </Suspense>
-            </MfaEnforcementGate>
-          </AppLayout>
+          <CostumeCartProvider>
+            <AppLayout>
+              <MfaEnforcementGate>
+                <Suspense fallback={<RouteSkeleton />}>
+                  <Outlet />
+                </Suspense>
+              </MfaEnforcementGate>
+            </AppLayout>
+          </CostumeCartProvider>
         </LocationFilterProvider>
       </CompanyProvider>
     </ProtectedRoute>

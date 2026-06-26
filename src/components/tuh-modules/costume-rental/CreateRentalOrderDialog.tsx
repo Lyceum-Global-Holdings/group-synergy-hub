@@ -21,6 +21,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId?: string;
+  initialItems?: { costume_id: string; quantity: number }[];
+  onCreated?: () => void;
 }
 
 interface LineRow {
@@ -36,7 +38,7 @@ const addDays = (iso: string, n: number) => {
 const rentalDays = (from: string, to: string) =>
   Math.max(1, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000));
 
-export function CreateRentalOrderDialog({ open, onOpenChange, companyId }: Props) {
+export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initialItems, onCreated }: Props) {
   const { customers } = useCustomers(companyId);
   const { costumes } = useCostumes(companyId);
   const { createOrder, isCreating } = useRentalOrders(companyId);
@@ -52,8 +54,12 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId }: Props
   useEffect(() => {
     if (open) {
       setCustomerId(""); setPickup(today()); setDue(addDays(today(), 1));
-      setDiscount("0"); setTax("0"); setNotes(""); setLines([]);
+      setDiscount("0"); setTax("0"); setNotes("");
+      const seeded = (initialItems ?? []).map((i) => ({ costume_id: i.costume_id, quantity: i.quantity, available: null }));
+      setLines(seeded);
+      if (seeded.length > 0) refreshAvailability(seeded);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const costumeById = useMemo(
@@ -128,6 +134,7 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId }: Props
           };
         }),
       });
+      onCreated?.();
       onOpenChange(false);
     } catch { /* toast in hook */ }
   };

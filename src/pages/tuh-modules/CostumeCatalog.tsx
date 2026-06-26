@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Search, Shirt, Tags, Pencil, Boxes } from "lucide-react";
+import { Plus, Search, Shirt, Tags, Pencil, Boxes, ShoppingCart, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,8 @@ import type { Costume, RentalCategory } from "@/types/costumeRental";
 import { CreateCostumeDialog } from "@/components/tuh-modules/costume-rental/CreateCostumeDialog";
 import { ManageUnitsDialog } from "@/components/tuh-modules/costume-rental/ManageUnitsDialog";
 import { RentalCategoriesDialog } from "@/components/tuh-modules/costume-rental/RentalCategoriesDialog";
+import { CostumeCartSheet } from "@/components/tuh-modules/costume-rental/CostumeCartSheet";
+import { useCostumeCart } from "@/contexts/CostumeCartContext";
 
 const STATUS_VARIANT = {
   active: "default" as const,
@@ -27,8 +29,10 @@ export default function CostumeCatalog() {
   const companyId = selectedCompany?.id;
   const { costumes, isLoading } = useCostumes(companyId);
   const { categories } = useRentalCategories(companyId);
+  const cart = useCostumeCart();
 
   const [search, setSearch] = useState("");
+  const [cartOpen, setCartOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [editCostume, setEditCostume] = useState<Costume | null>(null);
@@ -58,6 +62,12 @@ export default function CostumeCatalog() {
           <p className="text-sm text-muted-foreground">Rental costumes organised by category, with individual units.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" className="relative" onClick={() => setCartOpen(true)}>
+            <ShoppingCart className="h-4 w-4 mr-2" /> Bucket
+            {cart.count > 0 && (
+              <Badge className="ml-2 px-1.5 py-0 h-5 min-w-5 justify-center">{cart.count}</Badge>
+            )}
+          </Button>
           <Button variant="outline" onClick={() => setCategoriesOpen(true)}>
             <Tags className="h-4 w-4 mr-2" /> Categories
           </Button>
@@ -119,10 +129,24 @@ export default function CostumeCatalog() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 pt-1">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setUnitsCostume(c)}>
-                    <Boxes className="h-4 w-4 mr-1" /> Units
+                  {cart.quantityOf(c.id) > 0 ? (
+                    <Button size="sm" variant="secondary" className="flex-1" onClick={() => cart.add(c.id)}>
+                      <Check className="h-4 w-4 mr-1" /> In bucket ({cart.quantityOf(c.id)})
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm" className="flex-1"
+                      disabled={c.status !== "active"}
+                      onClick={() => cart.add(c.id)}
+                      title={c.status !== "active" ? "Costume is not active" : "Add to bucket"}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-1" /> Add
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setUnitsCostume(c)} title="Manage units">
+                    <Boxes className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => { setEditCostume(c); setCreateOpen(true); }}>
+                  <Button variant="ghost" size="sm" onClick={() => { setEditCostume(c); setCreateOpen(true); }} title="Edit">
                     <Pencil className="h-4 w-4" />
                   </Button>
                 </div>
@@ -135,6 +159,7 @@ export default function CostumeCatalog() {
       <CreateCostumeDialog open={createOpen} onOpenChange={setCreateOpen} companyId={companyId} costume={editCostume} />
       <ManageUnitsDialog open={!!unitsCostume} onOpenChange={(o) => !o && setUnitsCostume(null)} costume={unitsCostume} />
       <RentalCategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} companyId={companyId} />
+      <CostumeCartSheet open={cartOpen} onOpenChange={setCartOpen} companyId={companyId} />
     </div>
   );
 }
