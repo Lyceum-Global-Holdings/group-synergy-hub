@@ -6,11 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Printer } from "lucide-react";
+import { Plus, Trash2, Printer, ShoppingCart, Check } from "lucide-react";
 import { toast } from "sonner";
 import AssetQRCode from "@/components/warehouse/AssetQRCode";
 import { generateBulkQRCodePdf } from "@/utils/bulkQRCodePdf";
 import { useCostumeUnits } from "@/hooks/useCostumeUnits";
+import { useCostumeCart } from "@/contexts/CostumeCartContext";
 import type { Costume, CostumeUnit, UnitCondition, UnitStatus } from "@/types/costumeRental";
 
 interface Props {
@@ -29,8 +30,10 @@ const STATUS_VARIANT: Record<UnitStatus, "default" | "secondary" | "destructive"
 
 export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
   const { units, createUnit, deleteUnit } = useCostumeUnits(costume?.id);
+  const cart = useCostumeCart();
   const [condition, setCondition] = useState<UnitCondition>("good");
   const [printing, setPrinting] = useState(false);
+  const inBucket = costume ? cart.quantityOf(costume.id) : 0;
 
   const addUnit = async () => {
     if (!costume) return;
@@ -83,7 +86,17 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
           <Button onClick={addUnit} disabled={createUnit.isPending}>
             <Plus className="h-4 w-4 mr-2" /> Add unit
           </Button>
-          <Button variant="outline" className="ml-auto" onClick={printAllLabels} disabled={printing || units.length === 0}>
+          <Button
+            variant={inBucket > 0 ? "secondary" : "outline"}
+            className="ml-auto"
+            onClick={() => costume && cart.add(costume.id)}
+            disabled={!costume || costume.status !== "active"}
+            title={costume && costume.status !== "active" ? "Costume is not active" : "Add to rental bucket"}
+          >
+            {inBucket > 0 ? <Check className="h-4 w-4 mr-2" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+            {inBucket > 0 ? `In bucket (${inBucket})` : "Add to bucket"}
+          </Button>
+          <Button variant="outline" onClick={printAllLabels} disabled={printing || units.length === 0}>
             <Printer className="h-4 w-4 mr-2" /> {printing ? "Preparing…" : "Print labels"}
           </Button>
           <span className="text-sm text-muted-foreground">{units.length} unit(s)</span>

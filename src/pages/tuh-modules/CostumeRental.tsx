@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, CalendarClock } from "lucide-react";
+import { Plus, Search, CalendarClock, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,8 @@ import { useRentalOrders } from "@/hooks/useRentalOrders";
 import { formatCurrency } from "@/lib/utils";
 import type { RentalOrder, RentalOrderStatus } from "@/types/costumeRental";
 import { CreateRentalOrderDialog } from "@/components/tuh-modules/costume-rental/CreateRentalOrderDialog";
+import { CostumeCartSheet } from "@/components/tuh-modules/costume-rental/CostumeCartSheet";
+import { useCostumeCart } from "@/contexts/CostumeCartContext";
 
 const STATUS_VARIANT: Record<RentalOrderStatus, "default" | "secondary" | "destructive" | "outline"> = {
   draft: "outline",
@@ -39,6 +41,8 @@ export default function CostumeRental() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const cart = useCostumeCart();
 
   const isOverdue = (o: RentalOrder) => o.status === "checked_out" && new Date(o.due_date) < new Date();
 
@@ -71,9 +75,17 @@ export default function CostumeRental() {
           </h1>
           <p className="text-sm text-muted-foreground">Book costumes for a date range, approve, check out and return.</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} disabled={!companyId}>
-          <Plus className="h-4 w-4 mr-2" /> New Rental
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setCartOpen(true)}>
+            <ShoppingCart className="h-4 w-4 mr-2" /> Bucket
+            {cart.count > 0 && (
+              <Badge className="ml-2 px-1.5 py-0 h-5 min-w-5 justify-center">{cart.count}</Badge>
+            )}
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} disabled={!companyId}>
+            <Plus className="h-4 w-4 mr-2" /> New Rental
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -166,6 +178,7 @@ export default function CostumeRental() {
       </Card>
 
       <CreateRentalOrderDialog open={createOpen} onOpenChange={setCreateOpen} companyId={companyId} />
+      <CostumeCartSheet open={cartOpen} onOpenChange={setCartOpen} companyId={companyId} />
     </div>
   );
 }
