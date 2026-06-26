@@ -26,11 +26,13 @@ export function useRentalAvailability(
 }
 
 // Imperative one-off availability check (used inside the create dialog).
+// size: "" or "M" → that exact size; undefined/null → all sizes.
 export async function fetchRentalAvailability(
-  costumeId: string, from: string, to: string, excludeOrder?: string,
+  costumeId: string, from: string, to: string, excludeOrder?: string, size?: string | null,
 ): Promise<number> {
   const { data, error } = await (supabase as any).rpc("rental_costume_available_units", {
-    p_costume_id: costumeId, p_from: from, p_to: to, p_exclude_order: excludeOrder ?? null,
+    p_costume_id: costumeId, p_from: from, p_to: to,
+    p_exclude_order: excludeOrder ?? null, p_size: size ?? null,
   });
   if (error) throw error;
   return Number(data ?? 0);

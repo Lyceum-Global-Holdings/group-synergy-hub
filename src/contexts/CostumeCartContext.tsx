@@ -6,16 +6,21 @@ import { useCompany } from "@/contexts/CompanyContext";
 // it survives navigation and reload.
 export interface CostumeCartItem {
   costume_id: string;
+  size: string; // "" = unspecified
   quantity: number;
 }
+
+const sameLine = (a: CostumeCartItem, costumeId: string, size: string) =>
+  a.costume_id === costumeId && a.size === size;
 
 interface CostumeCartValue {
   items: CostumeCartItem[];
   count: number; // total quantity across the cart
-  quantityOf: (costumeId: string) => number;
-  add: (costumeId: string, qty?: number) => void;
-  setQuantity: (costumeId: string, qty: number) => void;
-  remove: (costumeId: string) => void;
+  quantityOf: (costumeId: string, size: string) => number;
+  quantityOfCostume: (costumeId: string) => number; // across all sizes
+  add: (costumeId: string, size: string, qty?: number) => void;
+  setQuantity: (costumeId: string, size: string, qty: number) => void;
+  remove: (costumeId: string, size: string) => void;
   clear: () => void;
 }
 
@@ -33,7 +38,9 @@ export function CostumeCartProvider({ children }: { children: React.ReactNode })
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(keyFor(companyId));
-      setItems(raw ? (JSON.parse(raw) as CostumeCartItem[]) : []);
+      const parsed = raw ? (JSON.parse(raw) as CostumeCartItem[]) : [];
+      // Normalise legacy items that predate sizes.
+      setItems(parsed.map((i) => ({ costume_id: i.costume_id, size: i.size ?? "", quantity: i.quantity })));
     } catch {
       setItems([]);
     }
@@ -45,30 +52,31 @@ export function CostumeCartProvider({ children }: { children: React.ReactNode })
     window.localStorage.setItem(keyFor(companyId), JSON.stringify(items));
   }, [items, companyId]);
 
-  const add = useCallback((costumeId: string, qty = 1) => {
+  const add = useCallback((costumeId: string, size: string, qty = 1) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.costume_id === costumeId);
-      if (existing) return prev.map((i) => (i.costume_id === costumeId ? { ...i, quantity: i.quantity + qty } : i));
-      return [...prev, { costume_id: costumeId, quantity: qty }];
+      const existing = prev.find((i) => sameLine(i, costumeId, size));
+      if (existing) return prev.map((i) => (sameLine(i, costumeId, size) ? { ...i, quantity: i.quantity + qty } : i));
+      return [...prev, { costume_id: costumeId, size, quantity: qty }];
     });
   }, []);
 
-  const setQuantity = useCallback((costumeId: string, qty: number) => {
+  const setQuantity = useCallback((costumeId: string, size: string, qty: number) => {
     setItems((prev) =>
       qty <= 0
-        ? prev.filter((i) => i.costume_id !== costumeId)
-        : prev.map((i) => (i.costume_id === costumeId ? { ...i, quantity: qty } : i)));
+        ? prev.filter((i) => !sameLine(i, costumeId, size))
+        : prev.map((i) => (sameLine(i, costumeId, size) ? { ...i, quantity: qty } : i)));
   }, []);
 
-  const remove = useCallback((costumeId: string) =>
-    setItems((prev) => prev.filter((i) => i.costume_id !== costumeId)), []);
+  const remove = useCallback((costumeId: string, size: string) =>
+    setItems((prev) => prev.filter((i) => !sameLine(i, costumeId, size))), []);
 
   const clear = useCallback(() => setItems([]), []);
 
   const value = useMemo<CostumeCartValue>(() => ({
     items,
     count: items.reduce((s, i) => s + i.quantity, 0),
-    quantityOf: (id) => items.find((i) => i.costume_id === id)?.quantity ?? 0,
+    quantityOf: (id, size) => items.find((i) => sameLine(i, id, size))?.quantity ?? 0,
+    quantityOfCostume: (id) => items.filter((i) => i.costume_id === id).reduce((s, i) => s + i.quantity, 0),
     add, setQuantity, remove, clear,
   }), [items, add, setQuantity, remove, clear]);
 

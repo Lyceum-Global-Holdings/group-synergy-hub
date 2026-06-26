@@ -34,7 +34,7 @@ export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) 
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("rental_costume_units")
-        .select("id, unit_code, costume_id, condition, status")
+        .select("id, unit_code, costume_id, size, condition, status")
         .in("costume_id", costumeIds)
         .eq("status", "available");
       if (error) throw error;
@@ -55,8 +55,9 @@ export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) 
   }, [open, order.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chosen = new Set(slots.map((s) => s.unit_id).filter(Boolean));
-  const unitsFor = (costumeId: string, currentUnitId: string) =>
-    availableUnits.filter((u) => u.costume_id === costumeId && (!chosen.has(u.id) || u.id === currentUnitId));
+  const unitsFor = (costumeId: string, size: string, currentUnitId: string) =>
+    availableUnits.filter((u) =>
+      u.costume_id === costumeId && (u.size ?? "") === size && (!chosen.has(u.id) || u.id === currentUnitId));
 
   const setSlot = (idx: number, patch: Partial<Slot>) =>
     setSlots((p) => p.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
@@ -79,13 +80,17 @@ export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) 
         <div className="space-y-4">
           {items.map((it: RentalOrderItem) => (
             <div key={it.id} className="rounded-lg border p-3 space-y-2">
-              <p className="font-medium text-sm">{it.costume?.name} <span className="text-xs text-muted-foreground">× {it.quantity}</span></p>
+              <p className="font-medium text-sm">
+                {it.costume?.name}
+                {it.size ? <span className="text-xs text-muted-foreground"> · size {it.size}</span> : null}
+                <span className="text-xs text-muted-foreground"> × {it.quantity}</span>
+              </p>
               {Array.from({ length: it.quantity }).map((_, k) => {
                 slotIdx++;
                 const idx = slotIdx;
                 const slot = slots[idx];
                 if (!slot) return null;
-                const opts = unitsFor(it.costume_id, slot.unit_id);
+                const opts = unitsFor(it.costume_id, it.size, slot.unit_id);
                 return (
                   <div key={k} className="flex items-center gap-2">
                     <Select value={slot.unit_id} onValueChange={(v) => setSlot(idx, { unit_id: v })}>

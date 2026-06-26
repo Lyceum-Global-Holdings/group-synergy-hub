@@ -154,7 +154,10 @@ export default function CostumeRentalView() {
             <TableBody>
               {(order.items ?? []).map((it: RentalOrderItem) => (
                 <TableRow key={it.id}>
-                  <TableCell>{it.costume?.name ?? "—"} <span className="text-xs text-muted-foreground font-mono">{it.costume?.costume_code}</span></TableCell>
+                  <TableCell>
+                    {it.costume?.name ?? "—"} <span className="text-xs text-muted-foreground font-mono">{it.costume?.costume_code}</span>
+                    {it.size ? <span className="ml-1 text-xs text-muted-foreground">· {it.size}</span> : null}
+                  </TableCell>
                   <TableCell className="text-right">{it.quantity}</TableCell>
                   <TableCell className="text-right">{it.rental_days}</TableCell>
                   <TableCell className="text-right">{formatCurrency(it.daily_rate)}</TableCell>

@@ -16,6 +16,8 @@ import { CreateCostumeDialog } from "@/components/tuh-modules/costume-rental/Cre
 import { ManageUnitsDialog } from "@/components/tuh-modules/costume-rental/ManageUnitsDialog";
 import { RentalCategoriesDialog } from "@/components/tuh-modules/costume-rental/RentalCategoriesDialog";
 import { CostumeCartSheet } from "@/components/tuh-modules/costume-rental/CostumeCartSheet";
+import { CostumeDetailDialog } from "@/components/tuh-modules/costume-rental/CostumeDetailDialog";
+import { AddToBucketDialog } from "@/components/tuh-modules/costume-rental/AddToBucketDialog";
 import { useCostumeCart } from "@/contexts/CostumeCartContext";
 
 const STATUS_VARIANT = {
@@ -37,6 +39,8 @@ export default function CostumeCatalog() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editCostume, setEditCostume] = useState<Costume | null>(null);
   const [unitsCostume, setUnitsCostume] = useState<Costume | null>(null);
+  const [detailCostume, setDetailCostume] = useState<Costume | null>(null);
+  const [addCostume, setAddCostume] = useState<Costume | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   const filtered = useMemo(() => {
@@ -104,7 +108,8 @@ export default function CostumeCatalog() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((c: Costume) => (
             <Card key={c.id} className="overflow-hidden">
-              <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+              <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden cursor-pointer"
+                   onClick={() => setDetailCostume(c)} title="View details">
                 {c.image_url
                   ? <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" />
                   : <Shirt className="h-10 w-10 text-muted-foreground" />}
@@ -112,7 +117,9 @@ export default function CostumeCatalog() {
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{c.name}</p>
+                    <button className="text-left w-full" onClick={() => setDetailCostume(c)}>
+                      <p className="font-medium truncate hover:underline">{c.name}</p>
+                    </button>
                     <p className="text-xs text-muted-foreground font-mono">{c.costume_code}</p>
                   </div>
                   <Badge variant={STATUS_VARIANT[c.status]} className="capitalize shrink-0">{c.status}</Badge>
@@ -129,15 +136,15 @@ export default function CostumeCatalog() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 pt-1">
-                  {cart.quantityOf(c.id) > 0 ? (
-                    <Button size="sm" variant="secondary" className="flex-1" onClick={() => cart.add(c.id)}>
-                      <Check className="h-4 w-4 mr-1" /> In bucket ({cart.quantityOf(c.id)})
+                  {cart.quantityOfCostume(c.id) > 0 ? (
+                    <Button size="sm" variant="secondary" className="flex-1" onClick={() => setAddCostume(c)} disabled={c.status !== "active"}>
+                      <Check className="h-4 w-4 mr-1" /> In bucket ({cart.quantityOfCostume(c.id)})
                     </Button>
                   ) : (
                     <Button
                       size="sm" className="flex-1"
                       disabled={c.status !== "active"}
-                      onClick={() => cart.add(c.id)}
+                      onClick={() => setAddCostume(c)}
                       title={c.status !== "active" ? "Costume is not active" : "Add to bucket"}
                     >
                       <ShoppingCart className="h-4 w-4 mr-1" /> Add
@@ -160,6 +167,14 @@ export default function CostumeCatalog() {
       <ManageUnitsDialog open={!!unitsCostume} onOpenChange={(o) => !o && setUnitsCostume(null)} costume={unitsCostume} />
       <RentalCategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} companyId={companyId} />
       <CostumeCartSheet open={cartOpen} onOpenChange={setCartOpen} companyId={companyId} />
+      <CostumeDetailDialog
+        open={!!detailCostume}
+        onOpenChange={(o) => !o && setDetailCostume(null)}
+        costume={detailCostume}
+        onManageUnits={(c) => { setDetailCostume(null); setUnitsCostume(c); }}
+        onEdit={(c) => { setDetailCostume(null); setEditCostume(c); setCreateOpen(true); }}
+      />
+      <AddToBucketDialog open={!!addCostume} onOpenChange={(o) => !o && setAddCostume(null)} costume={addCostume} />
     </div>
   );
 }

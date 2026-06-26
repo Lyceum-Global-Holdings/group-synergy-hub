@@ -47,20 +47,23 @@ export function CostumeCartSheet({ open, onOpenChange, companyId }: Props) {
             {items.map((it) => {
               const c = byId.get(it.costume_id);
               return (
-                <div key={it.costume_id} className="flex items-center gap-3 rounded-md border p-2">
+                <div key={`${it.costume_id}-${it.size}`} className="flex items-center gap-3 rounded-md border p-2">
                   <div className="h-10 w-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
                     {c?.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : <Shirt className="h-5 w-5 text-muted-foreground" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{c?.name ?? "Costume"}</p>
+                    <p className="text-sm font-medium truncate">
+                      {c?.name ?? "Costume"}
+                      {it.size && <span className="ml-1 text-xs text-muted-foreground">· {it.size}</span>}
+                    </p>
                     <p className="text-xs text-muted-foreground">{c ? `${formatCurrency(c.daily_rate)}/day` : it.costume_id.slice(0, 8)}</p>
                   </div>
                   <Input
                     type="number" min={1} className="w-16 h-8"
                     value={it.quantity}
-                    onChange={(e) => setQuantity(it.costume_id, Math.max(1, Number(e.target.value) || 1))}
+                    onChange={(e) => setQuantity(it.costume_id, it.size, Math.max(1, Number(e.target.value) || 1))}
                   />
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(it.costume_id)}>
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(it.costume_id, it.size)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

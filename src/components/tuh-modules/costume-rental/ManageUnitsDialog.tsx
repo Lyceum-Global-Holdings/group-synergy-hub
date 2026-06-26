@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,6 +13,7 @@ import AssetQRCode from "@/components/warehouse/AssetQRCode";
 import { generateBulkQRCodePdf } from "@/utils/bulkQRCodePdf";
 import { useCostumeUnits } from "@/hooks/useCostumeUnits";
 import { useCostumeCart } from "@/contexts/CostumeCartContext";
+import { AddToBucketDialog } from "./AddToBucketDialog";
 import type { Costume, CostumeUnit, UnitCondition, UnitStatus } from "@/types/costumeRental";
 
 interface Props {
@@ -32,13 +34,19 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
   const { units, createUnit, deleteUnit } = useCostumeUnits(costume?.id);
   const cart = useCostumeCart();
   const [condition, setCondition] = useState<UnitCondition>("good");
+  const [size, setSize] = useState("");
   const [printing, setPrinting] = useState(false);
-  const inBucket = costume ? cart.quantityOf(costume.id) : 0;
+  const [addOpen, setAddOpen] = useState(false);
+  const inBucket = costume ? cart.quantityOfCostume(costume.id) : 0;
+
+  // Default new-unit size to the costume's nominal size.
+  useEffect(() => { if (open) setSize(costume?.size ?? ""); }, [open, costume]);
 
   const addUnit = async () => {
     if (!costume) return;
     await createUnit.mutateAsync({
       costume_id: costume.id,
+      size: size.trim(),
       condition,
       company_id: costume.company_id,
     });
@@ -65,13 +73,18 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Units — {costume?.name}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-end gap-3 rounded-lg border p-3">
+        <div className="flex items-end gap-3 rounded-lg border p-3 flex-wrap">
+          <div className="space-y-1">
+            <Label>Size</Label>
+            <Input className="w-24" value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. M" />
+          </div>
           <div className="space-y-1">
             <Label>New unit condition</Label>
             <Select value={condition} onValueChange={(v) => setCondition(v as UnitCondition)}>
@@ -89,7 +102,7 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
           <Button
             variant={inBucket > 0 ? "secondary" : "outline"}
             className="ml-auto"
-            onClick={() => costume && cart.add(costume.id)}
+            onClick={() => setAddOpen(true)}
             disabled={!costume || costume.status !== "active"}
             title={costume && costume.status !== "active" ? "Costume is not active" : "Add to rental bucket"}
           >
@@ -109,6 +122,7 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
           {units.map((u: CostumeUnit) => (
             <div key={u.id} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
               <span className="font-mono">{u.unit_code}</span>
+              {u.size ? <Badge variant="outline">{u.size}</Badge> : null}
               <Badge variant={STATUS_VARIANT[u.status]} className="capitalize">{u.status}</Badge>
               <span className="text-muted-foreground capitalize">{u.condition.replace("_", " ")}</span>
               <div className="ml-auto flex items-center gap-2">
@@ -127,5 +141,11 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
         </div>
       </DialogContent>
     </Dialog>
+    <AddToBucketDialog
+      open={addOpen}
+      onOpenChange={setAddOpen}
+      costume={costume ? { ...costume, units } : null}
+    />
+    </>
   );
 }

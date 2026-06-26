@@ -21,7 +21,7 @@ export function useCostumes(companyId?: string) {
     queryFn: async () => {
       let query = (supabase as any)
         .from("rental_costumes")
-        .select("*, category:rental_categories(id, name), units:rental_costume_units(id, status, condition)")
+        .select("*, category:rental_categories(id, name), units:rental_costume_units(id, status, condition, size)")
         .order("created_at", { ascending: false });
       if (companyId) query = query.eq("company_id", companyId);
       const { data, error } = await query;

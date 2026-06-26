@@ -16,17 +16,19 @@ import { useRentalOrders } from "@/hooks/useRentalOrders";
 import { fetchRentalAvailability } from "@/hooks/useRentalAvailability";
 import { formatCurrency } from "@/lib/utils";
 import type { Costume } from "@/types/costumeRental";
+import { costumeSizeOptions, sizeLabel } from "./sizeUtils";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId?: string;
-  initialItems?: { costume_id: string; quantity: number }[];
+  initialItems?: { costume_id: string; size: string; quantity: number }[];
   onCreated?: () => void;
 }
 
 interface LineRow {
   costume_id: string;
+  size: string;
   quantity: number;
   available?: number | null;
 }
@@ -55,7 +57,7 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
     if (open) {
       setCustomerId(""); setPickup(today()); setDue(addDays(today(), 1));
       setDiscount("0"); setTax("0"); setNotes("");
-      const seeded = (initialItems ?? []).map((i) => ({ costume_id: i.costume_id, quantity: i.quantity, available: null }));
+      const seeded = (initialItems ?? []).map((i) => ({ costume_id: i.costume_id, size: i.size, quantity: i.quantity, available: null }));
       setLines(seeded);
       if (seeded.length > 0) refreshAvailability(seeded);
     }
@@ -83,7 +85,7 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
   const refreshAvailability = async (rows: LineRow[]) => {
     const updated = await Promise.all(rows.map(async (l) => {
       if (!l.costume_id) return { ...l, available: null };
-      try { return { ...l, available: await fetchRentalAvailability(l.costume_id, pickup, due) }; }
+      try { return { ...l, available: await fetchRentalAvailability(l.costume_id, pickup, due, undefined, l.size) }; }
       catch { return { ...l, available: null }; }
     }));
     setLines(updated);
@@ -95,14 +97,20 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickup, due]);
 
-  const addLine = () => setLines((p) => [...p, { costume_id: "", quantity: 1, available: null }]);
+  const addLine = () => setLines((p) => [...p, { costume_id: "", size: "", quantity: 1, available: null }]);
   const removeLine = (i: number) => setLines((p) => p.filter((_, idx) => idx !== i));
   const setLine = async (i: number, patch: Partial<LineRow>) => {
+    // When the costume changes, default the size to its first available variant.
+    if (patch.costume_id) {
+      const opts = costumeSizeOptions(costumeById.get(patch.costume_id));
+      patch.size = opts[0]?.size ?? "";
+    }
     const next = lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l));
     setLines(next);
-    if (patch.costume_id) {
+    const row = next[i];
+    if (row.costume_id) {
       try {
-        const avail = await fetchRentalAvailability(patch.costume_id, pickup, due);
+        const avail = await fetchRentalAvailability(row.costume_id, pickup, due, undefined, row.size);
         setLines((p) => p.map((l, idx) => (idx === i ? { ...l, available: avail } : l)));
       } catch { /* ignore */ }
     }
@@ -126,6 +134,7 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
           const c = costumeById.get(l.costume_id)!;
           return {
             costume_id: l.costume_id,
+            size: l.size,
             quantity: l.quantity,
             daily_rate: c.daily_rate,
             rental_days: days,
@@ -177,6 +186,8 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
           {lines.map((l, i) => {
             const c = costumeById.get(l.costume_id);
             const over = l.available != null && l.quantity > l.available;
+            const sizeOpts = costumeSizeOptions(c);
+            const hasSizes = sizeOpts.length > 1 || (sizeOpts.length === 1 && sizeOpts[0].size !== "");
             return (
               <div key={i} className="flex items-center gap-2 rounded-md border p-2">
                 <Select value={l.costume_id} onValueChange={(v) => setLine(i, { costume_id: v })}>
@@ -187,6 +198,16 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
                     ))}
                   </SelectContent>
                 </Select>
+                {l.costume_id && hasSizes && (
+                  <Select value={l.size} onValueChange={(v) => setLine(i, { size: v })}>
+                    <SelectTrigger className="w-24"><SelectValue placeholder="Size" /></SelectTrigger>
+                    <SelectContent>
+                      {sizeOpts.map((s) => (
+                        <SelectItem key={s.size || "_one"} value={s.size}>{sizeLabel(s.size)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Input
                   type="number" min={1} className="w-20" value={l.quantity}
                   onChange={(e) => setLine(i, { quantity: Math.max(1, Number(e.target.value) || 1) })}
