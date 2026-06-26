@@ -496,7 +496,10 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
                             {txn.quantity_change > 0 ? '+' : ''}{txn.quantity_change}
                           </TableCell>
                           <TableCell className="text-right">{txn.quantity_after}</TableCell>
-                          <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                          <TableCell
+                            className="min-w-[200px] whitespace-normal break-words text-muted-foreground"
+                            title={txn.notes || undefined}
+                          >
                             {txn.notes || '-'}
                           </TableCell>
                         </TableRow>
