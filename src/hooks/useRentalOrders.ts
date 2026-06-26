@@ -10,6 +10,7 @@ export function useRentalOrders(companyId?: string) {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
+    queryClient.invalidateQueries({ queryKey: ["rental-order"] }); // detail view
     queryClient.invalidateQueries({ queryKey: ["rental-availability"] });
   };
 
