@@ -91,3 +91,76 @@ export interface CreateCostumeUnitData {
   notes?: string | null;
   company_id: string;
 }
+
+export type RentalOrderStatus =
+  | 'draft' | 'pending_approval' | 'approved' | 'rejected'
+  | 'checked_out' | 'returned' | 'completed' | 'cancelled';
+
+export interface RentalOrderItem {
+  id: string;
+  rental_order_id: string;
+  costume_id: string;
+  quantity: number;
+  daily_rate: number;
+  rental_days: number;
+  line_total: number;
+  security_deposit: number;
+  company_id: string;
+  created_at: string;
+  updated_at: string;
+  costume?: Pick<Costume, 'id' | 'name' | 'costume_code' | 'image_url'> | null;
+}
+
+export interface RentalOrder {
+  id: string;
+  rental_number: string;
+  customer_id: string | null;
+  status: RentalOrderStatus;
+  booking_date: string;
+  pickup_date: string;
+  due_date: string;
+  actual_return_date: string | null;
+  rental_total: number;
+  deposit_total: number;
+  discount_amount: number;
+  tax_amount: number;
+  late_fee: number;
+  damage_fee: number;
+  deposit_refund: number;
+  total_amount: number;
+  pending_approval: boolean;
+  approved_by: string | null;
+  approved_date: string | null;
+  approval_comments: string | null;
+  checked_out_by: string | null;
+  checked_out_at: string | null;
+  returned_by: string | null;
+  returned_at: string | null;
+  notes: string | null;
+  company_id: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  customer?: { id: string; customer_name: string; customer_code: string } | null;
+  items?: RentalOrderItem[];
+}
+
+export interface CreateRentalOrderItemInput {
+  costume_id: string;
+  quantity: number;
+  daily_rate: number;
+  rental_days: number;
+  line_total: number;
+  security_deposit: number;
+}
+
+export interface CreateRentalOrderData {
+  customer_id: string | null;
+  pickup_date: string;
+  due_date: string;
+  discount_amount?: number;
+  tax_amount?: number;
+  notes?: string | null;
+  company_id: string;
+  items: CreateRentalOrderItemInput[];
+}

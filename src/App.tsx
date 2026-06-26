@@ -95,6 +95,8 @@ const CustomerMaster = lazy(() => import("./pages/tuh-modules/CustomerMaster"));
 const CustomerPO = lazy(() => import("./pages/tuh-modules/CustomerPO"));
 const CustomerPoView = lazy(() => import("./pages/tuh-modules/CustomerPoView"));
 const CostumeCatalog = lazy(() => import("./pages/tuh-modules/CostumeCatalog"));
+const CostumeRental = lazy(() => import("./pages/tuh-modules/CostumeRental"));
+const CostumeRentalView = lazy(() => import("./pages/tuh-modules/CostumeRentalView"));
 const MaterialDemandPlanning = lazy(() => import("./pages/procurement/MaterialDemandPlanning"));
 const RfqRfp = lazy(() => import("./pages/procurement/RfqRfp"));
 const BlanketPurchaseOrder = lazy(() => import("./pages/procurement/BlanketPurchaseOrder"));
@@ -350,6 +352,8 @@ function App() {
                 <Route path="/tuh-modules/customer-po" element={<CustomerPO />} />
                 <Route path="/tuh-modules/customer-po/:cpoId" element={<CustomerPoView />} />
                 <Route path="/tuh-modules/costume-catalog" element={<CostumeCatalog />} />
+                <Route path="/tuh-modules/costume-rental" element={<CostumeRental />} />
+                <Route path="/tuh-modules/costume-rental/:rentalId" element={<CostumeRentalView />} />
                 <Route path="/procurement/bill-of-materials" element={<BillOfMaterials />} />
                 <Route path="/procurement/material-demand" element={<MaterialDemandPlanning />} />
                 <Route path="/procurement/rfq-rfp" element={<RfqRfp />} />
