@@ -1,0 +1,20 @@
+# Self-hosted deployment for group-synergy-hub.
+# Copy this file to your server and run:  docker compose up -d
+#
+# The image is published to GHCR by .github/workflows/deploy.yml on every push
+# to main. To update:  docker compose pull && docker compose up -d
+services:
+  app:
+    image: ghcr.io/globallyceum25-dot/group-synergy-hub-635158f0:latest
+    container_name: synergy-hub
+    restart: unless-stopped
+    ports:
+      # host:container — map to 80 directly, or keep 8080 and put a reverse
+      # proxy (Caddy/nginx/Cloudflare Tunnel) in front for TLS. See DEPLOY.md.
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
