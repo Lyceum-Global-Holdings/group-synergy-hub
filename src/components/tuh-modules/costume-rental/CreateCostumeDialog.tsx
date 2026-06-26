@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Upload } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCostumes, uploadCostumeImage } from "@/hooks/useCostumes";
 import { useRentalCategories } from "@/hooks/useRentalCategories";
@@ -27,12 +27,14 @@ const EMPTY = {
   status: "active",
 };
 
+// A gallery image being edited: either an existing url or a new file to upload.
+interface ImgItem { id: string; url?: string; file?: File; preview: string; }
+
 export function CreateCostumeDialog({ open, onOpenChange, companyId, costume }: Props) {
   const { categories } = useRentalCategories(companyId);
   const { createCostume, updateCostume } = useCostumes(companyId);
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [images, setImages] = useState<ImgItem[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -49,14 +51,25 @@ export function CreateCostumeDialog({ open, onOpenChange, companyId, costume }: 
           replacement_value: String(costume.replacement_value ?? 0),
           status: costume.status,
         });
-        setImageUrl(costume.image_url ?? null);
+        const urls = costume.image_urls?.length ? costume.image_urls : (costume.image_url ? [costume.image_url] : []);
+        setImages(urls.map((u) => ({ id: `${u}-${Math.random()}`, url: u, preview: u })));
       } else {
         setForm(EMPTY);
-        setImageUrl(null);
+        setImages([]);
       }
-      setImageFile(null);
     }
   }, [open, costume]);
+
+  const addFiles = (files: FileList | null) => {
+    if (!files) return;
+    const next = Array.from(files).map((f) => ({ id: `${f.name}-${Math.random()}`, file: f, preview: URL.createObjectURL(f) }));
+    setImages((p) => [...p, ...next]);
+  };
+  const removeImage = (id: string) => setImages((p) => p.filter((i) => i.id !== id));
+  const makeCover = (id: string) => setImages((p) => {
+    const i = p.find((x) => x.id === id);
+    return i ? [i, ...p.filter((x) => x.id !== id)] : p;
+  });
 
   const set = (k: keyof typeof EMPTY, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -65,8 +78,15 @@ export function CreateCostumeDialog({ open, onOpenChange, companyId, costume }: 
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     setSaving(true);
     try {
-      let finalImageUrl = imageUrl;
-      if (imageFile) finalImageUrl = await uploadCostumeImage(imageFile);
+      // Upload any new files, preserving order; existing urls pass through.
+      const finalUrls: string[] = [];
+      for (const img of images) {
+        if (img.url) finalUrls.push(img.url);
+        else if (img.file) {
+          const u = await uploadCostumeImage(img.file);
+          if (u) finalUrls.push(u);
+        }
+      }
 
       const payload = {
         name: form.name.trim(),
@@ -77,7 +97,8 @@ export function CreateCostumeDialog({ open, onOpenChange, companyId, costume }: 
         gender: form.gender.trim() || null,
         theme: form.theme.trim() || null,
         brand: form.brand.trim() || null,
-        image_url: finalImageUrl,
+        image_url: finalUrls[0] ?? null,
+        image_urls: finalUrls,
         daily_rate: Number(form.daily_rate) || 0,
         flat_rate: form.flat_rate === "" ? null : Number(form.flat_rate),
         security_deposit: Number(form.security_deposit) || 0,
@@ -159,18 +180,29 @@ export function CreateCostumeDialog({ open, onOpenChange, companyId, costume }: 
           </div>
 
           <div className="col-span-2 space-y-2">
-            <Label>Photo</Label>
-            <div className="flex items-center gap-3">
-              {imageUrl && <img src={imageUrl} alt="" className="h-16 w-16 rounded object-cover border" />}
-              <label className="inline-flex items-center gap-2 cursor-pointer rounded-md border px-3 py-2 text-sm hover:bg-accent">
+            <Label>Photos <span className="text-xs text-muted-foreground font-normal">(first is the cover)</span></Label>
+            <div className="flex flex-wrap items-center gap-2">
+              {images.map((img, idx) => (
+                <div key={img.id} className="relative group">
+                  <img src={img.preview} alt="" className={`h-20 w-20 rounded object-cover border ${idx === 0 ? "ring-2 ring-primary" : ""}`} />
+                  {idx === 0 && <span className="absolute bottom-0 left-0 right-0 text-[10px] text-center bg-primary text-primary-foreground rounded-b">Cover</span>}
+                  <button type="button" onClick={() => removeImage(img.id)}
+                    className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full h-5 w-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100">
+                    <X className="h-3 w-3" />
+                  </button>
+                  {idx !== 0 && (
+                    <button type="button" onClick={() => makeCover(img.id)}
+                      className="absolute bottom-0 left-0 right-0 text-[10px] text-center bg-background/80 opacity-0 group-hover:opacity-100">
+                      Set cover
+                    </button>
+                  )}
+                </div>
+              ))}
+              <label className="h-20 w-20 flex flex-col items-center justify-center gap-1 cursor-pointer rounded-md border border-dashed text-xs text-muted-foreground hover:bg-accent">
                 <Upload className="h-4 w-4" />
-                {imageFile ? imageFile.name : "Upload image"}
-                <input type="file" accept="image/*" className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    setImageFile(f);
-                    if (f) setImageUrl(URL.createObjectURL(f));
-                  }} />
+                Add
+                <input type="file" accept="image/*" multiple className="hidden"
+                  onChange={(e) => { addFiles(e.target.files); e.currentTarget.value = ""; }} />
               </label>
             </div>
           </div>

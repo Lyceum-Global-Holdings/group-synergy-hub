@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shirt, ShoppingCart, Boxes, Pencil } from "lucide-react";
+import { Shirt, ShoppingCart, Boxes, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { Costume } from "@/types/costumeRental";
 import { costumeSizeOptions, sizeLabel } from "./sizeUtils";
@@ -25,6 +25,12 @@ const STATUS_VARIANT = {
 export function CostumeDetailDialog({ open, onOpenChange, costume, onManageUnits, onEdit }: Props) {
   const sizes = useMemo(() => costumeSizeOptions(costume), [costume]);
   const [addOpen, setAddOpen] = useState(false);
+  const gallery = useMemo(() => {
+    const urls = costume?.image_urls?.length ? costume.image_urls : (costume?.image_url ? [costume.image_url] : []);
+    return urls.filter(Boolean);
+  }, [costume]);
+  const [active, setActive] = useState(0);
+  useEffect(() => { setActive(0); }, [costume]);
   if (!costume) return null;
 
   const attrs: [string, string | null | undefined][] = [
@@ -49,10 +55,35 @@ export function CostumeDetailDialog({ open, onOpenChange, costume, onManageUnits
           </DialogHeader>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="aspect-[4/3] rounded-lg bg-muted overflow-hidden flex items-center justify-center">
-              {costume.image_url
-                ? <img src={costume.image_url} alt={costume.name} className="h-full w-full object-cover" />
-                : <Shirt className="h-12 w-12 text-muted-foreground" />}
+            <div className="space-y-2">
+              <div className="relative aspect-[4/3] rounded-lg bg-muted overflow-hidden flex items-center justify-center group">
+                {gallery.length > 0
+                  ? <img src={gallery[active]} alt={costume.name} className="h-full w-full object-cover" />
+                  : <Shirt className="h-12 w-12 text-muted-foreground" />}
+                {gallery.length > 1 && (
+                  <>
+                    <button type="button" onClick={() => setActive((a) => (a - 1 + gallery.length) % gallery.length)}
+                      className="absolute left-1 top-1/2 -translate-y-1/2 bg-background/80 rounded-full p-1 hover:bg-background">
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => setActive((a) => (a + 1) % gallery.length)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 bg-background/80 rounded-full p-1 hover:bg-background">
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                    <span className="absolute bottom-1 right-2 text-xs bg-background/80 rounded px-1.5">{active + 1}/{gallery.length}</span>
+                  </>
+                )}
+              </div>
+              {gallery.length > 1 && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {gallery.map((u, i) => (
+                    <button key={i} type="button" onClick={() => setActive(i)}
+                      className={`h-12 w-12 rounded overflow-hidden border ${i === active ? "ring-2 ring-primary" : ""}`}>
+                      <img src={u} alt="" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="space-y-2 text-sm">
               <p className="font-mono text-xs text-muted-foreground">{costume.costume_code}</p>

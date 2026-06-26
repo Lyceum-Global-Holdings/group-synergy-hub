@@ -36,6 +36,7 @@ export interface Costume {
   theme: string | null;
   brand: string | null;
   image_url: string | null;
+  image_urls: string[];
   daily_rate: number;
   flat_rate: number | null;
   security_deposit: number;
@@ -62,6 +63,7 @@ export interface CreateCostumeData {
   theme?: string | null;
   brand?: string | null;
   image_url?: string | null;
+  image_urls?: string[];
   daily_rate: number;
   flat_rate?: number | null;
   security_deposit?: number;
