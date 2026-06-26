@@ -80,6 +80,30 @@ export function useRentalOrders(companyId?: string) {
     onError: (e: any) => toast.error(e?.message ?? "Action failed"),
   });
 
+  // Fulfillment transitions that carry jsonb payloads (checkout/return/complete).
+  const fulfillment = useMutation({
+    mutationFn: async (args: {
+      rpc: "checkout_rental_order" | "return_rental_order" | "complete_rental_order";
+      id: string; assignments?: any[]; returns?: any[]; damageFee?: number; okMsg: string;
+    }) => {
+      const params: Record<string, any> = { p_id: args.id };
+      if (args.assignments !== undefined) params.p_assignments = args.assignments;
+      if (args.returns !== undefined) params.p_returns = args.returns;
+      if (args.damageFee !== undefined) params.p_damage_fee = args.damageFee;
+      const { data, error } = await (supabase as any).rpc(args.rpc, params);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_d, vars) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["rental-order"] });
+      queryClient.invalidateQueries({ queryKey: ["costume-units"] });
+      queryClient.invalidateQueries({ queryKey: ["costumes"] });
+      toast.success(vars.okMsg);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Action failed"),
+  });
+
   return {
     orders, isLoading, error,
     createOrder,
@@ -87,7 +111,10 @@ export function useRentalOrders(companyId?: string) {
     approveOrder: (id: string, comments?: string) => lifecycle.mutateAsync({ rpc: "approve_rental_order", id, comments, okMsg: "Rental approved" }),
     rejectOrder: (id: string, reason?: string) => lifecycle.mutateAsync({ rpc: "reject_rental_order", id, reason, okMsg: "Rental rejected" }),
     cancelOrder: (id: string, reason?: string) => lifecycle.mutateAsync({ rpc: "cancel_rental_order", id, reason, okMsg: "Rental cancelled" }),
-    isMutating: lifecycle.isPending,
+    checkoutOrder: (id: string, assignments: any[]) => fulfillment.mutateAsync({ rpc: "checkout_rental_order", id, assignments, okMsg: "Checked out" }),
+    returnOrder: (id: string, returns: any[], damageFee: number) => fulfillment.mutateAsync({ rpc: "return_rental_order", id, returns, damageFee, okMsg: "Return processed" }),
+    completeOrder: (id: string) => fulfillment.mutateAsync({ rpc: "complete_rental_order", id, okMsg: "Rental completed" }),
+    isMutating: lifecycle.isPending || fulfillment.isPending,
     isCreating: createOrder.isPending,
   };
 }
@@ -97,6 +124,8 @@ export function useRentalOrder(id?: string) {
     queryKey: ["rental-order", id],
     enabled: !!id,
     queryFn: async () => {
+      // Note: assignments (Phase C) are fetched separately by the Return dialog,
+      // so viewing an order never depends on the rental_unit_assignments table.
       const { data, error } = await (supabase as any)
         .from("rental_orders")
         .select("*, customer:customers(id, customer_name, customer_code), items:rental_order_items(*, costume:rental_costumes(id, name, costume_code, image_url))")

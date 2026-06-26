@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, X, Send, Ban, PackageCheck } from "lucide-react";
+import { ArrowLeft, Check, X, Send, Ban, PackageCheck, Undo2, CheckCircle2 } from "lucide-react";
+import { CheckoutDialog } from "@/components/tuh-modules/costume-rental/CheckoutDialog";
+import { ReturnDialog } from "@/components/tuh-modules/costume-rental/ReturnDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,10 +23,12 @@ export default function CostumeRentalView() {
   const navigate = useNavigate();
   const { selectedCompany } = useCompany();
   const { data: order, isLoading } = useRentalOrder(rentalId);
-  const { submitOrder, approveOrder, rejectOrder, cancelOrder, isMutating } = useRentalOrders(selectedCompany?.id);
+  const { submitOrder, approveOrder, rejectOrder, cancelOrder, completeOrder, isMutating } = useRentalOrders(selectedCompany?.id);
   const { data: isAdmin } = useIsAdmin();
   const { data: isSuperAdmin } = useSuperAdmin();
   const canApprove = (isAdmin || isSuperAdmin) ?? false;
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
 
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!order) return <div className="p-6 text-sm text-muted-foreground">Rental order not found.</div>;
@@ -62,9 +67,19 @@ export default function CostumeRentalView() {
             </Button>
           </>
         )}
-        {s === "approved" && (
-          <Button variant="outline" disabled title="Available in the next phase">
-            <PackageCheck className="h-4 w-4 mr-2" /> Check out (next phase)
+        {s === "approved" && canApprove && (
+          <Button onClick={() => setCheckoutOpen(true)} disabled={isMutating}>
+            <PackageCheck className="h-4 w-4 mr-2" /> Check out
+          </Button>
+        )}
+        {s === "checked_out" && canApprove && (
+          <Button onClick={() => setReturnOpen(true)} disabled={isMutating}>
+            <Undo2 className="h-4 w-4 mr-2" /> Process return
+          </Button>
+        )}
+        {s === "returned" && (
+          <Button onClick={() => completeOrder(order.id)} disabled={isMutating}>
+            <CheckCircle2 className="h-4 w-4 mr-2" /> Complete
           </Button>
         )}
         {["draft", "pending_approval", "approved", "rejected"].includes(s) && (
@@ -128,7 +143,17 @@ export default function CostumeRentalView() {
         <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>−{formatCurrency(order.discount_amount)}</span></div>
         <div className="flex justify-between font-medium border-t pt-1"><span>Payable</span><span>{formatCurrency(order.total_amount)}</span></div>
         <div className="flex justify-between text-muted-foreground"><span>Security deposit</span><span>{formatCurrency(order.deposit_total)}</span></div>
+        {(order.status === "returned" || order.status === "completed") && (
+          <>
+            <div className="flex justify-between text-muted-foreground"><span>Late fee</span><span>−{formatCurrency(order.late_fee)}</span></div>
+            <div className="flex justify-between text-muted-foreground"><span>Damage fee</span><span>−{formatCurrency(order.damage_fee)}</span></div>
+            <div className="flex justify-between font-medium border-t pt-1"><span>Deposit refund</span><span>{formatCurrency(order.deposit_refund)}</span></div>
+          </>
+        )}
       </div>
+
+      <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} order={order} companyId={selectedCompany?.id} />
+      <ReturnDialog open={returnOpen} onOpenChange={setReturnOpen} order={order} companyId={selectedCompany?.id} />
     </div>
   );
 }

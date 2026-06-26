@@ -96,6 +96,20 @@ export type RentalOrderStatus =
   | 'draft' | 'pending_approval' | 'approved' | 'rejected'
   | 'checked_out' | 'returned' | 'completed' | 'cancelled';
 
+export interface UnitAssignment {
+  id: string;
+  order_item_id: string;
+  unit_id: string;
+  condition_out: UnitCondition;
+  condition_in: UnitCondition | null;
+  returned: boolean;
+  damage_notes: string | null;
+  company_id: string;
+  created_at: string;
+  updated_at: string;
+  unit?: Pick<CostumeUnit, 'id' | 'unit_code'> | null;
+}
+
 export interface RentalOrderItem {
   id: string;
   rental_order_id: string;
@@ -109,6 +123,7 @@ export interface RentalOrderItem {
   created_at: string;
   updated_at: string;
   costume?: Pick<Costume, 'id' | 'name' | 'costume_code' | 'image_url'> | null;
+  assignments?: UnitAssignment[];
 }
 
 export interface RentalOrder {
