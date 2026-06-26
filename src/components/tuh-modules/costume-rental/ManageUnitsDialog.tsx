@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Printer } from "lucide-react";
+import { toast } from "sonner";
 import AssetQRCode from "@/components/warehouse/AssetQRCode";
+import { generateBulkQRCodePdf } from "@/utils/bulkQRCodePdf";
 import { useCostumeUnits } from "@/hooks/useCostumeUnits";
 import type { Costume, CostumeUnit, UnitCondition, UnitStatus } from "@/types/costumeRental";
 
@@ -28,6 +30,7 @@ const STATUS_VARIANT: Record<UnitStatus, "default" | "secondary" | "destructive"
 export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
   const { units, createUnit, deleteUnit } = useCostumeUnits(costume?.id);
   const [condition, setCondition] = useState<UnitCondition>("good");
+  const [printing, setPrinting] = useState(false);
 
   const addUnit = async () => {
     if (!costume) return;
@@ -36,6 +39,26 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
       condition,
       company_id: costume.company_id,
     });
+  };
+
+  const printAllLabels = async () => {
+    if (!costume || units.length === 0) return;
+    setPrinting(true);
+    try {
+      const blob = await generateBulkQRCodePdf(
+        units.map((u: CostumeUnit) => ({ id: u.id, name: costume.name, asset_tag: u.unit_code })),
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${costume.costume_code}-qr-labels.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(`Failed to generate labels: ${e.message}`);
+    } finally {
+      setPrinting(false);
+    }
   };
 
   return (
@@ -60,7 +83,10 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
           <Button onClick={addUnit} disabled={createUnit.isPending}>
             <Plus className="h-4 w-4 mr-2" /> Add unit
           </Button>
-          <span className="ml-auto text-sm text-muted-foreground">{units.length} unit(s)</span>
+          <Button variant="outline" className="ml-auto" onClick={printAllLabels} disabled={printing || units.length === 0}>
+            <Printer className="h-4 w-4 mr-2" /> {printing ? "Preparing…" : "Print labels"}
+          </Button>
+          <span className="text-sm text-muted-foreground">{units.length} unit(s)</span>
         </div>
 
         <div className="space-y-1">

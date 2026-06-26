@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useRentalOrders } from "@/hooks/useRentalOrders";
 import { formatCurrency } from "@/lib/utils";
@@ -33,20 +36,30 @@ export default function CostumeRental() {
   const { orders, isLoading } = useRentalOrders(companyId);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [overdueOnly, setOverdueOnly] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+
+  const isOverdue = (o: RentalOrder) => o.status === "checked_out" && new Date(o.due_date) < new Date();
 
   const filtered = useMemo(() =>
     orders.filter((o: RentalOrder) => {
       const q = search.toLowerCase();
-      return o.rental_number.toLowerCase().includes(q) ||
+      const matchesSearch = o.rental_number.toLowerCase().includes(q) ||
         (o.customer?.customer_name ?? "").toLowerCase().includes(q);
-    }), [orders, search]);
+      const matchesStatus = statusFilter === "all" || o.status === statusFilter;
+      const matchesOverdue = !overdueOnly || isOverdue(o);
+      return matchesSearch && matchesStatus && matchesOverdue;
+    }), [orders, search, statusFilter, overdueOnly]);
 
   const stats = useMemo(() => ({
-    total: orders.length,
     pending: orders.filter((o) => o.status === "pending_approval").length,
     out: orders.filter((o) => o.status === "checked_out").length,
-    overdue: orders.filter((o) => o.status === "checked_out" && new Date(o.due_date) < new Date()).length,
+    overdue: orders.filter(isOverdue).length,
+    revenue: orders.filter((o) => o.status === "returned" || o.status === "completed")
+      .reduce((s, o) => s + Number(o.total_amount || 0), 0),
+    depositsHeld: orders.filter((o) => o.status === "checked_out")
+      .reduce((s, o) => s + Number(o.deposit_total || 0), 0),
   }), [orders]);
 
   return (
@@ -63,23 +76,50 @@ export default function CostumeRental() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Total", value: stats.total },
-          { label: "Pending approval", value: stats.pending },
-          { label: "Checked out", value: stats.out },
-          { label: "Overdue", value: stats.overdue },
-        ].map((s) => (
-          <Card key={s.label}><CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className="text-2xl font-semibold">{s.value}</p>
-          </CardContent></Card>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Pending approval</p>
+          <p className="text-2xl font-semibold">{stats.pending}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Checked out</p>
+          <p className="text-2xl font-semibold">{stats.out}</p>
+        </CardContent></Card>
+        <Card
+          className={`cursor-pointer transition ${overdueOnly ? "ring-2 ring-destructive" : ""}`}
+          onClick={() => setOverdueOnly((v) => !v)}
+          title="Click to filter overdue rentals"
+        ><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Overdue</p>
+          <p className={`text-2xl font-semibold ${stats.overdue > 0 ? "text-destructive" : ""}`}>{stats.overdue}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Revenue (returned)</p>
+          <p className="text-2xl font-semibold">{formatCurrency(stats.revenue)}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Deposits held</p>
+          <p className="text-2xl font-semibold">{formatCurrency(stats.depositsHeld)}</p>
+        </CardContent></Card>
       </div>
 
-      <div className="relative w-72">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input className="pl-8" placeholder="Search by number or customer…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-72">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-8" placeholder="Search by number or customer…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {["draft", "pending_approval", "approved", "checked_out", "returned", "completed", "rejected", "cancelled"].map((st) => (
+              <SelectItem key={st} value={st} className="capitalize">{st.replace(/_/g, " ")}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {overdueOnly && (
+          <Button variant="ghost" size="sm" onClick={() => setOverdueOnly(false)}>Clear overdue filter</Button>
+        )}
       </div>
 
       <Card>
@@ -112,7 +152,10 @@ export default function CostumeRental() {
                     <TableCell className={overdue ? "text-destructive font-medium" : ""}>{fmtDate(o.due_date)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(o.total_amount)}</TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_VARIANT[o.status]} className="capitalize">{o.status.replace(/_/g, " ")}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={STATUS_VARIANT[o.status]} className="capitalize">{o.status.replace(/_/g, " ")}</Badge>
+                        {overdue && <Badge variant="destructive">Overdue</Badge>}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
