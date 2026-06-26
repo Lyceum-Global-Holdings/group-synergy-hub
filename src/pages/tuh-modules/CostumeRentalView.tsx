@@ -6,6 +6,9 @@ import { ReturnDialog } from "@/components/tuh-modules/costume-rental/ReturnDial
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -29,12 +32,32 @@ export default function CostumeRentalView() {
   const canApprove = (isAdmin || isSuperAdmin) ?? false;
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  const [action, setAction] = useState<null | "approve" | "reject" | "cancel">(null);
+  const [reason, setReason] = useState("");
 
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!order) return <div className="p-6 text-sm text-muted-foreground">Rental order not found.</div>;
 
   const s = order.status;
-  const prompt = (msg: string) => window.prompt(msg) ?? undefined;
+
+  const ACTION_META = {
+    approve: { title: "Approve rental", label: "Comment (optional)", required: false, btn: "Approve", variant: "default" as const },
+    reject: { title: "Reject rental", label: "Reason for rejection", required: true, btn: "Reject", variant: "destructive" as const },
+    cancel: { title: "Cancel rental", label: "Cancellation reason (optional)", required: false, btn: "Cancel rental", variant: "destructive" as const },
+  };
+
+  const runAction = async () => {
+    if (!action) return;
+    const r = reason.trim() || undefined;
+    try {
+      if (action === "approve") await approveOrder(order.id, r);
+      else if (action === "reject") await rejectOrder(order.id, r);
+      else if (action === "cancel") await cancelOrder(order.id, r);
+    } finally {
+      setAction(null);
+      setReason("");
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
@@ -59,10 +82,10 @@ export default function CostumeRentalView() {
         )}
         {s === "pending_approval" && canApprove && (
           <>
-            <Button onClick={() => approveOrder(order.id, prompt("Approval comment (optional):"))} disabled={isMutating}>
+            <Button onClick={() => { setReason(""); setAction("approve"); }} disabled={isMutating}>
               <Check className="h-4 w-4 mr-2" /> Approve
             </Button>
-            <Button variant="outline" onClick={() => rejectOrder(order.id, prompt("Reason for rejection:"))} disabled={isMutating}>
+            <Button variant="outline" onClick={() => { setReason(""); setAction("reject"); }} disabled={isMutating}>
               <X className="h-4 w-4 mr-2" /> Reject
             </Button>
           </>
@@ -83,7 +106,7 @@ export default function CostumeRentalView() {
           </Button>
         )}
         {["draft", "pending_approval", "approved", "rejected"].includes(s) && (
-          <Button variant="ghost" className="text-destructive" onClick={() => cancelOrder(order.id, prompt("Cancellation reason (optional):"))} disabled={isMutating}>
+          <Button variant="ghost" className="text-destructive" onClick={() => { setReason(""); setAction("cancel"); }} disabled={isMutating}>
             <Ban className="h-4 w-4 mr-2" /> Cancel
           </Button>
         )}
@@ -103,6 +126,14 @@ export default function CostumeRentalView() {
 
       {order.approval_comments && (
         <p className="text-sm"><span className="text-muted-foreground">Approval/Reject note: </span>{order.approval_comments}</p>
+      )}
+
+      {(order.approved_date || order.checked_out_at || order.returned_at) && (
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+          {order.approved_date && <span>{order.status === "rejected" ? "Rejected" : "Approved"}: {fmtDate(order.approved_date)}</span>}
+          {order.checked_out_at && <span>Checked out: {fmtDate(order.checked_out_at)}</span>}
+          {order.returned_at && <span>Returned: {fmtDate(order.returned_at)}</span>}
+        </div>
       )}
 
       {/* Items */}
@@ -154,6 +185,29 @@ export default function CostumeRentalView() {
 
       <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} order={order} companyId={selectedCompany?.id} />
       <ReturnDialog open={returnOpen} onOpenChange={setReturnOpen} order={order} companyId={selectedCompany?.id} />
+
+      <Dialog open={!!action} onOpenChange={(o) => { if (!o) { setAction(null); setReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{action ? ACTION_META[action].title : ""}</DialogTitle></DialogHeader>
+          {action && (
+            <div className="space-y-2">
+              <Label>{ACTION_META[action].label}</Label>
+              <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)}
+                placeholder={ACTION_META[action].required ? "Required" : "Optional"} autoFocus />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAction(null); setReason(""); }}>Back</Button>
+            <Button
+              variant={action ? ACTION_META[action].variant : "default"}
+              disabled={isMutating || (action ? ACTION_META[action].required && !reason.trim() : false)}
+              onClick={runAction}
+            >
+              {action ? ACTION_META[action].btn : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
