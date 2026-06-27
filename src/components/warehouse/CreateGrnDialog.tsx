@@ -90,6 +90,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   const updateDraftGrn = useUpdateDraftGrnWithItems();
   const [overallDiscType, setOverallDiscType] = useState<'none' | 'percent' | 'fixed'>('none');
   const [overallDiscValue, setOverallDiscValue] = useState<number>(0);
+  const [taxType, setTaxType] = useState<'none' | 'percent' | 'fixed'>('none');
+  const [taxValue, setTaxValue] = useState<number>(0);
   const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
@@ -125,6 +127,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     setInvoiceDocumentUrl(editingDraft.invoice_document_url || '');
     setOverallDiscType((editingDraft.discount_type as any) || 'none');
     setOverallDiscValue(Number(editingDraft.discount_value) || 0);
+    setTaxType((editingDraft.tax_type as any) || 'none');
+    setTaxValue(Number(editingDraft.tax_value) || 0);
     const hydratedItems: CreateGrnItemData[] = (editingDraft.grn_items || []).map((row: any) => ({
       po_item_id: row.po_item_id ?? undefined,
       warehouse_item_id: row.warehouse_item_id ?? undefined,
@@ -476,6 +480,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       remarks: values.remarks || undefined,
       discount_type: overallDiscType === 'none' ? null : overallDiscType,
       discount_value: overallDiscType === 'none' ? 0 : (Number(overallDiscValue) || 0),
+      tax_type: taxType === 'none' ? null : taxType,
+      tax_value: taxType === 'none' ? 0 : (Number(taxValue) || 0),
       company_id: selectedCompany?.id,
     };
 
@@ -499,6 +505,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     setItems([]);
     setOverallDiscType('none');
     setOverallDiscValue(0);
+    setTaxType('none');
+    setTaxValue(0);
     setSelectedPoId('');
     setInvoiceDocumentUrl('');
   };
@@ -999,6 +1007,9 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
               afterLine,
             );
             const netTotal = afterLine - docDisc;
+            const tv = Number(taxValue) || 0;
+            const taxAmt = Math.max(0, taxType === 'percent' ? (netTotal * tv) / 100 : taxType === 'fixed' ? tv : 0);
+            const grandTotal = netTotal + taxAmt;
             const fmt = (n: number) => `Rs. ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             return (
               <div className="ml-auto w-full max-w-sm rounded-lg border p-4 space-y-2 text-sm">
@@ -1025,7 +1036,27 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                 {docDisc > 0 && (
                   <div className="flex justify-between text-muted-foreground"><span>Overall discount applied</span><span>−{fmt(docDisc)}</span></div>
                 )}
-                <div className="flex justify-between font-semibold border-t pt-2 text-base"><span>Net total</span><span>{fmt(netTotal)}</span></div>
+                <div className="flex justify-between border-t pt-2"><span className="text-muted-foreground">Net (goods)</span><span>{fmt(netTotal)}</span></div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Tax</span>
+                  <div className="flex items-center gap-1">
+                    <Select value={taxType} onValueChange={(v) => setTaxType(v as any)}>
+                      <SelectTrigger className="w-[72px] h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">—</SelectItem>
+                        <SelectItem value="percent">%</SelectItem>
+                        <SelectItem value="fixed">Rs</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input type="number" min="0" className="w-24 h-9" value={taxValue}
+                      disabled={taxType === 'none'}
+                      onChange={(e) => setTaxValue(parseFloat(e.target.value) || 0)} />
+                  </div>
+                </div>
+                {taxAmt > 0 && (
+                  <div className="flex justify-between text-muted-foreground"><span>Tax applied</span><span>+{fmt(taxAmt)}</span></div>
+                )}
+                <div className="flex justify-between font-semibold border-t pt-2 text-base"><span>Grand total (payable)</span><span>{fmt(grandTotal)}</span></div>
               </div>
             );
           })()}

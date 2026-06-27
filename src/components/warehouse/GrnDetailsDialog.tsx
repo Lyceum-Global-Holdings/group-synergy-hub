@@ -281,9 +281,16 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                                 <span>−{lkr(Number(grn.discount_amount))}</span>
                               </div>
                             )}
+                            <div className="flex justify-between text-sm border-t pt-1.5"><span className="text-muted-foreground">Net (goods)</span><span>{lkr(grn.total_value || 0)}</span></div>
+                            {Number(grn.tax_amount) > 0 && (
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Tax{grn.tax_type === 'percent' ? ` (${grn.tax_value}%)` : ''}</span>
+                                <span>+{lkr(Number(grn.tax_amount))}</span>
+                              </div>
+                            )}
                             <div className="flex items-end justify-between border-t pt-1.5 mt-1">
-                              <span className="text-sm font-medium">Net total</span>
-                              <span className="text-2xl font-bold">{lkr(grn.total_value || 0)}</span>
+                              <span className="text-sm font-medium">Grand total</span>
+                              <span className="text-2xl font-bold">{lkr(grn.grand_total || grn.total_value || 0)}</span>
                             </div>
                           </>
                         );

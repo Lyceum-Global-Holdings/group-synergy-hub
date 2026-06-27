@@ -158,6 +158,8 @@ export const useCreateGoodsReceiptNote = () => {
           status: data.status,
           discount_type: data.discount_type ?? null,
           discount_value: data.discount_value ?? 0,
+          tax_type: data.tax_type ?? null,
+          tax_value: data.tax_value ?? 0,
           company_id: data.company_id || null,
           created_by: user.id,
         } as any)
@@ -329,6 +331,8 @@ export const useUpdateDraftGrnWithItems = () => {
           remarks: header.remarks ?? null,
           discount_type: header.discount_type ?? null,
           discount_value: header.discount_value ?? 0,
+          tax_type: header.tax_type ?? null,
+          tax_value: header.tax_value ?? 0,
           status: submit ? 'submitted' : 'draft',
         } as any)
         .eq('id', id);

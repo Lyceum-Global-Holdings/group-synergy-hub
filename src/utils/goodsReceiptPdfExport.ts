@@ -221,10 +221,16 @@ export async function downloadGrnPdf(opts: GenerateOptions): Promise<void> {
       doc.text(`Overall Discount: -${fmtMoney(grn.discount_amount, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
       cursorY += 14;
     }
+    doc.text(`Net (Goods): ${fmtMoney(grn.total_value, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
+    cursorY += 14;
+  }
+  if (Number(grn.tax_amount) > 0) {
+    doc.text(`Tax: +${fmtMoney(grn.tax_amount, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
+    cursorY += 14;
   }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text(`Grand Total: ${fmtMoney(grn.total_value, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
+  doc.text(`Grand Total: ${fmtMoney(grn.grand_total ?? grn.total_value, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
   cursorY += 18;
 
   // ---------- Rejection panel (if rejected) ----------
