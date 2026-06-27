@@ -14,8 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Package, ListPlus, AlertTriangle, PackageSearch, ChevronDown } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Trash2, Package, ListPlus, AlertTriangle, PackageSearch } from 'lucide-react';
 import { BrowseInventoryDialog, type BrowsePickedRow } from './BrowseInventoryDialog';
 import { BulkAddItemsPanel } from './material-issue/BulkAddItemsPanel';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
@@ -98,7 +97,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
   
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
-  const [showOptional, setShowOptional] = useState(false);
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
   const [bufferedAttachments, setBufferedAttachments] = useState<BufferedAttachment[]>([]);
   const [browseOpen, setBrowseOpen] = useState(false);
@@ -153,7 +151,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
     setItems([]);
     setReservedItems([]);
     setLocationTouched(false);
-    setShowOptional(false);
     setSrnDocumentTempPath('');
     setBrowseOpen(false);
     setCurrentTab('header');
@@ -181,12 +178,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
       location_id: editingDraft.location_id ?? '',
     });
     setLocationTouched(true); // prevent auto-default effect from overwriting saved location
-    // Auto-expand the optional section if the draft already has optional data,
-    // so saved values aren't hidden behind the collapsed toggle.
-    setShowOptional(Boolean(
-      editingDraft.cpo_id || editingDraft.contact_number || editingDraft.epf_number ||
-      editingDraft.job_number || editingDraft.pr_number,
-    ));
     (async () => {
       const { data, error } = await supabase
         .from('material_issue_items')
@@ -561,182 +552,121 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
             <TabsTrigger value="review">Review</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="header" className="space-y-4">
-            {/* Essentials — the minimum needed to issue stock */}
-            {/* Location Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="location_id">Issue Location <span className="text-destructive">*</span></Label>
-              <Select
-                value={formData.location_id}
-                onValueChange={(value) => {
-                  setLocationTouched(true);
-                  handleInputChange('location_id', value);
-                }}
-                disabled={!selectedCompany?.id}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={selectedCompany?.id ? "Select storage location for this issue" : "Select a company first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredLocations.map((loc: any) => (
-                    <SelectItem key={loc.id} value={loc.id}>
-                      {'\u00A0\u00A0'.repeat(Math.max(0, loc.depth ?? 0))}{loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {selectedCompany?.name
-                  ? <>Company: <strong>{selectedCompany.name}</strong>{!locationTouched && formData.location_id ? ' — auto-selected from header context.' : '. Stock will be issued only from bins at the selected location.'}</>
-                  : 'Stock will be issued only from bins at the selected location.'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="requested_by">Requested By *</Label>
-                <Input
-                  id="requested_by"
-                  value={formData.requested_by}
-                  onChange={(e) => handleInputChange('requested_by', e.target.value)}
-                  placeholder="Name of requester"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="department">Department *</Label>
-                <Input
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => handleInputChange('department', e.target.value)}
-                  placeholder="Department name"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="purpose">Purpose of Issue *</Label>
-              <Textarea
-                id="purpose"
-                value={formData.purpose}
-                onChange={(e) => handleInputChange('purpose', e.target.value)}
-                placeholder="Describe the purpose of this issue"
-                rows={3}
-                required
-              />
-            </div>
-
-            <SrnNumberField
-              value={formData.srn_number}
-              onChange={(v) => handleInputChange('srn_number', v)}
-            />
-
+          <TabsContent value="header" className="space-y-3">
             {/* CPO banner stays visible whenever a CPO is linked */}
             {formData.cpo_number && (
-              <Alert>
+              <Alert className="py-2">
                 <Package className="h-4 w-4" />
-                <AlertDescription>
-                  Issuing materials for CPO: <strong>{formData.cpo_number}</strong>
-                  <br />
-                  {reservedItems.length} items reserved
+                <AlertDescription className="text-xs">
+                  Issuing materials for CPO: <strong>{formData.cpo_number}</strong> — {reservedItems.length} items reserved
                 </AlertDescription>
               </Alert>
             )}
 
-            {/* Everything optional, collapsed behind one toggle */}
-            <Collapsible open={showOptional} onOpenChange={setShowOptional}>
-              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium hover:bg-muted">
-                <span>Optional details — CPO, dates, references &amp; attachments</span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${showOptional ? 'rotate-180' : ''}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-4">
-                {/* CPO Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="cpo_id">Customer Purchase Order</Label>
-                  <Select value={formData.cpo_id} onValueChange={handleCPOSelect}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select CPO to issue reserved items" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {confirmedCPOs.map((cpo) => (
-                        <SelectItem key={cpo.id} value={cpo.id}>
-                          {cpo.cpo_number} - {cpo.customer?.customer_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            {/* Compact, all-visible grid. Required fields marked with *. */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="col-span-2 space-y-1">
+                <Label htmlFor="location_id" className="text-xs">Issue Location <span className="text-destructive">*</span></Label>
+                <Select
+                  value={formData.location_id}
+                  onValueChange={(value) => {
+                    setLocationTouched(true);
+                    handleInputChange('location_id', value);
+                  }}
+                  disabled={!selectedCompany?.id}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={selectedCompany?.id ? "Select storage location for this issue" : "Select a company first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredLocations.map((loc: any) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                      {'\u00A0\u00A0'.repeat(Math.max(0, loc.depth ?? 0))}{loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] leading-tight text-muted-foreground">
+                  {selectedCompany?.name
+                    ? <>Company: <strong>{selectedCompany.name}</strong>{!locationTouched && formData.location_id ? ' — auto-selected from header context.' : '. Stock issued only from bins at this location.'}</>
+                    : 'Stock will be issued only from bins at the selected location.'}
+                </p>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact_number">Contact Number</Label>
-                    <Input
-                      id="contact_number"
-                      value={formData.contact_number}
-                      onChange={(e) => handleInputChange('contact_number', e.target.value)}
-                      placeholder="Phone number"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="epf_number">Gate Pass No</Label>
-                    <Input
-                      id="epf_number"
-                      value={formData.epf_number}
-                      onChange={(e) => handleInputChange('epf_number', e.target.value)}
-                      placeholder="Gate pass / reference number"
-                    />
-                  </div>
-                </div>
+              <div className="space-y-1">
+                <Label htmlFor="requested_by" className="text-xs">Requested By *</Label>
+                <Input id="requested_by" className="h-9" value={formData.requested_by} onChange={(e) => handleInputChange('requested_by', e.target.value)} placeholder="Name of requester" required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="department" className="text-xs">Department *</Label>
+                <Input id="department" className="h-9" value={formData.department} onChange={(e) => handleInputChange('department', e.target.value)} placeholder="Department name" required />
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="job_number">Job Number</Label>
-                    <Input
-                      id="job_number"
-                      value={formData.job_number}
-                      onChange={(e) => handleInputChange('job_number', e.target.value)}
-                      placeholder="Job/Project reference"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="issue_date">Date of Request</Label>
-                    <Input
-                      id="issue_date"
-                      type="date"
-                      value={formData.issue_date}
-                      onChange={(e) => handleInputChange('issue_date', e.target.value)}
-                    />
-                  </div>
-                </div>
+              {/* Customer PO — full width, optional */}
+              <div className="col-span-2 space-y-1">
+                <Label htmlFor="cpo_id" className="text-xs">Customer Purchase Order <span className="text-muted-foreground">(optional)</span></Label>
+                <Select value={formData.cpo_id} onValueChange={handleCPOSelect}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select CPO to issue reserved items" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {confirmedCPOs.map((cpo) => (
+                      <SelectItem key={cpo.id} value={cpo.id}>
+                        {cpo.cpo_number} - {cpo.customer?.customer_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="items_required_date">Items Required Date</Label>
-                    <Input
-                      id="items_required_date"
-                      type="date"
-                      value={formData.items_required_date}
-                      onChange={(e) => handleInputChange('items_required_date', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pr_number">PR Number (if any)</Label>
-                    <Input
-                      id="pr_number"
-                      value={formData.pr_number}
-                      onChange={(e) => handleInputChange('pr_number', e.target.value)}
-                      placeholder="Purchase requisition number"
-                    />
-                  </div>
-                </div>
+              <div className="space-y-1">
+                <Label htmlFor="contact_number" className="text-xs">Contact Number</Label>
+                <Input id="contact_number" className="h-9" value={formData.contact_number} onChange={(e) => handleInputChange('contact_number', e.target.value)} placeholder="Phone number" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="epf_number" className="text-xs">Gate Pass No</Label>
+                <Input id="epf_number" className="h-9" value={formData.epf_number} onChange={(e) => handleInputChange('epf_number', e.target.value)} placeholder="Gate pass / reference number" />
+              </div>
 
+              <div className="space-y-1">
+                <Label htmlFor="job_number" className="text-xs">Job Number</Label>
+                <Input id="job_number" className="h-9" value={formData.job_number} onChange={(e) => handleInputChange('job_number', e.target.value)} placeholder="Job/Project reference" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="pr_number" className="text-xs">PR Number (if any)</Label>
+                <Input id="pr_number" className="h-9" value={formData.pr_number} onChange={(e) => handleInputChange('pr_number', e.target.value)} placeholder="Purchase requisition number" />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="issue_date" className="text-xs">Date of Request</Label>
+                <Input id="issue_date" type="date" className="h-9" value={formData.issue_date} onChange={(e) => handleInputChange('issue_date', e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="items_required_date" className="text-xs">Items Required Date</Label>
+                <Input id="items_required_date" type="date" className="h-9" value={formData.items_required_date} onChange={(e) => handleInputChange('items_required_date', e.target.value)} />
+              </div>
+
+              {/* SRN number — full width */}
+              <div className="col-span-2">
+                <SrnNumberField
+                  value={formData.srn_number}
+                  onChange={(v) => handleInputChange('srn_number', v)}
+                />
+              </div>
+
+              {/* Purpose — full width */}
+              <div className="col-span-2 space-y-1">
+                <Label htmlFor="purpose" className="text-xs">Purpose of Issue *</Label>
+                <Textarea id="purpose" className="min-h-0" value={formData.purpose} onChange={(e) => handleInputChange('purpose', e.target.value)} placeholder="Describe the purpose of this issue" rows={2} required />
+              </div>
+
+              {/* Attachments side by side */}
+              <div className="col-span-2 grid grid-cols-2 gap-4">
                 <SrnDocumentUploadField
                   companyId={selectedCompany?.id}
                   currentDocumentUrl={srnDocumentTempPath || undefined}
                   onUpload={(path) => setSrnDocumentTempPath(path)}
                 />
-
                 <MaterialAttachmentsPanel
                   parentType="material_issue"
                   companyId={selectedCompany?.id}
@@ -744,8 +674,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
                   buffered={bufferedAttachments}
                   onBufferedChange={setBufferedAttachments}
                 />
-              </CollapsibleContent>
-            </Collapsible>
+              </div>
+            </div>
 
             <div className="flex justify-end">
               <Button onClick={() => setCurrentTab('items')}>
