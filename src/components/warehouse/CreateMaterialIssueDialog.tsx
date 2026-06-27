@@ -14,7 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Package, ListPlus, AlertTriangle, PackageSearch } from 'lucide-react';
+import { Trash2, Package, ListPlus, AlertTriangle, PackageSearch, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BrowseInventoryDialog, type BrowsePickedRow } from './BrowseInventoryDialog';
 import { BulkAddItemsPanel } from './material-issue/BulkAddItemsPanel';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
@@ -97,6 +98,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
   
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
+  const [showOptional, setShowOptional] = useState(false);
   const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
   const [bufferedAttachments, setBufferedAttachments] = useState<BufferedAttachment[]>([]);
   const [browseOpen, setBrowseOpen] = useState(false);
@@ -151,6 +153,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
     setItems([]);
     setReservedItems([]);
     setLocationTouched(false);
+    setShowOptional(false);
     setSrnDocumentTempPath('');
     setBrowseOpen(false);
     setCurrentTab('header');
@@ -178,6 +181,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
       location_id: editingDraft.location_id ?? '',
     });
     setLocationTouched(true); // prevent auto-default effect from overwriting saved location
+    // Auto-expand the optional section if the draft already has optional data,
+    // so saved values aren't hidden behind the collapsed toggle.
+    setShowOptional(Boolean(
+      editingDraft.cpo_id || editingDraft.contact_number || editingDraft.epf_number ||
+      editingDraft.job_number || editingDraft.pr_number,
+    ));
     (async () => {
       const { data, error } = await supabase
         .from('material_issue_items')
@@ -553,34 +562,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
           </TabsList>
 
           <TabsContent value="header" className="space-y-4">
-            {/* CPO Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="cpo_id">Customer Purchase Order (Optional)</Label>
-              <Select value={formData.cpo_id} onValueChange={handleCPOSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select CPO to issue reserved items" />
-                </SelectTrigger>
-                <SelectContent>
-                  {confirmedCPOs.map((cpo) => (
-                    <SelectItem key={cpo.id} value={cpo.id}>
-                      {cpo.cpo_number} - {cpo.customer?.customer_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.cpo_number && (
-              <Alert>
-                <Package className="h-4 w-4" />
-                <AlertDescription>
-                  Issuing materials for CPO: <strong>{formData.cpo_number}</strong>
-                  <br />
-                  {reservedItems.length} items reserved
-                </AlertDescription>
-              </Alert>
-            )}
-
+            {/* Essentials — the minimum needed to issue stock */}
             {/* Location Selection */}
             <div className="space-y-2">
               <Label htmlFor="location_id">Issue Location <span className="text-destructive">*</span></Label>
@@ -610,26 +592,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
               </p>
             </div>
 
-            <SrnNumberField
-              value={formData.srn_number}
-              onChange={(v) => handleInputChange('srn_number', v)}
-            />
-
-            <SrnDocumentUploadField
-              companyId={selectedCompany?.id}
-              currentDocumentUrl={srnDocumentTempPath || undefined}
-              onUpload={(path) => setSrnDocumentTempPath(path)}
-            />
-
-            <MaterialAttachmentsPanel
-              parentType="material_issue"
-              companyId={selectedCompany?.id}
-              label="Additional Attachments"
-              buffered={bufferedAttachments}
-              onBufferedChange={setBufferedAttachments}
-            />
-
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="requested_by">Requested By *</Label>
@@ -653,71 +615,6 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="contact_number">Contact Number</Label>
-                <Input
-                  id="contact_number"
-                  value={formData.contact_number}
-                  onChange={(e) => handleInputChange('contact_number', e.target.value)}
-                  placeholder="Phone number"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="epf_number">Gate Pass No</Label>
-                <Input
-                  id="epf_number"
-                  value={formData.epf_number}
-                  onChange={(e) => handleInputChange('epf_number', e.target.value)}
-                  placeholder="Gate pass / reference number"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="job_number">Job Number</Label>
-                <Input
-                  id="job_number"
-                  value={formData.job_number}
-                  onChange={(e) => handleInputChange('job_number', e.target.value)}
-                  placeholder="Job/Project reference"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="issue_date">Date of Request</Label>
-                <Input
-                  id="issue_date"
-                  type="date"
-                  value={formData.issue_date}
-                  onChange={(e) => handleInputChange('issue_date', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="items_required_date">Items Required Date</Label>
-                <Input
-                  id="items_required_date"
-                  type="date"
-                  value={formData.items_required_date}
-                  onChange={(e) => handleInputChange('items_required_date', e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pr_number">PR Number (if any)</Label>
-                <Input
-                  id="pr_number"
-                  value={formData.pr_number}
-                  onChange={(e) => handleInputChange('pr_number', e.target.value)}
-                  placeholder="Purchase requisition number"
-                />
-              </div>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="purpose">Purpose of Issue *</Label>
               <Textarea
@@ -729,6 +626,126 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
                 required
               />
             </div>
+
+            <SrnNumberField
+              value={formData.srn_number}
+              onChange={(v) => handleInputChange('srn_number', v)}
+            />
+
+            {/* CPO banner stays visible whenever a CPO is linked */}
+            {formData.cpo_number && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>
+                  Issuing materials for CPO: <strong>{formData.cpo_number}</strong>
+                  <br />
+                  {reservedItems.length} items reserved
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Everything optional, collapsed behind one toggle */}
+            <Collapsible open={showOptional} onOpenChange={setShowOptional}>
+              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium hover:bg-muted">
+                <span>Optional details — CPO, dates, references &amp; attachments</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${showOptional ? 'rotate-180' : ''}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-4">
+                {/* CPO Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="cpo_id">Customer Purchase Order</Label>
+                  <Select value={formData.cpo_id} onValueChange={handleCPOSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select CPO to issue reserved items" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {confirmedCPOs.map((cpo) => (
+                        <SelectItem key={cpo.id} value={cpo.id}>
+                          {cpo.cpo_number} - {cpo.customer?.customer_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_number">Contact Number</Label>
+                    <Input
+                      id="contact_number"
+                      value={formData.contact_number}
+                      onChange={(e) => handleInputChange('contact_number', e.target.value)}
+                      placeholder="Phone number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="epf_number">Gate Pass No</Label>
+                    <Input
+                      id="epf_number"
+                      value={formData.epf_number}
+                      onChange={(e) => handleInputChange('epf_number', e.target.value)}
+                      placeholder="Gate pass / reference number"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job_number">Job Number</Label>
+                    <Input
+                      id="job_number"
+                      value={formData.job_number}
+                      onChange={(e) => handleInputChange('job_number', e.target.value)}
+                      placeholder="Job/Project reference"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="issue_date">Date of Request</Label>
+                    <Input
+                      id="issue_date"
+                      type="date"
+                      value={formData.issue_date}
+                      onChange={(e) => handleInputChange('issue_date', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="items_required_date">Items Required Date</Label>
+                    <Input
+                      id="items_required_date"
+                      type="date"
+                      value={formData.items_required_date}
+                      onChange={(e) => handleInputChange('items_required_date', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pr_number">PR Number (if any)</Label>
+                    <Input
+                      id="pr_number"
+                      value={formData.pr_number}
+                      onChange={(e) => handleInputChange('pr_number', e.target.value)}
+                      placeholder="Purchase requisition number"
+                    />
+                  </div>
+                </div>
+
+                <SrnDocumentUploadField
+                  companyId={selectedCompany?.id}
+                  currentDocumentUrl={srnDocumentTempPath || undefined}
+                  onUpload={(path) => setSrnDocumentTempPath(path)}
+                />
+
+                <MaterialAttachmentsPanel
+                  parentType="material_issue"
+                  companyId={selectedCompany?.id}
+                  label="Additional Attachments"
+                  buffered={bufferedAttachments}
+                  onBufferedChange={setBufferedAttachments}
+                />
+              </CollapsibleContent>
+            </Collapsible>
 
             <div className="flex justify-end">
               <Button onClick={() => setCurrentTab('items')}>
