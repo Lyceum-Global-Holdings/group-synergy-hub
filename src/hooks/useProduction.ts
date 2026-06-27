@@ -474,7 +474,9 @@ export function useUpsertDailyEntry() {
     }) => {
       const { data: user } = await supabase.auth.getUser();
 
-      // Upsert daily entry
+      // Upsert the daily entry. Stage totals (output/wastage) and the rolled
+      // input are recomputed server-side by the sync_production_order trigger,
+      // which is the single source of truth — no client-side rollup needed.
       const { error } = await supabase
         .from("production_daily_entries")
         .upsert(
@@ -490,33 +492,6 @@ export function useUpsertDailyEntry() {
           { onConflict: "stage_id,entry_date" }
         );
       if (error) throw error;
-
-      // Recalculate cumulative totals from all daily entries
-      const { data: allEntries, error: fetchErr } = await supabase
-        .from("production_daily_entries")
-        .select("input_qty, output_qty, wastage_qty")
-        .eq("stage_id", input.stage_id);
-      if (fetchErr) throw fetchErr;
-
-      const totals = (allEntries || []).reduce(
-        (acc, e) => ({
-          input_qty: acc.input_qty + (e.input_qty || 0),
-          output_qty: acc.output_qty + (e.output_qty || 0),
-          wastage_qty: acc.wastage_qty + (e.wastage_qty || 0),
-        }),
-        { input_qty: 0, output_qty: 0, wastage_qty: 0 }
-      );
-
-      const { error: updateErr } = await supabase
-        .from("production_order_stages")
-        .update({
-          input_qty: totals.input_qty,
-          output_qty: totals.output_qty,
-          wastage_qty: totals.wastage_qty,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", input.stage_id);
-      if (updateErr) throw updateErr;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["production-daily-entries"] });
