@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Upload, X, Download, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, X, Download, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   BufferedAttachment,
@@ -72,7 +72,6 @@ export function MaterialAttachmentsPanel({
   const [pendingCategory, setPendingCategory] =
     useState<MaterialAttachmentCategory>("signed_srn");
   const fileRef = useRef<HTMLInputElement>(null);
-  const camRef = useRef<HTMLInputElement>(null);
 
   const rows = isBuffered
     ? (buffered ?? []).map((b) => ({
@@ -145,7 +144,6 @@ export function MaterialAttachmentsPanel({
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
-      if (camRef.current) camRef.current.value = "";
     }
   };
 
@@ -200,7 +198,7 @@ export function MaterialAttachmentsPanel({
           onValueChange={(v) => setPendingCategory(v as MaterialAttachmentCategory)}
           disabled={disabled || busy}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[160px] h-9">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -221,29 +219,11 @@ export function MaterialAttachmentsPanel({
           disabled={disabled || busy}
           className="hidden"
         />
-        <Input
-          ref={camRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => handleFiles(e.target.files)}
-          disabled={disabled || busy}
-          className="hidden"
-        />
-
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => camRef.current?.click()}
-          disabled={disabled || busy || rows.length >= MAX_FILES}
-        >
-          <Camera className="h-4 w-4 mr-1" /> Take photo
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
+          className="h-9"
           onClick={() => fileRef.current?.click()}
           disabled={disabled || busy || rows.length >= MAX_FILES}
         >
@@ -252,9 +232,9 @@ export function MaterialAttachmentsPanel({
         {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[11px] leading-tight text-muted-foreground">
         JPG, PNG, WEBP or PDF — up to {MAX_FILES} files, max 5MB each. Pick a category
-        before uploading; the first “Signed SRN” is used as primary evidence on PDFs.
+        first; the first “Signed SRN” is used as primary evidence on PDFs.
       </p>
 
       {list.isLoading && !isBuffered && (

@@ -564,7 +564,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
             )}
 
             {/* Compact, all-visible grid. Required fields marked with *. */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
               <div className="col-span-2 space-y-1">
                 <Label htmlFor="location_id" className="text-xs">Issue Location <span className="text-destructive">*</span></Label>
                 <Select
@@ -575,7 +575,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
                   }}
                   disabled={!selectedCompany?.id}
                 >
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-8">
                     <SelectValue placeholder={selectedCompany?.id ? "Select storage location for this issue" : "Select a company first"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -595,18 +595,18 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
 
               <div className="space-y-1">
                 <Label htmlFor="requested_by" className="text-xs">Requested By *</Label>
-                <Input id="requested_by" className="h-9" value={formData.requested_by} onChange={(e) => handleInputChange('requested_by', e.target.value)} placeholder="Name of requester" required />
+                <Input id="requested_by" className="h-8" value={formData.requested_by} onChange={(e) => handleInputChange('requested_by', e.target.value)} placeholder="Name of requester" required />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="department" className="text-xs">Department *</Label>
-                <Input id="department" className="h-9" value={formData.department} onChange={(e) => handleInputChange('department', e.target.value)} placeholder="Department name" required />
+                <Input id="department" className="h-8" value={formData.department} onChange={(e) => handleInputChange('department', e.target.value)} placeholder="Department name" required />
               </div>
 
               {/* Customer PO — full width, optional */}
               <div className="col-span-2 space-y-1">
                 <Label htmlFor="cpo_id" className="text-xs">Customer Purchase Order <span className="text-muted-foreground">(optional)</span></Label>
                 <Select value={formData.cpo_id} onValueChange={handleCPOSelect}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-8">
                     <SelectValue placeholder="Select CPO to issue reserved items" />
                   </SelectTrigger>
                   <SelectContent>
@@ -621,29 +621,29 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
 
               <div className="space-y-1">
                 <Label htmlFor="contact_number" className="text-xs">Contact Number</Label>
-                <Input id="contact_number" className="h-9" value={formData.contact_number} onChange={(e) => handleInputChange('contact_number', e.target.value)} placeholder="Phone number" />
+                <Input id="contact_number" className="h-8" value={formData.contact_number} onChange={(e) => handleInputChange('contact_number', e.target.value)} placeholder="Phone number" />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="epf_number" className="text-xs">Gate Pass No</Label>
-                <Input id="epf_number" className="h-9" value={formData.epf_number} onChange={(e) => handleInputChange('epf_number', e.target.value)} placeholder="Gate pass / reference number" />
+                <Input id="epf_number" className="h-8" value={formData.epf_number} onChange={(e) => handleInputChange('epf_number', e.target.value)} placeholder="Gate pass / reference number" />
               </div>
 
               <div className="space-y-1">
                 <Label htmlFor="job_number" className="text-xs">Job Number</Label>
-                <Input id="job_number" className="h-9" value={formData.job_number} onChange={(e) => handleInputChange('job_number', e.target.value)} placeholder="Job/Project reference" />
+                <Input id="job_number" className="h-8" value={formData.job_number} onChange={(e) => handleInputChange('job_number', e.target.value)} placeholder="Job/Project reference" />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="pr_number" className="text-xs">PR Number (if any)</Label>
-                <Input id="pr_number" className="h-9" value={formData.pr_number} onChange={(e) => handleInputChange('pr_number', e.target.value)} placeholder="Purchase requisition number" />
+                <Input id="pr_number" className="h-8" value={formData.pr_number} onChange={(e) => handleInputChange('pr_number', e.target.value)} placeholder="Purchase requisition number" />
               </div>
 
               <div className="space-y-1">
                 <Label htmlFor="issue_date" className="text-xs">Date of Request</Label>
-                <Input id="issue_date" type="date" className="h-9" value={formData.issue_date} onChange={(e) => handleInputChange('issue_date', e.target.value)} />
+                <Input id="issue_date" type="date" className="h-8" value={formData.issue_date} onChange={(e) => handleInputChange('issue_date', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="items_required_date" className="text-xs">Items Required Date</Label>
-                <Input id="items_required_date" type="date" className="h-9" value={formData.items_required_date} onChange={(e) => handleInputChange('items_required_date', e.target.value)} />
+                <Input id="items_required_date" type="date" className="h-8" value={formData.items_required_date} onChange={(e) => handleInputChange('items_required_date', e.target.value)} />
               </div>
 
               {/* SRN number — full width */}

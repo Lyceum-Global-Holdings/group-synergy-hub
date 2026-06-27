@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Upload, FileText, Download, X, Camera, Image as ImageIcon } from "lucide-react";
+import { Upload, FileText, Download, X, Image as ImageIcon } from "lucide-react";
 
 const BUCKET = "min-srn-documents";
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
@@ -61,7 +61,6 @@ export function SrnDocumentUploadField({
   const [fallbackPreviewUrl, setFallbackPreviewUrl] = useState<string | null>(null);
   const [promoting, setPromoting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setDocumentPath(currentDocumentUrl);
@@ -210,7 +209,6 @@ export function SrnDocumentUploadField({
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      if (cameraInputRef.current) cameraInputRef.current.value = "";
     }
   };
 
@@ -289,39 +287,19 @@ export function SrnDocumentUploadField({
             disabled={uploading || disabled}
             className="hidden"
           />
-          <Input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => handleFile(e.target.files?.[0])}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
             disabled={uploading || disabled}
-            className="hidden"
-          />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={uploading || disabled}
-              className="flex-1"
-            >
-              <Camera className="h-4 w-4" />
-              {uploading ? "Uploading..." : "Take photo"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || disabled}
-              className="flex-1"
-            >
-              <Upload className="h-4 w-4" />
-              Choose file
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Attach a photo or scan of the signed SRN. JPG, PNG, WEBP or PDF — max 5MB.
+            className="w-full h-9"
+          >
+            <Upload className="h-4 w-4" />
+            {uploading ? "Uploading..." : "Choose file"}
+          </Button>
+          <p className="text-[11px] leading-tight text-muted-foreground">
+            Attach a scan/photo of the signed SRN. JPG, PNG, WEBP or PDF — max 5MB.
           </p>
 
           {fallbackDocumentUrl && (
