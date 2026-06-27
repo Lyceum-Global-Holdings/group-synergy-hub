@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -5,6 +6,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useProductionOrder, useUpdateProductionOrder } from "@/hooks/useProduction";
 import { PRODUCTION_ORDER_STATUSES } from "@/constants/productionSectors";
 import StageProgressCard from "./StageProgressCard";
+import StagePipeline from "./StagePipeline";
 import { format } from "date-fns";
 
 interface Props {
@@ -15,6 +17,7 @@ interface Props {
 export default function ProductionOrderDetail({ orderId, onBack }: Props) {
   const { data: order, isLoading } = useProductionOrder(orderId);
   const updateOrder = useUpdateProductionOrder();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
@@ -32,6 +35,17 @@ export default function ProductionOrderDetail({ orderId, onBack }: Props) {
     const stageCosts = (s.production_stage_costs || []).reduce((cs: number, c: any) => cs + (Number(c.total_cost) || 0), 0);
     return sum + stageCosts;
   }, 0);
+
+  // Efficiency: final-stage good output vs target; total wastage across stages.
+  const target = order.target_qty || 0;
+  const finalOutput = stages.length > 0 ? (stages[stages.length - 1].output_qty || 0) : 0;
+  const overallYield = target > 0 ? Math.round((finalOutput / target) * 100) : 0;
+  const totalWastage = stages.reduce((sum: number, s: any) => sum + (s.wastage_qty || 0), 0);
+
+  // Selected stage for the detail panel: explicit pick → first in-progress → first.
+  const activeStage = stages.find((s: any) => s.status === "in_progress");
+  const effectiveSelectedId = selectedId ?? activeStage?.id ?? stages[0]?.id ?? null;
+  const selectedStage = stages.find((s: any) => s.id === effectiveSelectedId);
 
   const handleStatusChange = (status: string) => {
     updateOrder.mutate({ id: orderId, status });
@@ -72,76 +86,39 @@ export default function ProductionOrderDetail({ orderId, onBack }: Props) {
         </div>
       </div>
 
-      {/* Order Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Target Qty</p>
-            <p className="text-lg font-bold">{order.target_qty?.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Progress</p>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
-              </div>
-              <span className="text-sm font-bold">{progress}%</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Total Cost</p>
-            <p className="text-lg font-bold">{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Start Date</p>
-            <p className="text-sm font-medium">{order.start_date ? format(new Date(order.start_date), "dd MMM yyyy") : "—"}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground">Due Date</p>
-            <p className="text-sm font-medium">{order.due_date ? format(new Date(order.due_date), "dd MMM yyyy") : "—"}</p>
-          </CardContent>
-        </Card>
+      {/* Order Summary — efficiency KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        {[
+          { label: "Target", value: target.toLocaleString() },
+          { label: "Good output", value: finalOutput.toLocaleString() },
+          { label: "Overall yield", value: `${overallYield}%`, accent: overallYield >= 90 ? "text-green-600" : overallYield > 0 ? "text-amber-600" : "" },
+          { label: "Wastage", value: totalWastage.toLocaleString(), accent: totalWastage > 0 ? "text-destructive" : "" },
+          { label: "Total cost", value: totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+          { label: "Due", value: order.due_date ? format(new Date(order.due_date), "dd MMM") : "—" },
+        ].map((k) => (
+          <Card key={k.label}><CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">{k.label}</p>
+            <p className={`text-lg font-bold ${k.accent ?? ""}`}>{k.value}</p>
+          </CardContent></Card>
+        ))}
       </div>
 
-      {/* Stage Pipeline */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Production Stages</CardTitle></CardHeader>
-        <CardContent>
-          {/* Pipeline Stepper */}
-          <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-2">
-            {stages.map((stage: any, i: number) => (
-              <div key={stage.id} className="flex items-center">
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors
-                  ${stage.status === "completed" ? "bg-green-50 border-green-300 text-green-800 dark:bg-green-900/20 dark:text-green-400" :
-                    stage.status === "in_progress" ? "bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400" :
-                    "bg-muted/50 border-border text-muted-foreground"}`}
-                >
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-                    ${stage.status === "completed" ? "bg-green-500 text-white" :
-                      stage.status === "in_progress" ? "bg-amber-500 text-white" : "bg-muted-foreground/20 text-muted-foreground"}`}>
-                    {i + 1}
-                  </span>
-                  {stage.stage_name}
-                </div>
-                {i < stages.length - 1 && <div className="w-8 h-0.5 bg-border mx-1" />}
-              </div>
-            ))}
-          </div>
+      {/* Stage progress bar */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
+        </div>
+        <span className="text-sm font-medium text-muted-foreground">{completedStages}/{stages.length} stages · {progress}%</span>
+      </div>
 
-          {/* Stage Details */}
-          <div className="space-y-4">
-            {stages.map((stage: any) => (
-              <StageProgressCard key={stage.id} stage={stage} targetQty={order.target_qty || 0} />
-            ))}
-          </div>
+      {/* Stage pipeline board */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Production stages</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <StagePipeline stages={stages} selectedId={effectiveSelectedId} onSelect={setSelectedId} />
+          {selectedStage && (
+            <StageProgressCard key={selectedStage.id} stage={selectedStage} targetQty={target} defaultOpen />
+          )}
         </CardContent>
       </Card>
     </div>

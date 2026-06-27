@@ -54,6 +54,18 @@ export default function ProductionDashboard({ onViewOrder }: Props) {
     orders: orders?.filter((o) => o.sector_id === s.id).length || 0,
   }));
 
+  // Efficiency across non-cancelled orders: good output (final stage) vs target.
+  const active = (orders || []).filter((o) => o.status !== "cancelled");
+  const finalOutputOf = (o: any) => {
+    const st = ((o.production_order_stages || []) as any[]).slice().sort((a, b) => a.sequence_order - b.sequence_order);
+    return st.length ? Number(st[st.length - 1].output_qty || 0) : 0;
+  };
+  const totalTarget = active.reduce((s, o) => s + Number(o.target_qty || 0), 0);
+  const totalGoodOutput = active.reduce((s, o) => s + finalOutputOf(o), 0);
+  const totalWastage = active.reduce((s, o) =>
+    s + ((o.production_order_stages || []) as any[]).reduce((w, st) => w + Number(st.wastage_qty || 0), 0), 0);
+  const overallYield = totalTarget > 0 ? Math.round((totalGoodOutput / totalTarget) * 100) : 0;
+
   // Recent WIP orders
   const wipOrders = orders?.filter((o) => o.status === "in_progress").slice(0, 5) || [];
 
@@ -105,6 +117,26 @@ export default function ProductionDashboard({ onViewOrder }: Props) {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Efficiency KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardContent className="pt-6">
+          <p className="text-sm text-muted-foreground">Good Output</p>
+          <p className="text-2xl font-bold">{totalGoodOutput.toLocaleString()}<span className="text-sm font-normal text-muted-foreground"> / {totalTarget.toLocaleString()}</span></p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <p className="text-sm text-muted-foreground">Overall Yield</p>
+          <p className={`text-2xl font-bold ${overallYield >= 90 ? "text-green-600" : overallYield > 0 ? "text-amber-600" : ""}`}>{overallYield}%</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <p className="text-sm text-muted-foreground">Total Wastage</p>
+          <p className={`text-2xl font-bold ${totalWastage > 0 ? "text-destructive" : ""}`}>{totalWastage.toLocaleString()}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <p className="text-sm text-muted-foreground">Target (active)</p>
+          <p className="text-2xl font-bold">{totalTarget.toLocaleString()}</p>
+        </CardContent></Card>
       </div>
 
       {/* Charts */}
