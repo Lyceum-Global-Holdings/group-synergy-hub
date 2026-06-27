@@ -395,48 +395,60 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
           <TabsContent value="items" className="space-y-6">
             {/* Items Table */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Items</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Items ({po.items?.length ?? 0})</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="rounded-lg border overflow-hidden">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead>Item Code</TableHead>
-                      <TableHead>Item Name</TableHead>
+                      <TableHead>Item</TableHead>
                       <TableHead>Specifications</TableHead>
-                      <TableHead>Qty Ordered</TableHead>
-                      <TableHead>Qty Received</TableHead>
-                      <TableHead>Qty Pending</TableHead>
-                      <TableHead>Unit Price</TableHead>
-                      <TableHead>Total Price</TableHead>
+                      <TableHead className="text-right">Ordered</TableHead>
+                      <TableHead className="text-right">Received</TableHead>
+                      <TableHead className="text-right">Pending</TableHead>
+                      <TableHead className="text-right">Unit price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                       <TableHead>UOM</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {po.items?.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow key={item.id} className="hover:bg-muted/30">
                         <TableCell>
-                          {item.item_code ? (
-                            <Badge variant="outline" className="text-xs">
-                              {item.item_code}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">-</span>
-                          )}
+                          <p className="font-medium leading-tight">{item.item_name}</p>
+                          {item.item_code && <p className="text-xs text-muted-foreground font-mono">{item.item_code}</p>}
                         </TableCell>
-                        <TableCell className="font-medium">{item.item_name}</TableCell>
-                        <TableCell>{item.specifications || '-'}</TableCell>
-                        <TableCell>{item.quantity_ordered}</TableCell>
-                        <TableCell>{item.quantity_received}</TableCell>
-                        <TableCell>{item.quantity_pending}</TableCell>
-                        <TableCell>Rs. {item.unit_price.toLocaleString()}</TableCell>
-                        <TableCell>Rs. {item.total_price.toLocaleString()}</TableCell>
-                        <TableCell>{item.unit_of_measure}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.specifications || '-'}</TableCell>
+                        <TableCell className="text-right">{item.quantity_ordered}</TableCell>
+                        <TableCell className="text-right">{item.quantity_received}</TableCell>
+                        <TableCell className={cn('text-right', Number(item.quantity_pending) > 0 && 'text-amber-600 font-medium')}>{item.quantity_pending}</TableCell>
+                        <TableCell className="text-right">Rs. {item.unit_price.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium">Rs. {item.total_price.toLocaleString()}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.unit_of_measure}</TableCell>
                       </TableRow>
                     ))}
+                    {(!po.items || po.items.length === 0) && (
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No items.</TableCell></TableRow>
+                    )}
                   </TableBody>
+                  {po.items && po.items.length > 0 && (
+                    <tfoot>
+                      <TableRow className="bg-muted/40 font-medium">
+                        <TableCell>Total</TableCell>
+                        <TableCell />
+                        <TableCell className="text-right">{po.items.reduce((s, i) => s + (Number(i.quantity_ordered) || 0), 0)}</TableCell>
+                        <TableCell className="text-right">{po.items.reduce((s, i) => s + (Number(i.quantity_received) || 0), 0)}</TableCell>
+                        <TableCell className="text-right">{po.items.reduce((s, i) => s + (Number(i.quantity_pending) || 0), 0)}</TableCell>
+                        <TableCell />
+                        <TableCell className="text-right">Rs. {po.items.reduce((s, i) => s + (Number(i.total_price) || 0), 0).toLocaleString()}</TableCell>
+                        <TableCell />
+                      </TableRow>
+                    </tfoot>
+                  )}
                 </Table>
+                </div>
               </CardContent>
             </Card>
 
