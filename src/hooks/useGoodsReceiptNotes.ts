@@ -3,14 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { GoodsReceiptNote, CreateGrnData, GrnSummary, GrnRejectionReason } from '@/types/grn';
 import { useToast } from '@/hooks/use-toast';
 
-export const useGoodsReceiptNotes = (companyId?: string) => {
+export const useGoodsReceiptNotes = (companyId?: string, locationId?: string | null) => {
   return useQuery({
-    queryKey: ['goods-receipt-notes', companyId],
+    queryKey: ['goods-receipt-notes', companyId, locationId],
     queryFn: async () => {
       let query = supabase
         .from('goods_receipt_notes')
         .select(`
           *,
+          warehouse_locations(name),
           purchase_order:purchase_orders(po_number, supplier:suppliers(name)),
           created_by_profile:profiles!goods_receipt_notes_created_by_profile_fkey(full_name),
           received_by_profile:profiles!goods_receipt_notes_received_by_profile_fkey(full_name),
@@ -43,6 +44,9 @@ export const useGoodsReceiptNotes = (companyId?: string) => {
 
       if (companyId) {
         query = query.eq('company_id', companyId);
+      }
+      if (locationId) {
+        query = (query as any).eq('location_id', locationId);
       }
 
       const { data, error } = await query;
@@ -100,14 +104,20 @@ export const useGrnById = (id: string) => {
   });
 };
 
-export const useGrnSummary = (companyId?: string) => {
+export const useGrnSummary = (companyId?: string, locationId?: string | null) => {
   return useQuery({
-    queryKey: ['grn-summary', companyId],
+    queryKey: ['grn-summary', companyId, locationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('goods_receipt_notes')
         .select('id, status, total_value, created_at')
         .eq('company_id', companyId || '');
+
+      if (locationId) {
+        query = (query as any).eq('location_id', locationId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -161,6 +171,7 @@ export const useCreateGoodsReceiptNote = () => {
           tax_type: data.tax_type ?? null,
           tax_value: data.tax_value ?? 0,
           company_id: data.company_id || null,
+          location_id: data.location_id ?? null,
           created_by: user.id,
         } as any)
         .select()
@@ -333,6 +344,7 @@ export const useUpdateDraftGrnWithItems = () => {
           discount_value: header.discount_value ?? 0,
           tax_type: header.tax_type ?? null,
           tax_value: header.tax_value ?? 0,
+          location_id: header.location_id ?? null,
           status: submit ? 'submitted' : 'draft',
         } as any)
         .eq('id', id);

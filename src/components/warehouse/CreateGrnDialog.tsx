@@ -42,6 +42,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useCreateGoodsReceiptNote, useUpdateDraftGrnWithItems } from '@/hooks/useGoodsReceiptNotes';
 import { useWarehouseCatalogPage } from '@/hooks/useWarehouseCatalogPage';
@@ -85,6 +86,7 @@ interface CreateGrnDialogProps {
 export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: CreateGrnDialogProps) {
   const isEditMode = !!editingDraft;
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
   const updateDraftGrn = useUpdateDraftGrnWithItems();
@@ -483,6 +485,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       tax_type: taxType === 'none' ? null : taxType,
       tax_value: taxType === 'none' ? 0 : (Number(taxValue) || 0),
       company_id: selectedCompany?.id,
+      location_id: (editingDraft?.location_id ?? globalLocationId) ?? null,
     };
 
     if (isEditMode && editingDraft) {

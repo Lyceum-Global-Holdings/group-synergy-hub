@@ -60,6 +60,8 @@ export interface GoodsReceiptNote {
   grand_total?: number;
   remarks?: string;
   company_id?: string;
+  location_id?: string;
+  warehouse_locations?: { name: string } | null;
   created_by?: string;
   received_by?: string;
   approved_by?: string;
@@ -133,6 +135,7 @@ export interface CreateGrnData {
   tax_value?: number;
   remarks?: string;
   company_id?: string;
+  location_id?: string | null;
   items: CreateGrnItemData[];
 }
 

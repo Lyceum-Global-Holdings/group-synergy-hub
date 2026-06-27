@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { VirtualTable, type DataTableColumn } from '@/components/shared/VirtualTable';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useGoodsReceiptNotes, useGrnSummary } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 import { GrnStatus } from '@/types/grn';
@@ -41,8 +42,9 @@ const statusLabels: Record<GrnStatus, string> = {
 
 function GoodsReceiptNote() {
   const { selectedCompany } = useCompany();
-  const { data: grns = [], isLoading } = useGoodsReceiptNotes(selectedCompany?.id);
-  const { data: summary } = useGrnSummary(selectedCompany?.id);
+  const { globalLocationId } = useLocationFilter();
+  const { data: grns = [], isLoading } = useGoodsReceiptNotes(selectedCompany?.id, globalLocationId);
+  const { data: summary } = useGrnSummary(selectedCompany?.id, globalLocationId);
   const { data: userRoles = [] } = useCurrentUserRoles();
   const isAdmin = userRoles.some(role => role.role === 'admin' || role.role === 'super_admin');
 
@@ -184,6 +186,11 @@ function GoodsReceiptNote() {
               },
               { key: 'po_number', header: 'PO Number', render: (grn) => grn.po_number || '-' },
               { key: 'supplier_name', header: 'Supplier', render: (grn) => grn.supplier_name || '-' },
+              {
+                key: 'location',
+                header: 'Location',
+                render: (grn) => (grn as any).warehouse_locations?.name || <span className="text-muted-foreground">-</span>,
+              },
               {
                 key: 'status',
                 header: 'Status',
