@@ -545,3 +545,32 @@ export function useCPOs() {
     enabled: !!selectedCompany?.id,
   });
 }
+
+// ── Material Consumption (Phase 3) ──
+export function useIssueStageMaterials() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { stage_id: string; location_id: string }) => {
+      const { data, error } = await (supabase as any).rpc("issue_production_stage_materials", {
+        p_stage_id: input.stage_id,
+        p_location_id: input.location_id,
+      });
+      if (error) throw error;
+      return data as { issued: any[]; shortfalls: any[]; reference: string };
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["production-order"] });
+      qc.invalidateQueries({ queryKey: ["warehouse-items"] });
+      qc.invalidateQueries({ queryKey: ["warehouse-bin-allocations"] });
+      const issued = data?.issued?.length ?? 0;
+      const short = data?.shortfalls ?? [];
+      if (issued > 0) toast.success(`Issued ${issued} material line(s) to production`);
+      if (short.length > 0) {
+        toast.error(`${short.length} line(s) not issued — ${short.map((s: any) => `${s.item}: ${s.error}`).join("; ")}`);
+      } else if (issued === 0) {
+        toast.info("No BOM-linked materials left to issue for this stage");
+      }
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to issue materials"),
+  });
+}

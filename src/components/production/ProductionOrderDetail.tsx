@@ -117,7 +117,7 @@ export default function ProductionOrderDetail({ orderId, onBack }: Props) {
         <CardContent className="space-y-4">
           <StagePipeline stages={stages} selectedId={effectiveSelectedId} onSelect={setSelectedId} />
           {selectedStage && (
-            <StageProgressCard key={selectedStage.id} stage={selectedStage} targetQty={target} defaultOpen />
+            <StageProgressCard key={selectedStage.id} stage={selectedStage} targetQty={target} defaultOpen companyId={(order as any).company_id} />
           )}
         </CardContent>
       </Card>
