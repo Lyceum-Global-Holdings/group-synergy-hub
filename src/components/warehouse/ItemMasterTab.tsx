@@ -971,7 +971,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                           ((item.current_stock || 0) - Number(item.reserved_quantity ?? 0))
                         );
                         return (
-                          <span className="font-medium text-green-600">{available.toFixed(2)}</span>
+                          <span className={`font-medium ${available <= 0 ? 'text-destructive' : 'text-green-600'}`}>
+                            {available.toFixed(2)}
+                          </span>
                         );
                       })()}
                     </TableCell>
