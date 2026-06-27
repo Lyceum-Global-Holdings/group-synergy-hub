@@ -4,6 +4,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Shirt, Trash2, ShoppingCart } from "lucide-react";
 import { useCostumeCart } from "@/contexts/CostumeCartContext";
 import { useCostumes } from "@/hooks/useCostumes";
@@ -40,30 +41,36 @@ export function CostumeCartSheet({ open, onOpenChange, companyId }: Props) {
 
           <div className="flex-1 overflow-y-auto -mx-2 px-2 space-y-2 py-2">
             {items.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-10">
-                Your bucket is empty. Add costumes from the catalog.
-              </p>
+              <div className="flex flex-col items-center justify-center text-center py-16 gap-2">
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                  <ShoppingCart className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">Your bucket is empty.<br />Add costumes from the catalog.</p>
+              </div>
             )}
             {items.map((it) => {
               const c = byId.get(it.costume_id);
               return (
-                <div key={`${it.costume_id}-${it.size}`} className="flex items-center gap-3 rounded-md border p-2">
-                  <div className="h-10 w-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                    {c?.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : <Shirt className="h-5 w-5 text-muted-foreground" />}
+                <div key={`${it.costume_id}-${it.size}`} className="flex items-center gap-3 rounded-lg border p-2.5">
+                  <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                    {c?.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : <Shirt className="h-6 w-6 text-muted-foreground" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {c?.name ?? "Costume"}
-                      {it.size && <span className="ml-1 text-xs text-muted-foreground">· {it.size}</span>}
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium truncate">{c?.name ?? "Costume"}</p>
+                      {it.size && <Badge variant="secondary" className="text-[10px] shrink-0">{it.size}</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {c ? `${formatCurrency(c.daily_rate)}/day` : it.costume_id.slice(0, 8)}
+                      {c && <span> · {formatCurrency(Number(c.daily_rate) * it.quantity)}/day total</span>}
                     </p>
-                    <p className="text-xs text-muted-foreground">{c ? `${formatCurrency(c.daily_rate)}/day` : it.costume_id.slice(0, 8)}</p>
                   </div>
                   <Input
-                    type="number" min={1} className="w-16 h-8"
+                    type="number" min={1} className="w-14 h-8"
                     value={it.quantity}
                     onChange={(e) => setQuantity(it.costume_id, it.size, Math.max(1, Number(e.target.value) || 1))}
                   />
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(it.costume_id, it.size)}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(it.costume_id, it.size)} title="Remove">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

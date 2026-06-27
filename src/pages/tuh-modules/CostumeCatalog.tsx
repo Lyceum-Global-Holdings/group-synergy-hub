@@ -10,8 +10,9 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCostumes } from "@/hooks/useCostumes";
 import { useRentalCategories } from "@/hooks/useRentalCategories";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { Costume, RentalCategory } from "@/types/costumeRental";
+import { costumeSizeOptions, sizeLabel } from "@/components/tuh-modules/costume-rental/sizeUtils";
 import { CreateCostumeDialog } from "@/components/tuh-modules/costume-rental/CreateCostumeDialog";
 import { ManageUnitsDialog } from "@/components/tuh-modules/costume-rental/ManageUnitsDialog";
 import { RentalCategoriesDialog } from "@/components/tuh-modules/costume-rental/RentalCategoriesDialog";
@@ -107,35 +108,41 @@ export default function CostumeCatalog() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((c: Costume) => (
-            <Card key={c.id} className="overflow-hidden">
-              <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden cursor-pointer"
+            <Card key={c.id} className="overflow-hidden group flex flex-col transition hover:shadow-md">
+              <div className="relative aspect-[4/5] bg-muted overflow-hidden cursor-pointer"
                    onClick={() => setDetailCostume(c)} title="View details">
                 {c.image_url
-                  ? <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" />
-                  : <Shirt className="h-10 w-10 text-muted-foreground" />}
+                  ? <img src={c.image_url} alt={c.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  : <div className="h-full w-full flex items-center justify-center"><Shirt className="h-10 w-10 text-muted-foreground" /></div>}
+                <Badge variant={STATUS_VARIANT[c.status]} className="absolute top-2 right-2 capitalize shadow">{c.status}</Badge>
+                {(c.image_urls?.length ?? 0) > 1 && (
+                  <span className="absolute bottom-2 right-2 text-[10px] font-medium bg-background/90 shadow rounded-full px-1.5">{c.image_urls!.length} photos</span>
+                )}
               </div>
-              <CardContent className="p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <button className="text-left w-full" onClick={() => setDetailCostume(c)}>
-                      <p className="font-medium truncate hover:underline">{c.name}</p>
-                    </button>
-                    <p className="text-xs text-muted-foreground font-mono">{c.costume_code}</p>
-                  </div>
-                  <Badge variant={STATUS_VARIANT[c.status]} className="capitalize shrink-0">{c.status}</Badge>
+              <CardContent className="p-3 flex flex-col flex-1 gap-2">
+                <div className="min-w-0">
+                  <button className="text-left w-full" onClick={() => setDetailCostume(c)}>
+                    <p className="font-medium leading-tight truncate hover:underline">{c.name}</p>
+                  </button>
+                  <p className="text-xs text-muted-foreground font-mono">{c.costume_code}</p>
                 </div>
-                <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
-                  {c.category?.name && <Badge variant="outline">{c.category.name}</Badge>}
-                  {c.size && <span>Size {c.size}</span>}
-                  {c.color && <span>· {c.color}</span>}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{formatCurrency(c.daily_rate)}/day</span>
-                  <span className="text-xs text-muted-foreground">
-                    {c.available_units ?? 0}/{c.total_units ?? 0} available
+
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-semibold">{formatCurrency(c.daily_rate)}<span className="text-xs font-normal text-muted-foreground">/day</span></span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn("h-2 w-2 rounded-full", (c.available_units ?? 0) > 0 ? "bg-green-500" : "bg-muted-foreground/40")} />
+                    {c.available_units ?? 0}/{c.total_units ?? 0}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 pt-1">
+
+                <div className="flex flex-wrap gap-1">
+                  {c.category?.name && <Badge variant="outline" className="text-[10px]">{c.category.name}</Badge>}
+                  {costumeSizeOptions(c).slice(0, 4).map((s) => (
+                    <Badge key={s.size || "_one"} variant="secondary" className="text-[10px]">{sizeLabel(s.size)}</Badge>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 mt-auto pt-1">
                   {cart.quantityOfCostume(c.id) > 0 ? (
                     <Button size="sm" variant="secondary" className="flex-1" onClick={() => setAddCostume(c)} disabled={c.status !== "active"}>
                       <Check className="h-4 w-4 mr-1" /> In bucket ({cart.quantityOfCostume(c.id)})
@@ -150,10 +157,10 @@ export default function CostumeCatalog() {
                       <ShoppingCart className="h-4 w-4 mr-1" /> Add
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => setUnitsCostume(c)} title="Manage units">
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setUnitsCostume(c)} title="Manage units">
                     <Boxes className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => { setEditCostume(c); setCreateOpen(true); }} title="Edit">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditCostume(c); setCreateOpen(true); }} title="Edit">
                     <Pencil className="h-4 w-4" />
                   </Button>
                 </div>
