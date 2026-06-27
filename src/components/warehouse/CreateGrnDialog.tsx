@@ -65,6 +65,14 @@ const formSchema = z.object({
   remarks: z.string().optional(),
 });
 
+// Net line value after the per-line discount (gross − capped discount).
+const grnLineNet = (it: CreateGrnItemData): number => {
+  const gross = (Number(it.quantity_received) || 0) * (Number(it.unit_price) || 0);
+  const v = Number(it.discount_value) || 0;
+  const d = it.discount_type === 'percent' ? (gross * v) / 100 : it.discount_type === 'fixed' ? v : 0;
+  return Math.max(0, gross - Math.min(Math.max(d, 0), gross));
+};
+
 interface CreateGrnDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -80,6 +88,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
   const updateDraftGrn = useUpdateDraftGrnWithItems();
+  const [overallDiscType, setOverallDiscType] = useState<'none' | 'percent' | 'fixed'>('none');
+  const [overallDiscValue, setOverallDiscValue] = useState<number>(0);
   const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
@@ -113,6 +123,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     });
     setSelectedPoId(editingDraft.po_id || '');
     setInvoiceDocumentUrl(editingDraft.invoice_document_url || '');
+    setOverallDiscType((editingDraft.discount_type as any) || 'none');
+    setOverallDiscValue(Number(editingDraft.discount_value) || 0);
     const hydratedItems: CreateGrnItemData[] = (editingDraft.grn_items || []).map((row: any) => ({
       po_item_id: row.po_item_id ?? undefined,
       warehouse_item_id: row.warehouse_item_id ?? undefined,
@@ -127,6 +139,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       quantity_received: Number(row.quantity_received ?? 0),
       unit_price: Number(row.unit_price ?? 0),
       total_cost: Number(row.total_cost ?? 0),
+      discount_type: row.discount_type ?? null,
+      discount_value: Number(row.discount_value ?? 0),
       quality_status: (row.quality_status ?? 'good') as QualityStatus,
       remarks: row.remarks ?? undefined,
       batch_number: row.batch_number ?? '',
@@ -371,11 +385,9 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       }
     }
 
-    // Auto-calculate total cost
-    if (field === 'quantity_received' || field === 'unit_price') {
-      const qty = field === 'quantity_received' ? value : newItems[index].quantity_received;
-      const price = field === 'unit_price' ? value : newItems[index].unit_price;
-      newItems[index].total_cost = qty * price;
+    // Auto-calculate net line total (gross − per-line discount).
+    if (['quantity_received', 'unit_price', 'discount_type', 'discount_value'].includes(field)) {
+      newItems[index].total_cost = grnLineNet(newItems[index]);
     }
 
     setItems(newItems);
@@ -462,6 +474,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       invoice_date: values.invoice_date || undefined,
       invoice_document_url: invoiceDocumentUrl || undefined,
       remarks: values.remarks || undefined,
+      discount_type: overallDiscType === 'none' ? null : overallDiscType,
+      discount_value: overallDiscType === 'none' ? 0 : (Number(overallDiscValue) || 0),
       company_id: selectedCompany?.id,
     };
 
@@ -483,6 +497,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     onOpenChange(false);
     form.reset();
     setItems([]);
+    setOverallDiscType('none');
+    setOverallDiscValue(0);
     setSelectedPoId('');
     setInvoiceDocumentUrl('');
   };
@@ -575,7 +591,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
             </div>
 
             <div className="overflow-x-auto border rounded-md">
-            <Table className="min-w-[1100px]">
+            <Table className="min-w-[1280px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Item Name</TableHead>
@@ -584,6 +600,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                   <TableHead>Qty Remaining</TableHead>
                   <TableHead>Qty Receiving</TableHead>
                   <TableHead>Unit Price</TableHead>
+                  <TableHead>Discount</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Quality</TableHead>
                    <TableHead>Batch/Serial</TableHead>
@@ -835,7 +852,29 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                         disabled={!!item.po_item_id}
                       />
                     </TableCell>
-                    <TableCell>{item.total_cost.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={item.discount_type ?? 'none'}
+                          onValueChange={(v) => handleItemChange(index, 'discount_type', v === 'none' ? null : v)}
+                        >
+                          <SelectTrigger className="w-[70px] h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">—</SelectItem>
+                            <SelectItem value="percent">%</SelectItem>
+                            <SelectItem value="fixed">Rs</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number" min="0"
+                          value={item.discount_value ?? 0}
+                          disabled={!item.discount_type}
+                          onChange={(e) => handleItemChange(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                          className="w-20"
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">{item.total_cost.toFixed(2)}</TableCell>
                     <TableCell>
                       <Select
                         value={item.quality_status}
@@ -948,6 +987,48 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
             <Label>Remarks</Label>
             <Textarea {...form.register('remarks')} />
           </div>
+
+          {/* Totals & overall discount */}
+          {items.length > 0 && (() => {
+            const subtotal = items.reduce((s, it) => s + (Number(it.quantity_received) || 0) * (Number(it.unit_price) || 0), 0);
+            const afterLine = items.reduce((s, it) => s + grnLineNet(it), 0);
+            const lineDiscTotal = subtotal - afterLine;
+            const dv = Number(overallDiscValue) || 0;
+            const docDisc = Math.min(
+              Math.max(overallDiscType === 'percent' ? (afterLine * dv) / 100 : overallDiscType === 'fixed' ? dv : 0, 0),
+              afterLine,
+            );
+            const netTotal = afterLine - docDisc;
+            const fmt = (n: number) => `Rs. ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return (
+              <div className="ml-auto w-full max-w-sm rounded-lg border p-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{fmt(subtotal)}</span></div>
+                {lineDiscTotal > 0 && (
+                  <div className="flex justify-between text-muted-foreground"><span>Line discounts</span><span>−{fmt(lineDiscTotal)}</span></div>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Overall discount</span>
+                  <div className="flex items-center gap-1">
+                    <Select value={overallDiscType} onValueChange={(v) => setOverallDiscType(v as any)}>
+                      <SelectTrigger className="w-[72px] h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">—</SelectItem>
+                        <SelectItem value="percent">%</SelectItem>
+                        <SelectItem value="fixed">Rs</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input type="number" min="0" className="w-24 h-9" value={overallDiscValue}
+                      disabled={overallDiscType === 'none'}
+                      onChange={(e) => setOverallDiscValue(parseFloat(e.target.value) || 0)} />
+                  </div>
+                </div>
+                {docDisc > 0 && (
+                  <div className="flex justify-between text-muted-foreground"><span>Overall discount applied</span><span>−{fmt(docDisc)}</span></div>
+                )}
+                <div className="flex justify-between font-semibold border-t pt-2 text-base"><span>Net total</span><span>{fmt(netTotal)}</span></div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Actions */}

@@ -266,13 +266,29 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                     </div>
 
                     {/* Financial */}
-                    <div className="rounded-lg border p-4 space-y-2 bg-muted/30">
-                      <h3 className="text-sm font-semibold flex items-center gap-2"><Package className="h-4 w-4" /> Financial summary</h3>
-                      <div className="flex items-end justify-between">
-                        <span className="text-sm text-muted-foreground">Total value</span>
-                        <span className="text-2xl font-bold">{lkr(grn.total_value || 0)}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{items.length} item(s) · {totalReceived.toLocaleString()} units received</p>
+                    <div className="rounded-lg border p-4 space-y-1.5 bg-muted/30">
+                      <h3 className="text-sm font-semibold flex items-center gap-2 mb-1"><Package className="h-4 w-4" /> Financial summary</h3>
+                      {(() => {
+                        const lineDisc = items.reduce((s, i) => s + (Number(i.line_discount_amount) || 0), 0);
+                        const subtotal = Number(grn.subtotal_value) || (grandTotal + lineDisc + (Number(grn.discount_amount) || 0));
+                        return (
+                          <>
+                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>{lkr(subtotal)}</span></div>
+                            {lineDisc > 0 && <div className="flex justify-between text-sm text-muted-foreground"><span>Line discounts</span><span>−{lkr(lineDisc)}</span></div>}
+                            {Number(grn.discount_amount) > 0 && (
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Overall discount{grn.discount_type === 'percent' ? ` (${grn.discount_value}%)` : ''}</span>
+                                <span>−{lkr(Number(grn.discount_amount))}</span>
+                              </div>
+                            )}
+                            <div className="flex items-end justify-between border-t pt-1.5 mt-1">
+                              <span className="text-sm font-medium">Net total</span>
+                              <span className="text-2xl font-bold">{lkr(grn.total_value || 0)}</span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                      <p className="text-xs text-muted-foreground pt-1">{items.length} item(s) · {totalReceived.toLocaleString()} units received</p>
                     </div>
                   </div>
 
@@ -313,7 +329,8 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                           <TableHead className="text-right">Ordered</TableHead>
                           <TableHead className="text-right">Received</TableHead>
                           <TableHead className="text-right">Unit price</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="text-right">Disc.</TableHead>
+                          <TableHead className="text-right">Net total</TableHead>
                           <TableHead>Quality</TableHead>
                           {hasBatch && <><TableHead>Batch #</TableHead><TableHead>Mfg</TableHead><TableHead>Expiry</TableHead></>}
                         </TableRow>
@@ -332,6 +349,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                               <TableCell className="text-right">{item.quantity_ordered || '-'}</TableCell>
                               <TableCell className="text-right font-medium">{item.quantity_received}</TableCell>
                               <TableCell className="text-right">{Number(item.unit_price).toFixed(2)}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">{Number(item.line_discount_amount || 0) > 0 ? `−${Number(item.line_discount_amount).toFixed(2)}` : '—'}</TableCell>
                               <TableCell className="text-right font-medium">{Number(item.total_cost).toFixed(2)}</TableCell>
                               <TableCell>
                                 <Badge variant={item.quality_status === 'good' ? 'default' : item.quality_status === 'damaged' ? 'secondary' : 'destructive'} className="capitalize">
@@ -349,7 +367,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                           );
                         })}
                         {items.length === 0 && (
-                          <TableRow><TableCell colSpan={hasBatch ? 10 : 7} className="text-center text-muted-foreground py-8">No items.</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={hasBatch ? 11 : 8} className="text-center text-muted-foreground py-8">No items.</TableCell></TableRow>
                         )}
                       </TableBody>
                       {items.length > 0 && (
@@ -359,6 +377,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                             <TableCell />
                             <TableCell />
                             <TableCell className="text-right">{totalReceived.toLocaleString()}</TableCell>
+                            <TableCell />
                             <TableCell />
                             <TableCell className="text-right">{grandTotal.toFixed(2)}</TableCell>
                             <TableCell colSpan={hasBatch ? 4 : 1} />

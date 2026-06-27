@@ -50,6 +50,10 @@ export interface GoodsReceiptNote {
   invoice_document_url?: string;
   status: GrnStatus;
   total_value: number;
+  subtotal_value?: number;
+  discount_type?: 'percent' | 'fixed' | null;
+  discount_value?: number;
+  discount_amount?: number;
   remarks?: string;
   company_id?: string;
   created_by?: string;
@@ -89,6 +93,10 @@ export interface GrnItem {
   quantity_received: number;
   unit_price: number;
   total_cost: number;
+  discount_type?: 'percent' | 'fixed' | null;
+  discount_value?: number;
+  line_discount_amount?: number;
+  net_unit_price?: number;
   quality_status: QualityStatus;
   remarks?: string;
   created_at: string;
@@ -115,6 +123,8 @@ export interface CreateGrnData {
   invoice_date?: string;
   invoice_document_url?: string;
   status: GrnStatus;
+  discount_type?: 'percent' | 'fixed' | null;
+  discount_value?: number;
   remarks?: string;
   company_id?: string;
   items: CreateGrnItemData[];
@@ -135,6 +145,10 @@ export interface CreateGrnItemData {
   quantity_received: number;
   unit_price: number;
   total_cost: number;
+  discount_type?: 'percent' | 'fixed' | null;
+  discount_value?: number;
+  line_discount_amount?: number;
+  net_unit_price?: number;
   quality_status: QualityStatus;
   remarks?: string;
   // Batch tracking fields

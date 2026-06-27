@@ -156,6 +156,8 @@ export const useCreateGoodsReceiptNote = () => {
           invoice_document_url: data.invoice_document_url,
           remarks: data.remarks,
           status: data.status,
+          discount_type: data.discount_type ?? null,
+          discount_value: data.discount_value ?? 0,
           company_id: data.company_id || null,
           created_by: user.id,
         } as any)
@@ -197,6 +199,8 @@ export const useCreateGoodsReceiptNote = () => {
             quantity_received: item.quantity_received,
             unit_price: item.unit_price,
             total_cost: item.total_cost,
+            discount_type: item.discount_type ?? null,
+            discount_value: item.discount_value ?? 0,
             quality_status: item.quality_status,
             remarks: item.remarks,
             // Batch tracking fields
@@ -323,6 +327,8 @@ export const useUpdateDraftGrnWithItems = () => {
           invoice_date: header.invoice_date ?? null,
           invoice_document_url: header.invoice_document_url ?? null,
           remarks: header.remarks ?? null,
+          discount_type: header.discount_type ?? null,
+          discount_value: header.discount_value ?? 0,
           status: submit ? 'submitted' : 'draft',
         } as any)
         .eq('id', id);
@@ -347,6 +353,8 @@ export const useUpdateDraftGrnWithItems = () => {
         quantity_received: item.quantity_received,
         unit_price: item.unit_price,
         total_cost: item.total_cost,
+        discount_type: item.discount_type ?? null,
+        discount_value: item.discount_value ?? 0,
         quality_status: item.quality_status,
         remarks: item.remarks ?? null,
         batch_number: item.batch_number || null,

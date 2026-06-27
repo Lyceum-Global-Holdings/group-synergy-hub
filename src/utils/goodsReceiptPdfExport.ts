@@ -209,6 +209,19 @@ export async function downloadGrnPdf(opts: GenerateOptions): Promise<void> {
   doc.setFontSize(9);
   doc.text(`Total Items: ${items.length}`, pageWidth - margin, cursorY, { align: 'right' });
   cursorY += 14;
+  const lineDisc = items.reduce((s: number, it: any) => s + (Number(it.line_discount_amount) || 0), 0);
+  if (Number(grn.subtotal_value) > 0 && (lineDisc > 0 || Number(grn.discount_amount) > 0)) {
+    doc.text(`Subtotal: ${fmtMoney(grn.subtotal_value, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
+    cursorY += 14;
+    if (lineDisc > 0) {
+      doc.text(`Line Discounts: -${fmtMoney(lineDisc, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
+      cursorY += 14;
+    }
+    if (Number(grn.discount_amount) > 0) {
+      doc.text(`Overall Discount: -${fmtMoney(grn.discount_amount, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
+      cursorY += 14;
+    }
+  }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text(`Grand Total: ${fmtMoney(grn.total_value, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
