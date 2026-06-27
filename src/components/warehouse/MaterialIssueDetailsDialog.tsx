@@ -303,15 +303,15 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle>Material Issue Note - {issue.min_number}</DialogTitle>
+        <DialogHeader className="pb-4 border-b">
+          <div className="flex items-start justify-between gap-3 pr-8">
+            <div className="min-w-0">
+              <DialogTitle className="font-mono">{issue.min_number}</DialogTitle>
               <DialogDescription>
-                Created on {format(new Date(issue.created_at), 'MMM dd, yyyy')}
+                Material Issue Note · created {format(new Date(issue.created_at), 'dd MMM yyyy')}
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -322,8 +322,28 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
                 {downloadingPdf ? 'Generating…' : 'Download PDF'}
               </Button>
               <Badge variant={getStatusColor(issue.status)}>
-                {issue.status.toUpperCase()}
+                {issue.status.replace(/_/g, ' ').toUpperCase()}
               </Badge>
+            </div>
+          </div>
+
+          {/* KPI strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Line items</p>
+              <p className="text-lg font-bold">{items.length}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Department</p>
+              <p className="text-sm font-semibold mt-1 truncate">{issue.department || '—'}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Required by</p>
+              <p className="text-sm font-semibold mt-1">{issue.items_required_date ? format(new Date(issue.items_required_date), 'dd MMM yyyy') : '—'}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Issue date</p>
+              <p className="text-sm font-semibold mt-1">{issue.issue_date ? format(new Date(issue.issue_date), 'dd MMM yyyy') : '—'}</p>
             </div>
           </div>
         </DialogHeader>

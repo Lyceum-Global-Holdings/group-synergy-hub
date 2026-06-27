@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Send, Package, Edit, FileText, Check, X, Clock, FilePlus } from "lucide-react";
 import { useSendPurchaseOrder, usePurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { useSubmitPurchaseOrder, useApprovePurchaseOrder, usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
@@ -159,18 +160,41 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle className="text-xl">Purchase Order Details</DialogTitle>
+        <DialogHeader className="pb-4 border-b">
+          <div className="flex items-start justify-between gap-3 pr-8">
+            <div className="min-w-0">
+              <DialogTitle className="text-xl font-mono">{po.po_number}</DialogTitle>
               <DialogDescription>
-                PO Number: {po.po_number}
+                Purchase Order{(po as any).supplier_name ? ` · ${(po as any).supplier_name}` : ''}
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className={statusColors[po.status]}>
-                {statusLabels[po.status]}
-              </Badge>
+            <Badge className={cn('shrink-0', statusColors[po.status])}>
+              {statusLabels[po.status]}
+            </Badge>
+          </div>
+
+          {/* KPI strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Supplier</p>
+              <p className="text-sm font-semibold mt-0.5 truncate">{(po as any).supplier_name || (po as any).supplier?.name || '—'}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Line items</p>
+              <p className="text-lg font-bold">{po.items?.length ?? 0}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Total amount</p>
+              <p className="text-lg font-bold">Rs. {Number(po.total_amount || 0).toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-xs text-muted-foreground">PO date</p>
+              <p className="text-sm font-semibold mt-0.5">{(po as any).po_date ? format(new Date((po as any).po_date), 'dd MMM yyyy') : ((po as any).created_at ? format(new Date((po as any).created_at), 'dd MMM yyyy') : '—')}</p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 flex-wrap mt-3">
               <Button size="sm" variant="outline" onClick={() => setShowPdfView(true)}>
                 <FileText className="h-4 w-4 mr-2" />
                 View/Download PDF
@@ -217,7 +241,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   Create Amendment
                 </Button>
               )}
-            </div>
           </div>
         </DialogHeader>
 

@@ -89,18 +89,18 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+          <DialogHeader className="pb-4 border-b">
+            <div className="flex items-start justify-between gap-3 pr-8">
+              <div className="flex items-center gap-3 min-w-0">
                 <Avatar className="h-12 w-12">
                   <AvatarFallback className="text-lg">
                     {supplier.name.substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <DialogTitle className="text-2xl">{supplier.name}</DialogTitle>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline">{supplier.supplier_code}</Badge>
+                <div className="min-w-0">
+                  <DialogTitle className="text-2xl truncate">{supplier.name}</DialogTitle>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <Badge variant="outline" className="font-mono">{supplier.supplier_code}</Badge>
                     <Badge variant="outline">
                       {SUPPLIER_TYPES.find(t => t.value === supplier.supplier_type)?.label}
                     </Badge>
@@ -110,10 +110,30 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
                   </div>
                 </div>
               </div>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="shrink-0">
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </Button>
+            </div>
+
+            {/* KPI strip */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xs text-muted-foreground">Rating</p>
+                <div className="mt-0.5">{renderStars(supplier.rating)}</div>
+              </div>
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xs text-muted-foreground">Payment terms</p>
+                <p className="text-sm font-semibold mt-0.5">{PAYMENT_TERMS.find(p => p.value === supplier.payment_terms)?.label || supplier.payment_terms || '—'}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xs text-muted-foreground">Category</p>
+                <p className="text-sm font-semibold mt-0.5 truncate">{SUPPLIER_CATEGORIES.find(c => c.value === (supplier as any).supplier_category)?.label || (supplier as any).supplier_category || '—'}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xs text-muted-foreground">Added</p>
+                <p className="text-sm font-semibold mt-0.5">{(supplier as any).created_at ? format(new Date((supplier as any).created_at), 'dd MMM yyyy') : '—'}</p>
+              </div>
             </div>
           </DialogHeader>
 
