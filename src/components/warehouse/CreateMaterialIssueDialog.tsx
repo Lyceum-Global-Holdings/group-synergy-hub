@@ -563,9 +563,10 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
               </Alert>
             )}
 
-            {/* Compact, all-visible grid. Required fields marked with *. */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-              <div className="col-span-2 space-y-1">
+            {/* Compact, all-visible 3-column grid: short fields three-per-row,
+                wide ones span all three. */}
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2.5">
+              <div className="col-span-3 space-y-1">
                 <Label htmlFor="location_id" className="text-xs">Issue Location <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.location_id}
@@ -602,8 +603,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
                 <Input id="department" className="h-8" value={formData.department} onChange={(e) => handleInputChange('department', e.target.value)} placeholder="Department name" required />
               </div>
 
-              {/* Customer PO — full width, optional */}
-              <div className="col-span-2 space-y-1">
+              {/* Customer PO — optional */}
+              <div className="space-y-1">
                 <Label htmlFor="cpo_id" className="text-xs">Customer Purchase Order <span className="text-muted-foreground">(optional)</span></Label>
                 <Select value={formData.cpo_id} onValueChange={handleCPOSelect}>
                   <SelectTrigger className="h-8">
@@ -647,7 +648,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
               </div>
 
               {/* SRN number — full width */}
-              <div className="col-span-2">
+              <div className="col-span-3">
                 <SrnNumberField
                   value={formData.srn_number}
                   onChange={(v) => handleInputChange('srn_number', v)}
@@ -655,13 +656,13 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
               </div>
 
               {/* Purpose — full width */}
-              <div className="col-span-2 space-y-1">
+              <div className="col-span-3 space-y-1">
                 <Label htmlFor="purpose" className="text-xs">Purpose of Issue *</Label>
                 <Textarea id="purpose" className="min-h-0" value={formData.purpose} onChange={(e) => handleInputChange('purpose', e.target.value)} placeholder="Describe the purpose of this issue" rows={2} required />
               </div>
 
               {/* Attachments side by side */}
-              <div className="col-span-2 grid grid-cols-2 gap-4">
+              <div className="col-span-3 grid grid-cols-2 gap-4">
                 <SrnDocumentUploadField
                   companyId={selectedCompany?.id}
                   currentDocumentUrl={srnDocumentTempPath || undefined}
