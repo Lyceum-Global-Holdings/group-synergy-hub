@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CheckCircle, XCircle, FileCheck, Truck, Package, ArrowDown, ArrowUp, Download } from 'lucide-react';
+import { CheckCircle, XCircle, FileCheck, Truck, Package, ArrowDown, ArrowUp, Download, FileText, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueReturn';
@@ -45,6 +45,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
   const [issue, setIssue] = useState<MaterialIssueNote | null>(null);
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
   const [itemNames, setItemNames] = useState<Record<string, string>>({});
+  const [actorNames, setActorNames] = useState<Record<string, string>>({});
   const [srnFallback, setSrnFallback] = useState<{ path: string; category: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
@@ -53,8 +54,6 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
   const queryClient = useQueryClient();
   const { selectedCompany, companies } = useCompany();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const { data: userRoles = [] } = useCurrentUserRoles();
-  const canApprove = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
   const { reopenDraftAsync, isReopening } = useMaterialIssues();
 
   const handleReopen = async () => {
@@ -160,6 +159,22 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
       if (issueError) throw issueError;
       setIssue(issueData as MaterialIssueNote);
 
+      // Resolve names of the lifecycle actors (drafted/submitted/approved by).
+      const actorIds = [
+        (issueData as any).created_by,
+        (issueData as any).submitted_by,
+        (issueData as any).approved_by,
+      ].filter(Boolean) as string[];
+      if (actorIds.length) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', Array.from(new Set(actorIds)));
+        setActorNames(Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.full_name ?? ''])));
+      } else {
+        setActorNames({});
+      }
+
       // Fallback: surface the most relevant attachment when the primary SRN field is empty.
       if (!(issueData as any)?.srn_document_url) {
         const { data: atts } = await supabase
@@ -206,75 +221,6 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleApproveHOD = async () => {
-    if (!issueId) return;
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('material_issue_notes')
-        .update({
-          hod_approved_by: user.id,
-          hod_approval_date: new Date().toISOString(),
-          status: 'approved',
-        })
-        .eq('id', issueId);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Material issue approved by HOD',
-      });
-      
-      fetchIssueDetails();
-      invalidateLists();
-    } catch (error) {
-      console.error('Error approving:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to approve material issue',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleApproveManagement = async () => {
-    if (!issueId) return;
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('material_issue_notes')
-        .update({
-          management_approved_by: user.id,
-          management_approval_date: new Date().toISOString(),
-        })
-        .eq('id', issueId);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Material issue approved by Management',
-      });
-      
-      fetchIssueDetails();
-      invalidateLists();
-    } catch (error) {
-      console.error('Error approving:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to approve material issue',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -559,108 +505,53 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
           </TabsContent>
 
           <TabsContent value="approvals" className="space-y-4">
-            <div className="space-y-3">
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {issue.hod_approved_by ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-gray-400" />
-                    )}
-                    <div>
-                      <div className="font-semibold">HOD Approval</div>
-                      {issue.hod_approved_by ? (
-                        <div className="text-sm text-muted-foreground">
-                          Approved on {format(new Date(issue.hod_approval_date!), 'MMM dd, yyyy HH:mm')}
+            {(() => {
+              const nameOf = (id?: string | null) => (id ? (actorNames[id] || 'Unknown') : null);
+              const fmt = (d?: string | null) => (d ? format(new Date(d), 'MMM dd, yyyy HH:mm') : null);
+              const rejected = issue.status === 'rejected';
+              const cancelled = issue.status === 'cancelled';
+              const a = issue as any;
+              type Tone = 'green' | 'blue' | 'purple' | 'red' | 'muted';
+              const steps: { title: string; icon: any; tone: Tone; done: boolean; person?: string | null; date?: string | null; pending: string }[] = [
+                { title: 'Drafted', icon: FileText, tone: 'green', done: true, person: nameOf(a.created_by), date: issue.created_at, pending: '' },
+                { title: 'Submitted for approval', icon: Send, tone: 'green', done: !!a.submitted_by || !['draft'].includes(issue.status), person: nameOf(a.submitted_by), date: a.submitted_at, pending: 'Awaiting submission' },
+                { title: rejected ? 'Rejected' : 'Approved', icon: rejected ? XCircle : CheckCircle, tone: rejected ? 'red' : 'green', done: rejected || !!a.approved_by, person: nameOf(a.approved_by), date: a.approved_date, pending: cancelled ? 'Cancelled before approval' : 'Pending approval' },
+                { title: 'Items issued', icon: FileCheck, tone: 'blue', done: !!issue.issued_by, person: issue.issued_by_name, date: a.issue_date, pending: 'Not yet issued' },
+                { title: 'Items received', icon: Truck, tone: 'purple', done: !!issue.received_by, person: issue.received_by_name, date: a.received_date, pending: 'Not yet received' },
+              ];
+              const toneDot: Record<Tone, string> = {
+                green: 'bg-green-500 text-white', blue: 'bg-blue-500 text-white',
+                purple: 'bg-purple-500 text-white', red: 'bg-red-500 text-white',
+                muted: 'bg-muted text-muted-foreground',
+              };
+              return (
+                <ol className="relative pl-1">
+                  {steps.map((s, i) => {
+                    const Icon = s.icon;
+                    const isLast = i === steps.length - 1;
+                    return (
+                      <li key={s.title} className="relative flex gap-3 pb-5 last:pb-0">
+                        {!isLast && <span className="absolute left-[15px] top-8 bottom-0 w-px bg-border" />}
+                        <span className={`relative z-10 h-8 w-8 shrink-0 rounded-full flex items-center justify-center ${s.done ? toneDot[s.tone] : toneDot.muted}`}>
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <div className="pt-1 min-w-0">
+                          <p className="font-medium">{s.title}</p>
+                          {s.done ? (
+                            <p className="text-sm text-muted-foreground">
+                              {s.person ? `by ${s.person}` : (s.tone === 'red' ? 'Rejected' : 'Done')}
+                              {fmt(s.date) ? ` · ${fmt(s.date)}` : ''}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">{s.pending}</p>
+                          )}
                         </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">Pending approval</div>
-                      )}
-                    </div>
-                  </div>
-                  {!issue.hod_approved_by && issue.status === 'draft' && canApprove && (
-                    <Button onClick={handleApproveHOD} size="sm">
-                      Approve as HOD
-                    </Button>
-                  )}
-                  {!issue.hod_approved_by && issue.status === 'draft' && !canApprove && (
-                    <span className="text-xs text-muted-foreground">Only admins can approve</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {issue.management_approved_by ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-gray-400" />
-                    )}
-                    <div>
-                      <div className="font-semibold">Management Approval</div>
-                      {issue.management_approved_by ? (
-                        <div className="text-sm text-muted-foreground">
-                          Approved on {format(new Date(issue.management_approval_date!), 'MMM dd, yyyy HH:mm')}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">Pending approval</div>
-                      )}
-                    </div>
-                  </div>
-                  {!issue.management_approved_by && issue.hod_approved_by && canApprove && (
-                    <Button onClick={handleApproveManagement} size="sm">
-                      Approve as Management
-                    </Button>
-                  )}
-                  {!issue.management_approved_by && issue.hod_approved_by && !canApprove && (
-                    <span className="text-xs text-muted-foreground">Only admins can approve</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  {issue.issued_by ? (
-                    <FileCheck className="h-5 w-5 text-blue-600" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-gray-400" />
-                  )}
-                  <div>
-                    <div className="font-semibold">Items Issued</div>
-                    {issue.issued_by ? (
-                      <div className="text-sm text-muted-foreground">
-                        Issued by {issue.issued_by_name || 'Unknown'}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">Not yet issued</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  {issue.received_by ? (
-                    <Truck className="h-5 w-5 text-purple-600" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-gray-400" />
-                  )}
-                  <div>
-                    <div className="font-semibold">Items Received</div>
-                    {issue.received_by ? (
-                      <div className="text-sm text-muted-foreground">
-                        Received by {issue.received_by_name || 'Unknown'} on{' '}
-                        {format(new Date(issue.received_date!), 'MMM dd, yyyy HH:mm')}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">Not yet received</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              );
+            })()}
           </TabsContent>
 
           <TabsContent value="tracking">
