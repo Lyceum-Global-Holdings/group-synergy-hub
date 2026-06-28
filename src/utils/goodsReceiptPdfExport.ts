@@ -228,6 +228,10 @@ export async function downloadGrnPdf(opts: GenerateOptions): Promise<void> {
     doc.text(`Tax: +${fmtMoney(grn.tax_amount, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
     cursorY += 14;
   }
+  if (Number(grn.transport_cost) > 0) {
+    doc.text(`Transport / Freight: +${fmtMoney(grn.transport_cost, currency)}`, pageWidth - margin, cursorY, { align: 'right' });
+    cursorY += 14;
+  }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text(`Grand Total: ${fmtMoney(grn.grand_total ?? grn.total_value, currency)}`, pageWidth - margin, cursorY, { align: 'right' });

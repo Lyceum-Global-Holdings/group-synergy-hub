@@ -288,6 +288,12 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                                 <span>+{lkr(Number(grn.tax_amount))}</span>
                               </div>
                             )}
+                            {Number(grn.transport_cost) > 0 && (
+                              <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Transport / freight</span>
+                                <span>+{lkr(Number(grn.transport_cost))}</span>
+                              </div>
+                            )}
                             <div className="flex items-end justify-between border-t pt-1.5 mt-1">
                               <span className="text-sm font-medium">Grand total</span>
                               <span className="text-2xl font-bold">{lkr(grn.grand_total || grn.total_value || 0)}</span>

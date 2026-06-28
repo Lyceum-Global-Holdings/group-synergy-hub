@@ -57,6 +57,7 @@ export interface GoodsReceiptNote {
   tax_type?: 'percent' | 'fixed' | null;
   tax_value?: number;
   tax_amount?: number;
+  transport_cost?: number;
   grand_total?: number;
   remarks?: string;
   company_id?: string;
@@ -133,6 +134,7 @@ export interface CreateGrnData {
   discount_value?: number;
   tax_type?: 'percent' | 'fixed' | null;
   tax_value?: number;
+  transport_cost?: number;
   remarks?: string;
   company_id?: string;
   location_id?: string | null;

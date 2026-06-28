@@ -94,6 +94,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   const [overallDiscValue, setOverallDiscValue] = useState<number>(0);
   const [taxType, setTaxType] = useState<'none' | 'percent' | 'fixed'>('none');
   const [taxValue, setTaxValue] = useState<number>(0);
+  const [transportCost, setTransportCost] = useState<number>(0);
   const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
@@ -131,6 +132,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     setOverallDiscValue(Number(editingDraft.discount_value) || 0);
     setTaxType((editingDraft.tax_type as any) || 'none');
     setTaxValue(Number(editingDraft.tax_value) || 0);
+    setTransportCost(Number(editingDraft.transport_cost) || 0);
     const hydratedItems: CreateGrnItemData[] = (editingDraft.grn_items || []).map((row: any) => ({
       po_item_id: row.po_item_id ?? undefined,
       warehouse_item_id: row.warehouse_item_id ?? undefined,
@@ -484,6 +486,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       discount_value: overallDiscType === 'none' ? 0 : (Number(overallDiscValue) || 0),
       tax_type: taxType === 'none' ? null : taxType,
       tax_value: taxType === 'none' ? 0 : (Number(taxValue) || 0),
+      transport_cost: Number(transportCost) || 0,
       company_id: selectedCompany?.id,
       location_id: (editingDraft?.location_id ?? globalLocationId) ?? null,
     };
@@ -510,6 +513,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     setOverallDiscValue(0);
     setTaxType('none');
     setTaxValue(0);
+    setTransportCost(0);
     setSelectedPoId('');
     setInvoiceDocumentUrl('');
   };
@@ -1012,7 +1016,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
             const netTotal = afterLine - docDisc;
             const tv = Number(taxValue) || 0;
             const taxAmt = Math.max(0, taxType === 'percent' ? (netTotal * tv) / 100 : taxType === 'fixed' ? tv : 0);
-            const grandTotal = netTotal + taxAmt;
+            const transportAmt = Math.max(0, Number(transportCost) || 0);
+            const grandTotal = netTotal + taxAmt + transportAmt;
             const fmt = (n: number) => `Rs. ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             return (
               <div className="ml-auto w-full max-w-sm rounded-lg border p-4 space-y-2 text-sm">
@@ -1058,6 +1063,14 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                 </div>
                 {taxAmt > 0 && (
                   <div className="flex justify-between text-muted-foreground"><span>Tax applied</span><span>+{fmt(taxAmt)}</span></div>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Transport / freight</span>
+                  <Input type="number" min="0" className="w-24 h-9" value={transportCost}
+                    onChange={(e) => setTransportCost(parseFloat(e.target.value) || 0)} />
+                </div>
+                {transportAmt > 0 && (
+                  <div className="flex justify-between text-muted-foreground"><span>Transport added</span><span>+{fmt(transportAmt)}</span></div>
                 )}
                 <div className="flex justify-between font-semibold border-t pt-2 text-base"><span>Grand total (payable)</span><span>{fmt(grandTotal)}</span></div>
               </div>
