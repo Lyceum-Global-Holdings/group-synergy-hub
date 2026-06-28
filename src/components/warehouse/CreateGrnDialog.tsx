@@ -712,7 +712,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                                               // inside approve_grn_with_allocations on approval.
                                               const { data: existing } = await supabase
                                                 .from('warehouse_items')
-                                                .select('id')
+                                                .select('id, track_secondary_quantity, secondary_uom')
                                                 .eq('company_id', selectedCompany.id)
                                                 .eq('catalog_item_id', wi.id)
                                                 .maybeSingle();
@@ -728,8 +728,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                                                 unit_of_measure: (wi as any).unit_name || newItems[index].unit_of_measure,
                                                 is_batch_tracked: (wi as any).is_batch_tracked || false,
                                                 is_serialized: (wi as any).is_serialized || false,
-                                                track_secondary_quantity: (wi as any).track_secondary_quantity || false,
-                                                secondary_uom: (wi as any).secondary_uom || '',
+                                                track_secondary_quantity: (existing as any)?.track_secondary_quantity || false,
+                                                secondary_uom: (existing as any)?.secondary_uom || '',
                                                 unit_price: (wi as any).unit_cost ? Number((wi as any).unit_cost) : newItems[index].unit_price,
                                               };
                                               const qty = newItems[index].quantity_received || 0;
