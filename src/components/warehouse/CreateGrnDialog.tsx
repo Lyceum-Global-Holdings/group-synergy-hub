@@ -725,6 +725,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                                                 catalog_item_id: wi.id,
                                                 item_name: wi.name,
                                                 item_code: wi.item_code,
+                                                unit_of_measure: (wi as any).unit_name || newItems[index].unit_of_measure,
                                                 is_batch_tracked: (wi as any).is_batch_tracked || false,
                                                 is_serialized: (wi as any).is_serialized || false,
                                                 track_secondary_quantity: (wi as any).track_secondary_quantity || false,
