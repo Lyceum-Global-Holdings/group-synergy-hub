@@ -63,7 +63,7 @@
     "jspdf-autotable": "^3.5.37",
     "jszip": "^3.10.1",
     "lucide-react": "^0.462.0",
-    "mermaid": "^11.4.1",
+    "mermaid": "^11.16.0",
     "next-themes": "^0.3.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
@@ -83,6 +83,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/js": "^9.9.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -93,19 +94,18 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "@vitest/ui": "^4.1.5",
-    "@eslint/js": "^9.9.0",
+    "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
-    "typescript-eslint": "^8.3.0",
-    "autoprefixer": "^10.4.20",
     "jsdom": "^29.1.1",
     "lovable-tagger": "^1.0.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.6.2",
-    "vite": "^5.4.6",
+    "typescript-eslint": "^8.3.0",
+    "vite": "^5.4.21",
     "vitest": "^4.1.5"
   }
 }
