@@ -6,6 +6,8 @@ import { InboundOutboundChart } from "./charts/InboundOutboundChart";
 import { TopItemsBarList } from "./charts/TopItemsBarList";
 import { MovementMixDonut } from "./charts/MovementMixDonut";
 import { SpendTrendChart } from "./charts/SpendTrendChart";
+import { MaterialFlowSankey } from "./charts/MaterialFlowSankey";
+import { Workflow } from "lucide-react";
 
 interface Props {
   companyId: string | null;
@@ -69,6 +71,20 @@ export function AnalyticsGrid({ companyId, locationId }: Props) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Panel
+          title="Material Flow Map"
+          subtitle="GRN + Returns → Inventory → Issues · 30d · by location / product"
+          icon={<Workflow className="h-4 w-4" />}
+          accent="primary"
+          className="lg:col-span-3"
+        >
+          <MaterialFlowSankey
+            overall={data?.sankey}
+            byLocation={data?.sankey_by_location}
+            byProduct={data?.sankey_by_product}
+          />
+        </Panel>
+
         <Panel
           title="Material Flow"
           subtitle="Issued vs Returned · 14d"

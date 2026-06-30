@@ -106,6 +106,12 @@ export interface DashboardAnalytics {
   top_returned: Array<{ item_id: string; name: string; item_code: string | null; qty: number }>;
   movement_mix: Array<{ type: string; count: number }>;
   spend_trend: Array<{ w: string; amount: number }>;
+  sankey: {
+    nodes: Array<{ key?: string; name: string }>;
+    links: Array<{ source: number; target: number; value: number }>;
+  };
+  sankey_by_location: Array<{ id: string | null; name: string; grn: number; returns: number; issues: number }>;
+  sankey_by_product: Array<{ name: string; grn: number; returns: number; issues: number }>;
 }
 
 export function useDashboardAnalytics(companyId?: string | null, locationId?: string | null) {
