@@ -461,6 +461,48 @@ export async function fetchGrnRegister(
   }, { start: from ?? undefined, end: to ?? undefined });
 }
 
+export async function fetchFreightSummary(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: { period?: { from?: string; to?: string }; locationId?: string | null },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from || null;
+  const to = params.period?.to || null;
+  const { data, error } = await supabase.rpc("report_freight_cost_summary" as any, {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+    p_location_id: params.locationId || null,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, {
+    grn_count: sumCol(rows, "grn_count"),
+    total_freight: sumCol(rows, "total_freight"),
+  }, { start: from ?? undefined, end: to ?? undefined });
+}
+
+export async function fetchFreightRegister(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: { period?: { from?: string; to?: string }; locationId?: string | null },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from || null;
+  const to = params.period?.to || null;
+  const { data, error } = await supabase.rpc("report_freight_register" as any, {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+    p_location_id: params.locationId || null,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, {
+    transport_cost: sumCol(rows, "transport_cost"),
+    grand_total: sumCol(rows, "grand_total"),
+  }, { start: from ?? undefined, end: to ?? undefined });
+}
+
 /* ---------------- Assets & Tools ---------------- */
 
 export async function fetchAssetRegister(
@@ -600,6 +642,10 @@ export async function buildReportEnvelope(
       return fetchBinUtilisation(def, ctx, params as never);
     case "warehouse.grnRegister":
       return fetchGrnRegister(def, ctx, params as never);
+    case "warehouse.freightSummary":
+      return fetchFreightSummary(def, ctx, params as never);
+    case "warehouse.freightRegister":
+      return fetchFreightRegister(def, ctx, params as never);
     case "warehouse.assetRegister":
       return fetchAssetRegister(def, ctx, params as never);
     case "warehouse.toolLedger":

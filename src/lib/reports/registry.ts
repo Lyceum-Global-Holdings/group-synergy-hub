@@ -476,6 +476,49 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "approved_at", label: "Approved", type: "datetime", width: 22 },
     ],
   },
+  {
+    code: "WH-FRT-SUM-001",
+    title: "Freight Cost Summary",
+    description: "GRN transport / freight cost aggregated by supplier and month.",
+    moduleKey: "warehouse",
+    group: "Receipts",
+    standard: "IAS 2 landed cost",
+    hookId: "warehouse.freightSummary",
+    parameters: [
+      { key: "period", label: "GRN Date Range", type: "dateRange", defaultDays: 90 },
+      { key: "locationId", label: "Location", type: "location" },
+    ],
+    columns: [
+      { key: "supplier_name", label: "Supplier", type: "string", width: 30 },
+      { key: "period_month", label: "Month", type: "string", width: 12 },
+      { key: "grn_count", label: "GRNs", type: "integer", width: 8, align: "right" },
+      { key: "total_freight", label: "Total Freight", type: "currency", width: 16, align: "right" },
+      { key: "avg_freight", label: "Avg per GRN", type: "currency", width: 16, align: "right" },
+    ],
+  },
+  {
+    code: "WH-FRT-REG-001",
+    title: "Freight Register",
+    description: "Per-GRN transport / freight cost with supplier, location and totals.",
+    moduleKey: "warehouse",
+    group: "Receipts",
+    standard: "IAS 2 landed cost",
+    hookId: "warehouse.freightRegister",
+    parameters: [
+      { key: "period", label: "GRN Date Range", type: "dateRange", defaultDays: 90 },
+      { key: "locationId", label: "Location", type: "location" },
+    ],
+    columns: [
+      { key: "grn_number", label: "GRN #", type: "string", width: 18 },
+      { key: "grn_date", label: "GRN Date", type: "date", width: 14 },
+      { key: "supplier_name", label: "Supplier", type: "string", width: 30 },
+      { key: "po_number", label: "PO #", type: "string", width: 18 },
+      { key: "location_name", label: "Location", type: "string", width: 20 },
+      { key: "net_value", label: "Net (Goods)", type: "currency", width: 16, align: "right" },
+      { key: "transport_cost", label: "Freight", type: "currency", width: 14, align: "right" },
+      { key: "grand_total", label: "Grand Total", type: "currency", width: 16, align: "right" },
+    ],
+  },
 
   // ============ WAREHOUSE — ASSETS & TOOLS ============
   {

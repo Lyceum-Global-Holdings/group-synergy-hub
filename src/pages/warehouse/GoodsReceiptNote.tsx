@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign, FileBarChart, Eye, Pencil } from 'lucide-react';
+import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign, FileBarChart, Eye, Pencil, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +80,12 @@ function GoodsReceiptNote() {
             <Link to="/management/reports?template=WH-GRN-REG-001">
               <FileBarChart className="mr-2 h-4 w-4" />
               Generate Report
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/management/reports?template=WH-FRT-SUM-001">
+              <Truck className="mr-2 h-4 w-4" />
+              Freight Report
             </Link>
           </Button>
           <Button onClick={() => setShowCreateDialog(true)}>
