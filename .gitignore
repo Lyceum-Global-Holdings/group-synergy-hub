@@ -13,6 +13,11 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
+# Environment files — never commit (keep .env.example only)
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

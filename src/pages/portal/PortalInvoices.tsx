@@ -89,7 +89,7 @@ export default function PortalInvoices() {
       toast({ title: "Download failed", description: error?.message, variant: "destructive" });
       return;
     }
-    window.open(data.signedUrl, "_blank");
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const openMatch = async (row: InvoiceRow) => {

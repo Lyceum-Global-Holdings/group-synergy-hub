@@ -262,6 +262,7 @@ export function ReserveMaterialsFromCPODialog({
                   <Link 
                     to="/warehouse/item-bin-master" 
                     target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 underline hover:text-primary"
                   >
                     Go to Item & Bin Master

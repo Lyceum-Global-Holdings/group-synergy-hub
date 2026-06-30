@@ -47,7 +47,7 @@ export default function Documentation() {
   const handleDownload = (manual: TrainingManual) => {
     const url = manual.document_url || manual.file_url;
     if (url) {
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 

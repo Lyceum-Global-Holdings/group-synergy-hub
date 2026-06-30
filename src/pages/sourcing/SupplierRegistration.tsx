@@ -167,7 +167,7 @@ export default function SupplierRegistration() {
             <Button variant="outline" size="sm" onClick={copyToClipboard}>
               <Copy className="w-4 h-4 mr-2" /> Copy
             </Button>
-            <Button variant="outline" size="sm" onClick={() => window.open(publicRegistrationUrl, "_blank")}>
+            <Button variant="outline" size="sm" onClick={() => window.open(publicRegistrationUrl, "_blank", "noopener,noreferrer")}>
               <ExternalLink className="w-4 h-4 mr-2" /> Preview
             </Button>
           </div>
