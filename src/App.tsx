@@ -78,6 +78,7 @@ import { markRouteChange } from "@/lib/perfTelemetry";
 import { prefetchCommonRoutesOnIdle, prefetchNeighborRoutesOnIdle } from "@/lib/routePreload";
 import { RouteSkeleton } from "@/components/layout/RouteSkeleton";
 import { isScannerShell } from "@/lib/scannerShell";
+import RootErrorBoundary from "./components/common/RootErrorBoundary";
 
 // Lightweight scanner PWA shell mounted at hosts like scan.lgh.lk.
 const ScannerApp = lazy(() => import("./scanner/ScannerApp"));
@@ -255,12 +256,15 @@ function App() {
   // exposing only the two scan-driven workflows.
   if (isScannerShell()) {
     return (
-      <Suspense fallback={<PageLoader />}>
-        <ScannerApp />
-      </Suspense>
+      <RootErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <ScannerApp />
+        </Suspense>
+      </RootErrorBoundary>
     );
   }
   return (
+    <RootErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
@@ -438,6 +442,7 @@ function App() {
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
+    </RootErrorBoundary>
   );
 }
 

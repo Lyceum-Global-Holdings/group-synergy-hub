@@ -18,6 +18,7 @@ import ScrollToTop from "@/components/layout/ScrollToTop";
 import { Loader2 } from "lucide-react";
 import ScannerLayout from "./ScannerLayout";
 import { SCANNER_BASENAME } from "@/lib/scannerShell";
+import RootErrorBoundary from "@/components/common/RootErrorBoundary";
 
 const Auth = lazy(() => import("@/pages/Auth"));
 const MfaChallenge = lazy(() => import("@/pages/auth/MfaChallenge"));
@@ -67,6 +68,7 @@ const ProtectedShell = () => (
 
 export default function ScannerApp() {
   return (
+    <RootErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
@@ -122,5 +124,6 @@ export default function ScannerApp() {
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
+    </RootErrorBoundary>
   );
 }
