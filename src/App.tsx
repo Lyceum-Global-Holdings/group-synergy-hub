@@ -268,6 +268,12 @@ const ProtectedLayout = () => (
 );
 
 function App() {
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    } catch {}
+  }, []);
+
   // Field-scanner subdomain (scan.lgh.lk) boots a stripped-down shell
   // exposing only the two scan-driven workflows.
   if (isScannerShell()) {
