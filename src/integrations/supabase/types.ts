@@ -9315,12 +9315,17 @@ export type Database = {
           company_id: string | null
           created_at: string
           created_by: string | null
+          discount_amount: number
+          discount_type: string | null
+          discount_value: number
+          grand_total: number
           grn_date: string
           grn_number: string
           id: string
           invoice_date: string | null
           invoice_document_url: string | null
           invoice_number: string | null
+          location_id: string | null
           mr_number: string | null
           po_id: string | null
           po_number: string | null
@@ -9334,10 +9339,15 @@ export type Database = {
             | null
           remarks: string | null
           status: string
+          subtotal_value: number
           supplier_address: string | null
           supplier_id: string | null
           supplier_name: string
+          tax_amount: number
+          tax_type: string | null
+          tax_value: number
           total_value: number | null
+          transport_cost: number
           updated_at: string
         }
         Insert: {
@@ -9347,12 +9357,17 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount_amount?: number
+          discount_type?: string | null
+          discount_value?: number
+          grand_total?: number
           grn_date?: string
           grn_number: string
           id?: string
           invoice_date?: string | null
           invoice_document_url?: string | null
           invoice_number?: string | null
+          location_id?: string | null
           mr_number?: string | null
           po_id?: string | null
           po_number?: string | null
@@ -9366,10 +9381,15 @@ export type Database = {
             | null
           remarks?: string | null
           status?: string
+          subtotal_value?: number
           supplier_address?: string | null
           supplier_id?: string | null
           supplier_name: string
+          tax_amount?: number
+          tax_type?: string | null
+          tax_value?: number
           total_value?: number | null
+          transport_cost?: number
           updated_at?: string
         }
         Update: {
@@ -9379,12 +9399,17 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount_amount?: number
+          discount_type?: string | null
+          discount_value?: number
+          grand_total?: number
           grn_date?: string
           grn_number?: string
           id?: string
           invoice_date?: string | null
           invoice_document_url?: string | null
           invoice_number?: string | null
+          location_id?: string | null
           mr_number?: string | null
           po_id?: string | null
           po_number?: string | null
@@ -9398,10 +9423,15 @@ export type Database = {
             | null
           remarks?: string | null
           status?: string
+          subtotal_value?: number
           supplier_address?: string | null
           supplier_id?: string | null
           supplier_name?: string
+          tax_amount?: number
+          tax_type?: string | null
+          tax_value?: number
           total_value?: number | null
+          transport_cost?: number
           updated_at?: string
         }
         Relationships: [
@@ -9432,6 +9462,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles_directory"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_notes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "goods_receipt_notes_po_id_fkey"
@@ -9470,12 +9507,16 @@ export type Database = {
           conversion_note: string | null
           created_at: string
           description: string | null
+          discount_type: string | null
+          discount_value: number
           expiry_date: string | null
           grn_id: string
           id: string
           item_code: string | null
           item_name: string
+          line_discount_amount: number
           manufacturing_date: string | null
+          net_unit_price: number | null
           po_item_id: string | null
           quality_status: string | null
           quantity_ordered: number | null
@@ -9495,12 +9536,16 @@ export type Database = {
           conversion_note?: string | null
           created_at?: string
           description?: string | null
+          discount_type?: string | null
+          discount_value?: number
           expiry_date?: string | null
           grn_id: string
           id?: string
           item_code?: string | null
           item_name: string
+          line_discount_amount?: number
           manufacturing_date?: string | null
+          net_unit_price?: number | null
           po_item_id?: string | null
           quality_status?: string | null
           quantity_ordered?: number | null
@@ -9520,12 +9565,16 @@ export type Database = {
           conversion_note?: string | null
           created_at?: string
           description?: string | null
+          discount_type?: string | null
+          discount_value?: number
           expiry_date?: string | null
           grn_id?: string
           id?: string
           item_code?: string | null
           item_name?: string
+          line_discount_amount?: number
           manufacturing_date?: string | null
+          net_unit_price?: number | null
           po_item_id?: string | null
           quality_status?: string | null
           quantity_ordered?: number | null
@@ -10587,6 +10636,9 @@ export type Database = {
         Row: {
           approved_by: string | null
           approved_date: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           company_id: string | null
           contact_number: string | null
           cpo_id: string | null
@@ -10636,6 +10688,9 @@ export type Database = {
         Insert: {
           approved_by?: string | null
           approved_date?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           company_id?: string | null
           contact_number?: string | null
           cpo_id?: string | null
@@ -10685,6 +10740,9 @@ export type Database = {
         Update: {
           approved_by?: string | null
           approved_date?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           company_id?: string | null
           contact_number?: string | null
           cpo_id?: string | null
@@ -12961,6 +13019,9 @@ export type Database = {
       production_stage_costs: {
         Row: {
           bom_item_id: string | null
+          consumed_at: string | null
+          consumed_by: string | null
+          consumed_qty: number
           created_at: string
           id: string
           item_name: string
@@ -12975,6 +13036,9 @@ export type Database = {
         }
         Insert: {
           bom_item_id?: string | null
+          consumed_at?: string | null
+          consumed_by?: string | null
+          consumed_qty?: number
           created_at?: string
           id?: string
           item_name: string
@@ -12989,6 +13053,9 @@ export type Database = {
         }
         Update: {
           bom_item_id?: string | null
+          consumed_at?: string | null
+          consumed_by?: string | null
+          consumed_qty?: number
           created_at?: string
           id?: string
           item_name?: string
@@ -14348,6 +14415,447 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      rental_categories: {
+        Row: {
+          code: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "rental_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_costume_units: {
+        Row: {
+          company_id: string
+          condition: string
+          costume_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          size: string
+          status: string
+          unit_code: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          condition?: string
+          costume_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          size?: string
+          status?: string
+          unit_code: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          condition?: string
+          costume_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          size?: string
+          status?: string
+          unit_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_costume_units_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_costume_units_costume_id_fkey"
+            columns: ["costume_id"]
+            isOneToOne: false
+            referencedRelation: "rental_costumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_costumes: {
+        Row: {
+          brand: string | null
+          category_id: string | null
+          color: string | null
+          company_id: string
+          costume_code: string
+          created_at: string
+          created_by: string | null
+          daily_rate: number
+          description: string | null
+          flat_rate: number | null
+          gender: string | null
+          id: string
+          image_url: string | null
+          image_urls: string[]
+          name: string
+          replacement_value: number
+          security_deposit: number
+          size: string | null
+          status: string
+          theme: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          category_id?: string | null
+          color?: string | null
+          company_id: string
+          costume_code: string
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number
+          description?: string | null
+          flat_rate?: number | null
+          gender?: string | null
+          id?: string
+          image_url?: string | null
+          image_urls?: string[]
+          name: string
+          replacement_value?: number
+          security_deposit?: number
+          size?: string | null
+          status?: string
+          theme?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          category_id?: string | null
+          color?: string | null
+          company_id?: string
+          costume_code?: string
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number
+          description?: string | null
+          flat_rate?: number | null
+          gender?: string | null
+          id?: string
+          image_url?: string | null
+          image_urls?: string[]
+          name?: string
+          replacement_value?: number
+          security_deposit?: number
+          size?: string | null
+          status?: string
+          theme?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_costumes_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "rental_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_costumes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_order_items: {
+        Row: {
+          company_id: string
+          costume_id: string
+          created_at: string
+          daily_rate: number
+          id: string
+          line_total: number
+          quantity: number
+          rental_days: number
+          rental_order_id: string
+          security_deposit: number
+          size: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          costume_id: string
+          created_at?: string
+          daily_rate?: number
+          id?: string
+          line_total?: number
+          quantity?: number
+          rental_days?: number
+          rental_order_id: string
+          security_deposit?: number
+          size?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          costume_id?: string
+          created_at?: string
+          daily_rate?: number
+          id?: string
+          line_total?: number
+          quantity?: number
+          rental_days?: number
+          rental_order_id?: string
+          security_deposit?: number
+          size?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_order_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_order_items_costume_id_fkey"
+            columns: ["costume_id"]
+            isOneToOne: false
+            referencedRelation: "rental_costumes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_order_items_rental_order_id_fkey"
+            columns: ["rental_order_id"]
+            isOneToOne: false
+            referencedRelation: "rental_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_orders: {
+        Row: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          actual_return_date?: string | null
+          approval_comments?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          booking_date?: string
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          damage_fee?: number
+          deposit_refund?: number
+          deposit_total?: number
+          discount_amount?: number
+          due_date: string
+          id?: string
+          late_fee?: number
+          notes?: string | null
+          pending_approval?: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total?: number
+          returned_at?: string | null
+          returned_by?: string | null
+          status?: string
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          actual_return_date?: string | null
+          approval_comments?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          booking_date?: string
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          damage_fee?: number
+          deposit_refund?: number
+          deposit_total?: number
+          discount_amount?: number
+          due_date?: string
+          id?: string
+          late_fee?: number
+          notes?: string | null
+          pending_approval?: boolean
+          pickup_date?: string
+          rental_number?: string
+          rental_total?: number
+          returned_at?: string | null
+          returned_by?: string | null
+          status?: string
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_unit_assignments: {
+        Row: {
+          company_id: string
+          condition_in: string | null
+          condition_out: string
+          created_at: string
+          damage_notes: string | null
+          id: string
+          order_item_id: string
+          returned: boolean
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          condition_in?: string | null
+          condition_out?: string
+          created_at?: string
+          damage_notes?: string | null
+          id?: string
+          order_item_id: string
+          returned?: boolean
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          condition_in?: string | null
+          condition_out?: string
+          created_at?: string
+          damage_notes?: string | null
+          id?: string
+          order_item_id?: string
+          returned?: boolean
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_unit_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_unit_assignments_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "rental_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_unit_assignments_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "rental_costume_units"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_audit_log: {
         Row: {
@@ -19165,6 +19673,30 @@ export type Database = {
           },
         ]
       }
+      ui_view_settings: {
+        Row: {
+          config: Json
+          created_at: string
+          updated_at: string
+          updated_by: string | null
+          view_key: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          view_key: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          view_key?: string
+        }
+        Relationships: []
+      }
       uptime_checks: {
         Row: {
           checked_at: string
@@ -20062,11 +20594,14 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string | null
+          document_discount_amount: number
           grn_date: string | null
           grn_id: string | null
           grn_item_id: string | null
           grn_number: string | null
           id: string
+          line_discount_amount: number
+          net_unit_price: number | null
           po_id: string | null
           po_number: string | null
           quantity_received: number
@@ -20083,11 +20618,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string | null
+          document_discount_amount?: number
           grn_date?: string | null
           grn_id?: string | null
           grn_item_id?: string | null
           grn_number?: string | null
           id?: string
+          line_discount_amount?: number
+          net_unit_price?: number | null
           po_id?: string | null
           po_number?: string | null
           quantity_received?: number
@@ -20104,11 +20642,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string | null
+          document_discount_amount?: number
           grn_date?: string | null
           grn_id?: string | null
           grn_item_id?: string | null
           grn_number?: string | null
           id?: string
+          line_discount_amount?: number
+          net_unit_price?: number | null
           po_id?: string | null
           po_number?: string | null
           quantity_received?: number
@@ -20180,6 +20721,7 @@ export type Database = {
           created_at: string
           expiry_date: string | null
           id: string
+          min_item_id: string | null
           notes: string | null
           quantity_issued: number | null
           quantity_remaining: number | null
@@ -20202,6 +20744,7 @@ export type Database = {
           created_at?: string
           expiry_date?: string | null
           id?: string
+          min_item_id?: string | null
           notes?: string | null
           quantity_issued?: number | null
           quantity_remaining?: number | null
@@ -20224,6 +20767,7 @@ export type Database = {
           created_at?: string
           expiry_date?: string | null
           id?: string
+          min_item_id?: string | null
           notes?: string | null
           quantity_issued?: number | null
           quantity_remaining?: number | null
@@ -20272,6 +20816,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_min_item_id_fkey"
+            columns: ["min_item_id"]
+            isOneToOne: false
+            referencedRelation: "material_issue_items"
             referencedColumns: ["id"]
           },
           {
@@ -21548,6 +22099,9 @@ export type Database = {
         Returns: {
           approved_by: string | null
           approved_date: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           company_id: string | null
           contact_number: string | null
           cpo_id: string | null
@@ -21628,6 +22182,46 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "material_return_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_rental_order: {
+        Args: { p_comments?: string; p_id: string }
+        Returns: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rental_orders"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -21757,6 +22351,107 @@ export type Database = {
         Args: { _site_report_id: string }
         Returns: boolean
       }
+      cancel_material_issue: {
+        Args: { p_min_id: string; p_reason?: string }
+        Returns: {
+          approved_by: string | null
+          approved_date: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          company_id: string | null
+          contact_number: string | null
+          cpo_id: string | null
+          cpo_number: string | null
+          created_at: string
+          created_by: string | null
+          department: string | null
+          dispatch_note: string | null
+          epf_number: string | null
+          form_reference: string | null
+          hod_approval_date: string | null
+          hod_approved_by: string | null
+          id: string
+          issue_date: string
+          issued_by: string | null
+          issued_by_name: string | null
+          issued_to: string
+          items_required_date: string | null
+          job_number: string | null
+          location_id: string | null
+          management_approval_date: string | null
+          management_approved_by: string | null
+          min_number: string
+          mr_received_by: string | null
+          mr_received_date: string | null
+          notes: string | null
+          order_completed: boolean | null
+          po_number: string | null
+          pr_number: string | null
+          purpose: string | null
+          received_by: string | null
+          received_by_name: string | null
+          received_date: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          request_id: string | null
+          requested_by: string | null
+          srn_document_url: string | null
+          srn_number: string | null
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          total_value: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "material_issue_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cancel_rental_order: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rental_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       check_duplicate_supplier: {
         Args: {
           p_email?: string
@@ -21782,6 +22477,86 @@ export type Database = {
           id: string
           item_code: string
         }[]
+      }
+      checkout_rental_order: {
+        Args: { p_assignments: Json; p_id: string }
+        Returns: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rental_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      complete_rental_order: {
+        Args: { p_id: string }
+        Returns: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rental_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       compute_telegram_job_next_run: {
         Args: {
@@ -21985,6 +22760,7 @@ export type Database = {
       generate_bpo_number: { Args: never; Returns: string }
       generate_construction_document_number: { Args: never; Returns: string }
       generate_contract_number: { Args: never; Returns: string }
+      generate_costume_code: { Args: never; Returns: string }
       generate_cpo_number: { Args: never; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_cycle_count_number: { Args: never; Returns: string }
@@ -22011,6 +22787,7 @@ export type Database = {
       generate_quality_inspection_number: { Args: never; Returns: string }
       generate_quote_number: { Args: never; Returns: string }
       generate_release_number: { Args: never; Returns: string }
+      generate_rental_number: { Args: never; Returns: string }
       generate_rfp_number: { Args: never; Returns: string }
       generate_rfq_number: { Args: never; Returns: string }
       generate_safety_incident_number: { Args: never; Returns: string }
@@ -22643,6 +23420,9 @@ export type Database = {
         Returns: {
           approved_by: string | null
           approved_date: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           company_id: string | null
           contact_number: string | null
           cpo_id: string | null
@@ -22695,6 +23475,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      issue_production_stage_materials: {
+        Args: { p_location_id: string; p_stage_id: string }
+        Returns: Json
       }
       issue_tool_from_bin: {
         Args: {
@@ -23079,6 +23863,7 @@ export type Database = {
           status: string
         }[]
       }
+      recompute_grn_totals: { Args: { p_grn_id: string }; Returns: undefined }
       recompute_item_primary_location: {
         Args: { p_item_id: string }
         Returns: undefined
@@ -23143,12 +23928,17 @@ export type Database = {
           company_id: string | null
           created_at: string
           created_by: string | null
+          discount_amount: number
+          discount_type: string | null
+          discount_value: number
+          grand_total: number
           grn_date: string
           grn_number: string
           id: string
           invoice_date: string | null
           invoice_document_url: string | null
           invoice_number: string | null
+          location_id: string | null
           mr_number: string | null
           po_id: string | null
           po_number: string | null
@@ -23162,10 +23952,15 @@ export type Database = {
             | null
           remarks: string | null
           status: string
+          subtotal_value: number
           supplier_address: string | null
           supplier_id: string | null
           supplier_name: string
+          tax_amount: number
+          tax_type: string | null
+          tax_value: number
           total_value: number | null
+          transport_cost: number
           updated_at: string
         }
         SetofOptions: {
@@ -23180,6 +23975,9 @@ export type Database = {
         Returns: {
           approved_by: string | null
           approved_date: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           company_id: string | null
           contact_number: string | null
           cpo_id: string | null
@@ -23233,6 +24031,50 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reject_rental_order: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rental_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      release_material_issue_reservations: {
+        Args: { p_min_id: string }
+        Returns: undefined
+      }
       relocate_warehouse_bin: {
         Args: {
           _bin_id: string
@@ -23246,6 +24088,16 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
+      rental_costume_available_units: {
+        Args: {
+          p_costume_id: string
+          p_exclude_order?: string
+          p_from: string
+          p_size?: string
+          p_to: string
+        }
+        Returns: number
+      }
       reopen_grn_draft: {
         Args: { p_grn_id: string }
         Returns: {
@@ -23255,12 +24107,17 @@ export type Database = {
           company_id: string | null
           created_at: string
           created_by: string | null
+          discount_amount: number
+          discount_type: string | null
+          discount_value: number
+          grand_total: number
           grn_date: string
           grn_number: string
           id: string
           invoice_date: string | null
           invoice_document_url: string | null
           invoice_number: string | null
+          location_id: string | null
           mr_number: string | null
           po_id: string | null
           po_number: string | null
@@ -23274,10 +24131,15 @@ export type Database = {
             | null
           remarks: string | null
           status: string
+          subtotal_value: number
           supplier_address: string | null
           supplier_id: string | null
           supplier_name: string
+          tax_amount: number
+          tax_type: string | null
+          tax_value: number
           total_value: number | null
+          transport_cost: number
           updated_at: string
         }
         SetofOptions: {
@@ -23292,6 +24154,9 @@ export type Database = {
         Returns: {
           approved_by: string | null
           approved_date: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           company_id: string | null
           contact_number: string | null
           cpo_id: string | null
@@ -23631,6 +24496,40 @@ export type Database = {
           serial_number: string
           status: string
           useful_life_years: number
+        }[]
+      }
+      report_freight_cost_summary: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_location_id?: string
+        }
+        Returns: {
+          avg_freight: number
+          grn_count: number
+          period_month: string
+          supplier_id: string
+          supplier_name: string
+          total_freight: number
+        }[]
+      }
+      report_freight_register: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_location_id?: string
+        }
+        Returns: {
+          grand_total: number
+          grn_date: string
+          grn_number: string
+          location_name: string
+          net_value: number
+          po_number: string
+          supplier_name: string
+          transport_cost: number
         }[]
       }
       report_general_ledger_detail: {
@@ -24213,6 +25112,7 @@ export type Database = {
           period_debit: number
         }[]
       }
+      reserve_material_issue: { Args: { p_min_id: string }; Returns: Json }
       resolve_public_portal_company: {
         Args: { _slug: string }
         Returns: {
@@ -24221,6 +25121,46 @@ export type Database = {
           logo_url: string
           name: string
         }[]
+      }
+      return_rental_order: {
+        Args: { p_damage_fee?: number; p_id: string; p_returns?: Json }
+        Returns: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rental_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       return_tool_to_bin: {
         Args: {
@@ -24311,6 +25251,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_ui_view_setting: {
+        Args: { p_config: Json; p_view_key: string }
+        Returns: {
+          config: Json
+          created_at: string
+          updated_at: string
+          updated_by: string | null
+          view_key: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ui_view_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       split_partial_piece: {
         Args: { p_first_size: number; p_id: string; p_second_size: number }
         Returns: Json
@@ -24350,6 +25306,9 @@ export type Database = {
         Returns: {
           approved_by: string | null
           approved_date: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           company_id: string | null
           contact_number: string | null
           cpo_id: string | null
@@ -24402,6 +25361,50 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      submit_rental_for_approval: {
+        Args: { p_id: string }
+        Returns: {
+          actual_return_date: string | null
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
+          booking_date: string
+          checked_out_at: string | null
+          checked_out_by: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          damage_fee: number
+          deposit_refund: number
+          deposit_total: number
+          discount_amount: number
+          due_date: string
+          id: string
+          late_fee: number
+          notes: string | null
+          pending_approval: boolean
+          pickup_date: string
+          rental_number: string
+          rental_total: number
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "rental_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      sync_production_order: {
+        Args: { p_order_id: string }
+        Returns: undefined
       }
       tool_adjustment_post_ledger: {
         Args: {
