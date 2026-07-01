@@ -264,6 +264,7 @@ function App() {
     );
   }
   return (
+    <RootErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
