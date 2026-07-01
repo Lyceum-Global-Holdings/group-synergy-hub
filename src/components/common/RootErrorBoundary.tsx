@@ -29,7 +29,7 @@ export default class RootErrorBoundary extends Component<Props, State> {
   };
 
   private handleGoAuth = () => {
-    window.location.href = "/auth";
+    window.location.href = "/auth?app=main";
   };
 
   render() {

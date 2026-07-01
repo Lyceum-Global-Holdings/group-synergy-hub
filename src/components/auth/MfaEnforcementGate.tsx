@@ -17,7 +17,7 @@ const EXEMPT_PATH_PREFIXES = ["/auth", "/portal", "/public-supplier-registration
  *   required_all    → every signed-in user must enroll TOTP
  *
  * Within the configured grace period a dismissible banner is shown; after the
- * grace period unenrolled users are hard-redirected to /auth/mfa-setup and
+ * grace period unenrolled users are hard-redirected to /account/mfa and
  * blocked from the rest of the app.
  *
  * Aligned with NIST SP 800-63B AAL2 and ISO 27001 A.9.4.2.
@@ -63,7 +63,7 @@ export default function MfaEnforcementGate({ children }: { children: React.React
   useEffect(() => {
     if (!user || !inScope || hasFactor !== false || exempt) return;
     if (!graceExpired) return;
-    navigate("/auth/mfa-setup", { replace: true });
+    navigate("/account/mfa", { replace: true });
   }, [user?.id, inScope, hasFactor, exempt, graceExpired, navigate]);
 
   const showBanner = !!user && inScope && hasFactor === false && !exempt && !graceExpired && !dismissed;
@@ -84,7 +84,7 @@ export default function MfaEnforcementGate({ children }: { children: React.React
               <span>
                 Your administrator requires MFA on your account. Please enroll within {Math.max(0, Math.ceil(grace - elapsedDays))} day(s) to avoid losing access.
               </span>
-              <Button size="sm" onClick={() => navigate("/auth/mfa-setup")}>
+              <Button size="sm" onClick={() => navigate("/account/mfa")}>
                 Set up now
               </Button>
             </AlertDescription>

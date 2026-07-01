@@ -1,6 +1,34 @@
 // App version: 1.0.2 - Code splitting for performance
 import { Suspense, lazy as reactLazy, ComponentType } from "react";
 
+const CHUNK_RELOAD_KEY = "__chunk_reload_attempt__";
+
+function isChunkLoadErrorMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("Failed to fetch dynamically imported module") ||
+    message.includes("Importing a module script failed") ||
+    message.includes("error loading dynamically imported module") ||
+    message.includes("Failed to load module script") ||
+    message.includes("A dynamically imported module could not be loaded") ||
+    message.includes("ChunkLoadError") ||
+    message.includes("Loading chunk")
+  );
+}
+
+function requestChunkRecovery(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return false;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+  } catch {
+    // If sessionStorage is blocked, a single reload is still safer than a
+    // permanent blank Suspense state after a stale deployment.
+  }
+  window.location.reload();
+  return true;
+}
+
 // Wrap React.lazy so a failed dynamic import (typically caused by a stale
 // index.html pointing at a chunk hash that no longer exists after a deploy)
 // triggers a one-shot full reload instead of a blank screen inside Suspense.
@@ -10,18 +38,9 @@ const lazy = <T extends ComponentType<any>>(
   reactLazy(() =>
     factory().catch((err) => {
       const message = err?.message ?? String(err);
-      const isChunkError =
-        message.includes("Failed to fetch dynamically imported module") ||
-        message.includes("Importing a module script failed") ||
-        message.includes("error loading dynamically imported module");
-      if (isChunkError && typeof window !== "undefined") {
-        const key = "__chunk_reload_attempt__";
-        if (!sessionStorage.getItem(key)) {
-          sessionStorage.setItem(key, "1");
-          window.location.reload();
-          // Return a never-resolving promise so Suspense holds while reloading.
-          return new Promise<{ default: T }>(() => {});
-        }
+      if (isChunkLoadErrorMessage(message) && requestChunkRecovery()) {
+        // Return a never-resolving promise so Suspense holds while reloading.
+        return new Promise<{ default: T }>(() => {});
       }
       throw err;
     }),
@@ -33,25 +52,13 @@ const lazy = <T extends ComponentType<any>>(
 // We reload once to pick up the fresh index.html + chunk hashes.
 if (typeof window !== "undefined") {
   const handleChunkError = (message: string | undefined) => {
-    if (!message) return;
-    const isChunkError =
-      message.includes("Failed to fetch dynamically imported module") ||
-      message.includes("Importing a module script failed") ||
-      message.includes("error loading dynamically imported module");
-    if (!isChunkError) return;
-    const key = "__chunk_reload_attempt__";
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, "1");
-    window.location.reload();
+    if (!isChunkLoadErrorMessage(message)) return;
+    requestChunkRecovery();
   };
   window.addEventListener("error", (e) => handleChunkError(e.message));
   window.addEventListener("unhandledrejection", (e) =>
     handleChunkError(e.reason?.message ?? String(e.reason ?? ""))
   );
-  // Clear the reload guard after a successful load.
-  window.addEventListener("load", () => {
-    setTimeout(() => sessionStorage.removeItem("__chunk_reload_attempt__"), 2000);
-  });
 }
 
 import { Toaster } from "@/components/ui/toaster";
@@ -208,6 +215,15 @@ function RouteChangeTracker() {
   return null;
 }
 
+function AppRenderReady() {
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    } catch {}
+  }, []);
+  return null;
+}
+
 // Tiered freshness policy: stale-while-revalidate by default for performance.
 // Live-critical hooks (stock, approvals, dashboards/KPIs) opt into staleTime:0
 // per-hook. Realtime subscriptions remain authoritative for cross-tab updates.
@@ -276,6 +292,7 @@ function App() {
           }}
         >
           <ScrollToTop />
+          <AppRenderReady />
           <RouteChangeTracker />
           <PerfOverlay />
           <Suspense fallback={<PageLoader />}>

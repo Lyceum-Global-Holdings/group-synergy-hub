@@ -31,30 +31,46 @@ export default function Auth() {
   const redirectUrl = searchParams.get('redirect');
   const action = searchParams.get('action');
 
+  const resolvePostLoginPath = () => {
+    const scanner = isScannerShell();
+
+    if (redirectUrl) {
+      try {
+        const parsed = new URL(redirectUrl, window.location.origin);
+        if (parsed.origin !== window.location.origin) return '/';
+
+        let path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        if (action) {
+          parsed.searchParams.set('action', action);
+          path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+
+        if (scanner && parsed.pathname.startsWith(SCANNER_BASENAME)) {
+          return `${parsed.pathname.slice(SCANNER_BASENAME.length) || '/'}${parsed.search}${parsed.hash}`;
+        }
+        if (!scanner && parsed.pathname.startsWith(SCANNER_BASENAME)) {
+          return '/';
+        }
+        return path.startsWith('/') ? path : '/';
+      } catch {
+        return '/';
+      }
+    }
+
+    let from: string = location.state?.from?.pathname || '/';
+    if (scanner && from.startsWith(SCANNER_BASENAME)) {
+      from = from.slice(SCANNER_BASENAME.length) || '/';
+    }
+    if (!scanner && from.startsWith(SCANNER_BASENAME)) {
+      from = '/';
+    }
+    return from.startsWith('/') ? from : '/';
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
-      // Priority: query param redirect > location state > default.
-      // The scanner shell mounts under BrowserRouter basename="/scanner",
-      // so navigating to "/" would land outside the router and blank the
-      // page. When we're inside the scanner bundle, react-router paths are
-      // already relative to the basename, so "/" is correct here — but the
-      // `location.state.from` may carry a full path from a prior redirect
-      // that included the basename; strip it if so.
-      const scanner = isScannerShell();
-      if (redirectUrl) {
-        const fullRedirect = action ? `${redirectUrl}?action=${action}` : redirectUrl;
-        navigate(fullRedirect, { replace: true });
-      } else {
-        let from: string = location.state?.from?.pathname || '/';
-        if (scanner && from.startsWith(SCANNER_BASENAME)) {
-          from = from.slice(SCANNER_BASENAME.length) || '/';
-        }
-        if (!scanner && from === '/scanner') {
-          from = '/';
-        }
-        navigate(from, { replace: true });
-      }
+      navigate(resolvePostLoginPath(), { replace: true });
     }
   }, [user, navigate, location, redirectUrl, action]);
 
