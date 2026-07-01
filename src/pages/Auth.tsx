@@ -11,6 +11,7 @@ import { Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import TurnstileWidget from '@/components/security/TurnstileWidget';
 import { useTurnstileSiteKey } from '@/hooks/useTurnstileSiteKey';
 import { useTurnstileEnabledFor } from '@/hooks/usePublicSecuritySettings';
+import { isScannerShell, SCANNER_BASENAME } from '@/lib/scannerShell';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -33,12 +34,25 @@ export default function Auth() {
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
-      // Priority: query param redirect > location state > default
+      // Priority: query param redirect > location state > default.
+      // The scanner shell mounts under BrowserRouter basename="/scanner",
+      // so navigating to "/" would land outside the router and blank the
+      // page. When we're inside the scanner bundle, react-router paths are
+      // already relative to the basename, so "/" is correct here — but the
+      // `location.state.from` may carry a full path from a prior redirect
+      // that included the basename; strip it if so.
+      const scanner = isScannerShell();
       if (redirectUrl) {
         const fullRedirect = action ? `${redirectUrl}?action=${action}` : redirectUrl;
         navigate(fullRedirect, { replace: true });
       } else {
-        const from = location.state?.from?.pathname || '/';
+        let from: string = location.state?.from?.pathname || '/';
+        if (scanner && from.startsWith(SCANNER_BASENAME)) {
+          from = from.slice(SCANNER_BASENAME.length) || '/';
+        }
+        if (!scanner && from === '/scanner') {
+          from = '/';
+        }
         navigate(from, { replace: true });
       }
     }
