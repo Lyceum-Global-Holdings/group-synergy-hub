@@ -442,6 +442,7 @@ function App() {
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
+    </RootErrorBoundary>
   );
 }
 
