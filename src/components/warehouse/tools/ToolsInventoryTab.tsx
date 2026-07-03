@@ -32,6 +32,7 @@ import {
   Pencil,
   Search,
   SlidersHorizontal,
+  Boxes,
   Trash2,
   X,
 } from "lucide-react";
@@ -55,10 +56,11 @@ interface ToolsInventoryTabProps {
   onAdjustQuantity?: (tool: WarehouseTool) => void;
   onEditTool?: (tool: WarehouseTool) => void;
   onDeleteTool?: (tool: WarehouseTool) => void;
+  onManageUnits?: (tool: WarehouseTool) => void;
 }
 
 export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabProps>(function ToolsInventoryTab(
-  { tools, isLoading, onAdjustQuantity, onEditTool, onDeleteTool },
+  { tools, isLoading, onAdjustQuantity, onEditTool, onDeleteTool, onManageUnits },
   ref,
 ) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -348,6 +350,10 @@ export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabPro
                             <DropdownMenuItem onClick={() => onAdjustQuantity?.(tool)}>
                               <SlidersHorizontal className="h-4 w-4 mr-2" />
                               Adjust Quantity
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onManageUnits?.(tool)}>
+                              <Boxes className="h-4 w-4 mr-2" />
+                              Manage Units
                             </DropdownMenuItem>
                             {showDelete &&
                               (hasIssued ? (

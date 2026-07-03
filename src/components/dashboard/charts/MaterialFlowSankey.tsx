@@ -52,7 +52,14 @@ export function MaterialFlowSankey({ data }: Props) {
         <span>Product</span>
         <span>Issues</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Material flow Sankey">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        style={{ height: 200, display: "block" }}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Material flow Sankey"
+      >
         {links.map((lk, i) => (
           <path key={i} d={lk.path} fill={lk.color} opacity={0.28} />
         ))}
@@ -97,13 +104,13 @@ function buildModel(data?: SankeyFlow) {
   const totalIssues = products.reduce((a, p) => a + Number(p.issues || 0), 0);
   if (totalGrn + totalReturns + totalIssues === 0) return null;
 
-  const W = 720;
+  const W = 1100;
   const nodeW = 12;
-  const gap = 9;
-  const xs = [104, 288, 472, 604]; // source, location, product, issues
-  const H = 232;
+  const gap = 8;
+  const xs = [150, 450, 750, 980]; // source, location, product, issues
+  const H = 200;
   const centerY = H / 2;
-  const maxBar = 150;
+  const maxBar = 134;
 
   // Per-node "unit" heights: source col by grn/returns, loc by inbound, prod by max(inbound,issues), issues by total.
   const locInbound = locations.map((l) => Number(l.grn || 0) + Number(l.returns || 0));

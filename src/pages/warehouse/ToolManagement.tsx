@@ -25,6 +25,7 @@ import { BulkReturnToolDialog } from "@/components/warehouse/tools/BulkReturnToo
 import { BulkToolImportDialog } from "@/components/warehouse/tools/BulkToolImportDialog";
 import { ImportFromItemMasterDialog } from "@/components/warehouse/tools/ImportFromItemMasterDialog";
 import { ToolAdjustmentDialog } from "@/components/warehouse/tools/ToolAdjustmentDialog";
+import { ManageToolUnitsDialog } from "@/components/warehouse/tools/ManageToolUnitsDialog";
 import { DeleteConfirmationDialog } from "@/components/admin/DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseTool } from "@/types/toolManagement";
@@ -42,6 +43,8 @@ export default function ToolManagement() {
   const [showEditTool, setShowEditTool] = useState(false);
   const [selectedToolForAdjustment, setSelectedToolForAdjustment] = useState<WarehouseTool | null>(null);
   const [selectedToolForEdit, setSelectedToolForEdit] = useState<WarehouseTool | null>(null);
+  const [selectedToolForUnits, setSelectedToolForUnits] = useState<WarehouseTool | null>(null);
+  const [showManageUnits, setShowManageUnits] = useState(false);
   const [selectedToolForDelete, setSelectedToolForDelete] = useState<WarehouseTool | null>(null);
   const [showDeleteTool, setShowDeleteTool] = useState(false);
 
@@ -176,6 +179,10 @@ export default function ToolManagement() {
               setSelectedToolForDelete(tool);
               setShowDeleteTool(true);
             }}
+            onManageUnits={(tool) => {
+              setSelectedToolForUnits(tool);
+              setShowManageUnits(true);
+            }}
           />
         </TabsContent>
 
@@ -193,6 +200,7 @@ export default function ToolManagement() {
       </Tabs>
 
       <CreateToolDialog open={showCreateTool} onOpenChange={setShowCreateTool} />
+      <ManageToolUnitsDialog tool={selectedToolForUnits} open={showManageUnits} onOpenChange={setShowManageUnits} />
       <IssueToolDialog open={showIssueTool} onOpenChange={setShowIssueTool} tools={tools} />
       <ReturnToolDialog open={showReturnTool} onOpenChange={setShowReturnTool} activeIssues={activeIssues} />
       <BulkIssueToolDialog open={showBulkIssueTool} onOpenChange={setShowBulkIssueTool} tools={tools} />
