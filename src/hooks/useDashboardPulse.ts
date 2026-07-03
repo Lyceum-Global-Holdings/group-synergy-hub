@@ -114,6 +114,25 @@ export interface DashboardAnalytics {
   sankey_by_product: Array<{ name: string; grn: number; returns: number; issues: number }>;
 }
 
+export interface SankeyFlow {
+  locations: Array<{ key: string; name: string; grn: number; returns: number }>;
+  products: Array<{ key: string; name: string; issues: number }>;
+  links: Array<{ l: string; p: string; v: number }>;
+}
+
+export function useDashboardSankeyFlow(companyId?: string | null, locationId?: string | null) {
+  return useQuery({
+    queryKey: ["dashboard-pulse", "sankey-flow", companyId, locationId],
+    queryFn: () =>
+      callRpc<SankeyFlow>("get_dashboard_sankey_flow", {
+        p_company_id: companyId ?? null,
+        p_location_id: locationId ?? null,
+      }),
+    staleTime: 30_000,
+    enabled: !!companyId,
+  });
+}
+
 export function useDashboardAnalytics(companyId?: string | null, locationId?: string | null) {
   return useQuery({
     queryKey: ["dashboard-pulse", "analytics", companyId, locationId],

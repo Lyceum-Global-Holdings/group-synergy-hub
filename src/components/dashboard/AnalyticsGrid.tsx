@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Loader2, ArrowDownToLine, ArrowUpFromLine, PackageCheck, PackageX, Activity, TrendingUp } from "lucide-react";
-import { useDashboardAnalytics } from "@/hooks/useDashboardPulse";
+import { useDashboardAnalytics, useDashboardSankeyFlow } from "@/hooks/useDashboardPulse";
 import { MaterialFlowChart } from "./charts/MaterialFlowChart";
 import { InboundOutboundChart } from "./charts/InboundOutboundChart";
 import { TopItemsBarList } from "./charts/TopItemsBarList";
@@ -50,6 +50,7 @@ function Panel({ title, subtitle, icon, accent = "primary", children, className 
 
 export function AnalyticsGrid({ companyId, locationId }: Props) {
   const { data, isLoading } = useDashboardAnalytics(companyId, locationId);
+  const { data: sankeyFlow } = useDashboardSankeyFlow(companyId, locationId);
 
   if (isLoading) {
     return (
@@ -73,16 +74,12 @@ export function AnalyticsGrid({ companyId, locationId }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Panel
           title="Material Flow Map"
-          subtitle="GRN + Returns → Inventory → Issues · 30d · by location / product"
+          subtitle="GRN + Returns → Location → Product → Issues · 30d"
           icon={<Workflow className="h-4 w-4" />}
           accent="primary"
           className="lg:col-span-3"
         >
-          <MaterialFlowSankey
-            overall={data?.sankey}
-            byLocation={data?.sankey_by_location}
-            byProduct={data?.sankey_by_product}
-          />
+          <MaterialFlowSankey data={sankeyFlow} />
         </Panel>
 
         <Panel
