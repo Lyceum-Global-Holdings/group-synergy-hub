@@ -59,6 +59,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
     bin_id: "",
     issued_to_name: "",
     department: "",
+    job_reference: "",
     issue_date: format(new Date(), "yyyy-MM-dd"),
     expected_return_date: "",
     expected_return_time: "",
@@ -81,6 +82,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
       bin_id: "",
       issued_to_name: "",
       department: "",
+      job_reference: "",
       issue_date: format(new Date(), "yyyy-MM-dd"),
       expected_return_date: "",
       expected_return_time: "",
@@ -95,7 +97,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
     setSubmitting(true);
     try {
       if (requiresBin && formData.bin_id) {
-        const { error } = await supabase.rpc("issue_tool_from_bin", {
+        const { data: issueId, error } = await supabase.rpc("issue_tool_from_bin", {
           p_tool_id: formData.tool_id,
           p_bin_id: formData.bin_id,
           p_quantity: formData.quantity_issued,
@@ -109,6 +111,9 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
           p_company_id: selectedCompany?.id ?? null,
         });
         if (error) throw error;
+        if (formData.job_reference.trim() && issueId) {
+          await supabase.from("tool_issues").update({ job_reference: formData.job_reference.trim() } as any).eq("id", issueId as any);
+        }
       } else {
         // Legacy path: no bin allocations exist for this tool
         const { data: userData } = await supabase.auth.getUser();
@@ -118,6 +123,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
           tool_id: formData.tool_id,
           issued_to_name: formData.issued_to_name,
           department: formData.department || null,
+          job_reference: formData.job_reference || null,
           issue_date: formData.issue_date,
           expected_return_date: formData.expected_return_date || null,
           expected_return_time: formData.expected_return_time || null,
@@ -295,6 +301,17 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Job / Project Reference</Label>
+              <Input
+                value={formData.job_reference}
+                onChange={(e) => setFormData({ ...formData, job_reference: e.target.value })}
+                placeholder="e.g. Job #4471"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Quantity * (max {maxQty})</Label>
               <Input

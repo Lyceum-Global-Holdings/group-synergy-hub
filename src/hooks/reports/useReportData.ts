@@ -586,6 +586,27 @@ export async function fetchToolCalibrationHistory(
   return envelopeBase(def, ctx, rows, { cost: sumCol(rows, "cost") }, { start: from ?? undefined, end: to ?? undefined });
 }
 
+export async function fetchToolCost(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: { period?: { from?: string; to?: string } },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from || null;
+  const to = params.period?.to || null;
+  const { data, error } = await supabase.rpc("report_tool_cost" as any, {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, {
+    calibration_cost: sumCol(rows, "calibration_cost"),
+    maintenance_cost: sumCol(rows, "maintenance_cost"),
+    total_cost: sumCol(rows, "total_cost"),
+  }, { start: from ?? undefined, end: to ?? undefined });
+}
+
 export async function fetchToolMaintenanceDue(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
@@ -734,6 +755,8 @@ export async function buildReportEnvelope(
       return fetchToolMaintenanceDue(def, ctx, params as never);
     case "warehouse.toolMaintenanceHistory":
       return fetchToolMaintenanceHistory(def, ctx, params as never);
+    case "warehouse.toolCost":
+      return fetchToolCost(def, ctx, params as never);
     case "warehouse.batchTraceability":
       return fetchBatchTraceability(def, ctx, params as never);
 

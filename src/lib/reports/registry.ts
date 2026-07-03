@@ -659,6 +659,28 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     ],
   },
 
+  {
+    code: "WH-TOOL-COST-001",
+    title: "Tool Cost (Calibration + Maintenance)",
+    description: "Calibration and maintenance spend rolled up per tool.",
+    moduleKey: "warehouse",
+    group: "Assets",
+    standard: "ISO 55000",
+    hookId: "warehouse.toolCost",
+    parameters: [
+      { key: "period", label: "Date Range", type: "dateRange", defaultDays: 365 },
+    ],
+    columns: [
+      { key: "tool_code", label: "Tool Code", type: "string", width: 16 },
+      { key: "tool_name", label: "Tool", type: "string", width: 30 },
+      { key: "calibration_cost", label: "Calibration", type: "currency", width: 16, align: "right" },
+      { key: "maintenance_cost", label: "Maintenance", type: "currency", width: 16, align: "right" },
+      { key: "total_cost", label: "Total", type: "currency", width: 16, align: "right" },
+      { key: "calibration_count", label: "# Cal.", type: "integer", width: 8, align: "right" },
+      { key: "maintenance_count", label: "# Svc.", type: "integer", width: 8, align: "right" },
+    ],
+  },
+
   // ============ WAREHOUSE — ASSETS & TOOLS ============
   {
     code: "WH-AST-REG-001",

@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus, FileBarChart } from "lucide-react";
+import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus, FileBarChart, Gauge } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { useToolReturns } from "@/hooks/useToolReturns";
@@ -26,6 +26,7 @@ import { BulkToolImportDialog } from "@/components/warehouse/tools/BulkToolImpor
 import { ImportFromItemMasterDialog } from "@/components/warehouse/tools/ImportFromItemMasterDialog";
 import { ToolAdjustmentDialog } from "@/components/warehouse/tools/ToolAdjustmentDialog";
 import { ManageToolUnitsDialog } from "@/components/warehouse/tools/ManageToolUnitsDialog";
+import { ToolDueAlertsTab } from "@/components/warehouse/tools/ToolDueAlertsTab";
 import { DeleteConfirmationDialog } from "@/components/admin/DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseTool } from "@/types/toolManagement";
@@ -161,6 +162,10 @@ export default function ToolManagement() {
               <Badge variant="destructive">{overdueIssues.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="due" className="flex items-center gap-2">
+            <Gauge className="h-4 w-4" />
+            Due &amp; Alerts
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="inventory" className="mt-6">
@@ -196,6 +201,10 @@ export default function ToolManagement() {
 
         <TabsContent value="overdue" className="mt-6">
           <OverdueToolsTab issues={overdueIssues} isLoading={isLoadingIssues} />
+        </TabsContent>
+
+        <TabsContent value="due" className="mt-6">
+          <ToolDueAlertsTab />
         </TabsContent>
       </Tabs>
 
