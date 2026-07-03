@@ -586,6 +586,44 @@ export async function fetchToolCalibrationHistory(
   return envelopeBase(def, ctx, rows, { cost: sumCol(rows, "cost") }, { start: from ?? undefined, end: to ?? undefined });
 }
 
+export async function fetchToolMaintenanceDue(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: { period?: { from?: string; to?: string }; status?: string },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from || null;
+  const to = params.period?.to || null;
+  const status = params.status && params.status !== "all" ? params.status : null;
+  const { data, error } = await supabase.rpc("report_tool_maintenance_due" as any, {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+    p_status: status,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, undefined, { start: from ?? undefined, end: to ?? undefined });
+}
+
+export async function fetchToolMaintenanceHistory(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: { period?: { from?: string; to?: string }; type?: string },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from || null;
+  const to = params.period?.to || null;
+  const type = params.type && params.type !== "all" ? params.type : null;
+  const { data, error } = await supabase.rpc("report_tool_maintenance_history" as any, {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+    p_type: type,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, { cost: sumCol(rows, "cost") }, { start: from ?? undefined, end: to ?? undefined });
+}
+
 /* ---------------- Traceability ---------------- */
 
 export async function fetchBatchTraceability(
@@ -692,6 +730,10 @@ export async function buildReportEnvelope(
       return fetchToolCalibrationDue(def, ctx, params as never);
     case "warehouse.toolCalibrationHistory":
       return fetchToolCalibrationHistory(def, ctx, params as never);
+    case "warehouse.toolMaintenanceDue":
+      return fetchToolMaintenanceDue(def, ctx, params as never);
+    case "warehouse.toolMaintenanceHistory":
+      return fetchToolMaintenanceHistory(def, ctx, params as never);
     case "warehouse.batchTraceability":
       return fetchBatchTraceability(def, ctx, params as never);
 

@@ -589,6 +589,76 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     ],
   },
 
+  {
+    code: "WH-TOOL-MAINT-DUE-001",
+    title: "Tool Maintenance Due",
+    description: "Serialized tool units with service due, overdue, in-repair or unscheduled.",
+    moduleKey: "warehouse",
+    group: "Assets",
+    standard: "ISO 55000",
+    hookId: "warehouse.toolMaintenanceDue",
+    parameters: [
+      { key: "period", label: "Due Date Range", type: "dateRange", defaultDays: 90 },
+      {
+        key: "status", label: "Due state", type: "select",
+        options: [
+          { value: "all", label: "All" },
+          { value: "overdue", label: "Overdue" },
+          { value: "due_soon", label: "Due within 30 days" },
+          { value: "in_repair", label: "In repair" },
+          { value: "unscheduled", label: "Unscheduled" },
+        ],
+        defaultValue: "all",
+      },
+    ],
+    columns: [
+      { key: "tool_code", label: "Tool Code", type: "string", width: 16 },
+      { key: "tool_name", label: "Tool", type: "string", width: 26 },
+      { key: "unit_code", label: "Unit", type: "string", width: 16 },
+      { key: "serial_number", label: "Serial", type: "string", width: 16 },
+      { key: "location_name", label: "Location", type: "string", width: 18 },
+      { key: "last_service_date", label: "Last Service", type: "date", width: 14 },
+      { key: "next_due_date", label: "Next Due", type: "date", width: 14 },
+      { key: "days_to_due", label: "Days", type: "integer", width: 8, align: "right" },
+      { key: "due_state", label: "State", type: "string", width: 12 },
+    ],
+  },
+  {
+    code: "WH-TOOL-MAINT-HIST-001",
+    title: "Tool Maintenance History",
+    description: "Service / repair records with type, provider, cost and next due.",
+    moduleKey: "warehouse",
+    group: "Assets",
+    standard: "ISO 55000",
+    hookId: "warehouse.toolMaintenanceHistory",
+    parameters: [
+      { key: "period", label: "Service Date Range", type: "dateRange", defaultDays: 365 },
+      {
+        key: "type", label: "Type", type: "select",
+        options: [
+          { value: "all", label: "All" },
+          { value: "preventive", label: "Preventive" },
+          { value: "inspection", label: "Inspection" },
+          { value: "repair", label: "Repair" },
+          { value: "overhaul", label: "Overhaul" },
+        ],
+        defaultValue: "all",
+      },
+    ],
+    columns: [
+      { key: "maintenance_date", label: "Date", type: "date", width: 14 },
+      { key: "tool_code", label: "Tool Code", type: "string", width: 16 },
+      { key: "tool_name", label: "Tool", type: "string", width: 24 },
+      { key: "unit_code", label: "Unit", type: "string", width: 16 },
+      { key: "maintenance_type", label: "Type", type: "string", width: 14 },
+      { key: "provider", label: "Provider", type: "string", width: 20 },
+      { key: "performed_by", label: "By", type: "string", width: 16 },
+      { key: "description", label: "Description", type: "string", width: 30 },
+      { key: "next_due_date", label: "Next Due", type: "date", width: 14 },
+      { key: "cost", label: "Cost", type: "currency", width: 14, align: "right" },
+    ],
+  },
+
   // ============ WAREHOUSE — ASSETS & TOOLS ============
   {
     code: "WH-AST-REG-001",

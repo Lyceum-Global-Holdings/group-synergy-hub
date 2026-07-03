@@ -8,9 +8,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, QrCode, History, ChevronDown, ChevronRight, Gauge } from "lucide-react";
+import { Loader2, Plus, QrCode, History, ChevronDown, ChevronRight, Gauge, Wrench } from "lucide-react";
 import { useToolUnits, useToolUnitEvents } from "@/hooks/useToolUnits";
 import { RecordCalibrationDialog } from "./RecordCalibrationDialog";
+import { RecordMaintenanceDialog } from "./RecordMaintenanceDialog";
 import { generateBulkQRCodePdf, downloadBulkQRCodePdf } from "@/utils/bulkQRCodePdf";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -43,6 +44,7 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
   const [calUnit, setCalUnit] = useState<ToolUnit | null>(null);
+  const [mntUnit, setMntUnit] = useState<ToolUnit | null>(null);
 
   const handleGenerate = async () => {
     if (!tool) return;
@@ -139,6 +141,7 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
                     onStatus={(status) => setStatus.mutate({ id: u.id, status })}
                     onCondition={(condition) => setStatus.mutate({ id: u.id, condition })}
                     onCalibrate={() => setCalUnit(u)}
+                    onService={() => setMntUnit(u)}
                     fmt={fmt}
                   />
                 ))}
@@ -153,6 +156,13 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
           defaultIntervalMonths={(tool as any)?.calibration_interval_months ?? null}
           open={!!calUnit}
           onOpenChange={(o) => { if (!o) setCalUnit(null); }}
+        />
+        <RecordMaintenanceDialog
+          unit={mntUnit}
+          toolName={tool?.name}
+          defaultIntervalMonths={(tool as any)?.maintenance_interval_months ?? null}
+          open={!!mntUnit}
+          onOpenChange={(o) => { if (!o) setMntUnit(null); }}
         />
       </DialogContent>
     </Dialog>
@@ -169,7 +179,7 @@ function dueTone(d?: string | null): string {
 }
 
 function UnitRow({
-  unit, expanded, onToggle, onStatus, onCondition, onCalibrate, fmt,
+  unit, expanded, onToggle, onStatus, onCondition, onCalibrate, onService, fmt,
 }: {
   unit: ToolUnit;
   expanded: boolean;
@@ -177,6 +187,7 @@ function UnitRow({
   onStatus: (s: ToolUnitStatus) => void;
   onCondition: (c: ToolUnitCondition) => void;
   onCalibrate: () => void;
+  onService: () => void;
   fmt: (d?: string | null, f?: string) => string;
 }) {
   return (
@@ -215,9 +226,12 @@ function UnitRow({
         </TableCell>
         <TableCell className={`text-xs ${dueTone(unit.next_calibration_due)}`}>{unit.next_calibration_due ? fmt(unit.next_calibration_due) : "—"}</TableCell>
         <TableCell className={`text-xs ${dueTone(unit.next_maintenance_due)}`}>{unit.next_maintenance_due ? fmt(unit.next_maintenance_due) : "—"}</TableCell>
-        <TableCell className="text-right">
+        <TableCell className="text-right whitespace-nowrap">
           <Button variant="ghost" size="sm" className="h-7 px-2" onClick={onCalibrate} title="Record calibration">
             <Gauge className="h-3.5 w-3.5 mr-1" /> Calibrate
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={onService} title="Record maintenance">
+            <Wrench className="h-3.5 w-3.5 mr-1" /> Service
           </Button>
         </TableCell>
       </TableRow>
