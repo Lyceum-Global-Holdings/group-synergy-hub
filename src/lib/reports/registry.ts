@@ -520,6 +520,75 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     ],
   },
 
+  {
+    code: "WH-TOOL-CAL-DUE-001",
+    title: "Tool Calibration Due",
+    description: "Serialized tool units with calibration due, overdue or unscheduled.",
+    moduleKey: "warehouse",
+    group: "Assets",
+    standard: "ISO/IEC 17025",
+    hookId: "warehouse.toolCalibrationDue",
+    parameters: [
+      { key: "period", label: "Due Date Range", type: "dateRange", defaultDays: 90 },
+      {
+        key: "status", label: "Due state", type: "select",
+        options: [
+          { value: "all", label: "All" },
+          { value: "overdue", label: "Overdue" },
+          { value: "due_soon", label: "Due within 30 days" },
+          { value: "unscheduled", label: "Unscheduled" },
+        ],
+        defaultValue: "all",
+      },
+    ],
+    columns: [
+      { key: "tool_code", label: "Tool Code", type: "string", width: 16 },
+      { key: "tool_name", label: "Tool", type: "string", width: 26 },
+      { key: "unit_code", label: "Unit", type: "string", width: 16 },
+      { key: "serial_number", label: "Serial", type: "string", width: 16 },
+      { key: "location_name", label: "Location", type: "string", width: 18 },
+      { key: "last_calibration_date", label: "Last Cal.", type: "date", width: 14 },
+      { key: "next_due_date", label: "Next Due", type: "date", width: 14 },
+      { key: "days_to_due", label: "Days", type: "integer", width: 8, align: "right" },
+      { key: "due_state", label: "State", type: "string", width: 12 },
+    ],
+  },
+  {
+    code: "WH-TOOL-CAL-HIST-001",
+    title: "Tool Calibration History",
+    description: "Calibration records with result, provider, certificate and next due.",
+    moduleKey: "warehouse",
+    group: "Assets",
+    standard: "ISO/IEC 17025",
+    hookId: "warehouse.toolCalibrationHistory",
+    parameters: [
+      { key: "period", label: "Calibration Date Range", type: "dateRange", defaultDays: 365 },
+      {
+        key: "result", label: "Result", type: "select",
+        options: [
+          { value: "all", label: "All" },
+          { value: "pass", label: "Pass" },
+          { value: "adjusted", label: "Adjusted" },
+          { value: "limited", label: "Limited" },
+          { value: "fail", label: "Fail" },
+        ],
+        defaultValue: "all",
+      },
+    ],
+    columns: [
+      { key: "calibration_date", label: "Date", type: "date", width: 14 },
+      { key: "tool_code", label: "Tool Code", type: "string", width: 16 },
+      { key: "tool_name", label: "Tool", type: "string", width: 24 },
+      { key: "unit_code", label: "Unit", type: "string", width: 16 },
+      { key: "result", label: "Result", type: "string", width: 12 },
+      { key: "provider", label: "Provider", type: "string", width: 20 },
+      { key: "performed_by", label: "By", type: "string", width: 16 },
+      { key: "certificate_number", label: "Certificate", type: "string", width: 18 },
+      { key: "next_due_date", label: "Next Due", type: "date", width: 14 },
+      { key: "cost", label: "Cost", type: "currency", width: 14, align: "right" },
+    ],
+  },
+
   // ============ WAREHOUSE — ASSETS & TOOLS ============
   {
     code: "WH-AST-REG-001",

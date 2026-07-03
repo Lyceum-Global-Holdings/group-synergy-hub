@@ -8,8 +8,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, QrCode, History, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, Plus, QrCode, History, ChevronDown, ChevronRight, Gauge } from "lucide-react";
 import { useToolUnits, useToolUnitEvents } from "@/hooks/useToolUnits";
+import { RecordCalibrationDialog } from "./RecordCalibrationDialog";
 import { generateBulkQRCodePdf, downloadBulkQRCodePdf } from "@/utils/bulkQRCodePdf";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -41,6 +42,7 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
   const [serial, setSerial] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
+  const [calUnit, setCalUnit] = useState<ToolUnit | null>(null);
 
   const handleGenerate = async () => {
     if (!tool) return;
@@ -124,6 +126,7 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
                   <TableHead>Condition</TableHead>
                   <TableHead>Cal. due</TableHead>
                   <TableHead>Maint. due</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -135,6 +138,7 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
                     onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
                     onStatus={(status) => setStatus.mutate({ id: u.id, status })}
                     onCondition={(condition) => setStatus.mutate({ id: u.id, condition })}
+                    onCalibrate={() => setCalUnit(u)}
                     fmt={fmt}
                   />
                 ))}
@@ -142,19 +146,37 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
             </Table>
           </div>
         )}
+
+        <RecordCalibrationDialog
+          unit={calUnit}
+          toolName={tool?.name}
+          defaultIntervalMonths={(tool as any)?.calibration_interval_months ?? null}
+          open={!!calUnit}
+          onOpenChange={(o) => { if (!o) setCalUnit(null); }}
+        />
       </DialogContent>
     </Dialog>
   );
 }
 
+/** Due-date tone: overdue = red, within 30d = amber. */
+function dueTone(d?: string | null): string {
+  if (!d) return "text-muted-foreground";
+  const days = Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return "text-destructive font-medium";
+  if (days <= 30) return "text-warning font-medium";
+  return "";
+}
+
 function UnitRow({
-  unit, expanded, onToggle, onStatus, onCondition, fmt,
+  unit, expanded, onToggle, onStatus, onCondition, onCalibrate, fmt,
 }: {
   unit: ToolUnit;
   expanded: boolean;
   onToggle: () => void;
   onStatus: (s: ToolUnitStatus) => void;
   onCondition: (c: ToolUnitCondition) => void;
+  onCalibrate: () => void;
   fmt: (d?: string | null, f?: string) => string;
 }) {
   return (
@@ -191,12 +213,17 @@ function UnitRow({
             </SelectContent>
           </Select>
         </TableCell>
-        <TableCell className="text-xs">{unit.next_calibration_due ? fmt(unit.next_calibration_due) : "—"}</TableCell>
-        <TableCell className="text-xs">{unit.next_maintenance_due ? fmt(unit.next_maintenance_due) : "—"}</TableCell>
+        <TableCell className={`text-xs ${dueTone(unit.next_calibration_due)}`}>{unit.next_calibration_due ? fmt(unit.next_calibration_due) : "—"}</TableCell>
+        <TableCell className={`text-xs ${dueTone(unit.next_maintenance_due)}`}>{unit.next_maintenance_due ? fmt(unit.next_maintenance_due) : "—"}</TableCell>
+        <TableCell className="text-right">
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={onCalibrate} title="Record calibration">
+            <Gauge className="h-3.5 w-3.5 mr-1" /> Calibrate
+          </Button>
+        </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={7} className="bg-muted/30">
+          <TableCell colSpan={8} className="bg-muted/30">
             <UnitTimeline unitId={unit.id} fmt={fmt} />
           </TableCell>
         </TableRow>

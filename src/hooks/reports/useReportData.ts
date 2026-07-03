@@ -548,6 +548,44 @@ export async function fetchToolLedger(
   }, { start: from ?? undefined, end: to ?? undefined });
 }
 
+export async function fetchToolCalibrationDue(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: { period?: { from?: string; to?: string }; status?: string },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from || null;
+  const to = params.period?.to || null;
+  const status = params.status && params.status !== "all" ? params.status : null;
+  const { data, error } = await supabase.rpc("report_tool_calibration_due" as any, {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+    p_status: status,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, undefined, { start: from ?? undefined, end: to ?? undefined });
+}
+
+export async function fetchToolCalibrationHistory(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  params: { period?: { from?: string; to?: string }; result?: string },
+): Promise<ReportEnvelope> {
+  const from = params.period?.from || null;
+  const to = params.period?.to || null;
+  const result = params.result && params.result !== "all" ? params.result : null;
+  const { data, error } = await supabase.rpc("report_tool_calibration_history" as any, {
+    p_company_id: ctx.companyId,
+    p_date_from: from,
+    p_date_to: to,
+    p_result: result,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, { cost: sumCol(rows, "cost") }, { start: from ?? undefined, end: to ?? undefined });
+}
+
 /* ---------------- Traceability ---------------- */
 
 export async function fetchBatchTraceability(
@@ -650,6 +688,10 @@ export async function buildReportEnvelope(
       return fetchAssetRegister(def, ctx, params as never);
     case "warehouse.toolLedger":
       return fetchToolLedger(def, ctx, params as never);
+    case "warehouse.toolCalibrationDue":
+      return fetchToolCalibrationDue(def, ctx, params as never);
+    case "warehouse.toolCalibrationHistory":
+      return fetchToolCalibrationHistory(def, ctx, params as never);
     case "warehouse.batchTraceability":
       return fetchBatchTraceability(def, ctx, params as never);
 
