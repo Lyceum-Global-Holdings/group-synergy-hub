@@ -35,6 +35,9 @@ import {
   Boxes,
   Trash2,
   X,
+  Wrench,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -49,6 +52,7 @@ import {
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ToolBinAllocationsPanel } from "./ToolBinAllocationsPanel";
+import { ToolDetailsDialog } from "./ToolDetailsDialog";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
@@ -68,6 +72,8 @@ export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabPro
   const [conditionFilter, setConditionFilter] = useState<string>("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewTool, setViewTool] = useState<WarehouseTool | null>(null);
 
   const { canDelete } = useIsAdminOrHigher();
   const { selectedCompany } = useCompany();
@@ -213,35 +219,52 @@ export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabPro
             Clear
           </Button>
         )}
-      </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Total Tools</div>
-          <div className="text-2xl font-bold">
-            {isFiltered ? `${filteredTools.length} / ${tools.length}` : tools.length}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Total Quantity</div>
-          <div className="text-2xl font-bold">
-            {filteredTools.reduce((sum, t) => sum + t.total_quantity, 0)}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Available</div>
-          <div className="text-2xl font-bold">
-            {filteredTools.reduce((sum, t) => sum + t.available_quantity, 0)}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Currently Issued</div>
-          <div className="text-2xl font-bold">
-            {filteredTools.reduce((sum, t) => sum + t.issued_quantity, 0)}
-          </div>
+        <div className="ml-auto inline-flex rounded-md border p-0.5">
+          <Button
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setViewMode("grid")}
+            aria-label="Grid view"
+            title="Grid view"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "secondary" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setViewMode("list")}
+            aria-label="List view"
+            title="List view"
+          >
+            <List className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
+      {isFiltered && (
+        <p className="text-xs text-muted-foreground">
+          Showing <span className="font-medium text-foreground">{filteredTools.length}</span> of {tools.length} tools
+          {" · "}
+          {filteredTools.reduce((sum, t) => sum + t.available_quantity, 0)} available
+        </p>
+      )}
+
+      {viewMode === "grid" ? (
+        <ToolGrid
+          tools={filteredTools}
+          isLoading={isLoading}
+          emptyText={globalLocationId ? `No tools at ${currentLocation?.name ?? "this location"}.` : "No tools found."}
+          canDelete={canDelete}
+          onView={setViewTool}
+          onManageUnits={onManageUnits}
+          onEditTool={onEditTool}
+          onAdjustQuantity={onAdjustQuantity}
+          onDeleteTool={onDeleteTool}
+        />
+      ) : (
       <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
@@ -298,7 +321,13 @@ export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabPro
                       </TableCell>
                       <TableCell className="font-mono text-sm">{tool.tool_code}</TableCell>
                       <TableCell>
-                        <div className="font-medium">{tool.name}</div>
+                        <button
+                          type="button"
+                          onClick={() => setViewTool(tool)}
+                          className="font-medium text-left hover:text-primary hover:underline focus-visible:outline-none focus-visible:underline"
+                        >
+                          {tool.name}
+                        </button>
                         {tool.description && (
                           <div className="text-xs text-muted-foreground truncate max-w-[240px]">
                             {tool.description}
@@ -336,6 +365,17 @@ export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabPro
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => onManageUnits?.(tool)}
+                          title="Manage serialized units, QR labels, calibration & maintenance"
+                        >
+                          <Boxes className="h-3.5 w-3.5 mr-1.5" />
+                          Units
+                        </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -387,6 +427,7 @@ export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabPro
                               ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                     {expanded && (
@@ -403,6 +444,153 @@ export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabPro
           </TableBody>
         </Table>
       </div>
+      )}
+
+      <ToolDetailsDialog
+        tool={viewTool}
+        open={!!viewTool}
+        onOpenChange={(o) => { if (!o) setViewTool(null); }}
+        onManageUnits={onManageUnits}
+        onEdit={onEditTool}
+        onAdjust={onAdjustQuantity}
+      />
     </div>
   );
 });
+
+interface ToolGridProps {
+  tools: WarehouseTool[];
+  isLoading: boolean;
+  emptyText: string;
+  canDelete: boolean;
+  onView?: (tool: WarehouseTool) => void;
+  onManageUnits?: (tool: WarehouseTool) => void;
+  onEditTool?: (tool: WarehouseTool) => void;
+  onAdjustQuantity?: (tool: WarehouseTool) => void;
+  onDeleteTool?: (tool: WarehouseTool) => void;
+}
+
+function ToolGrid({ tools, isLoading, emptyText, canDelete, onView, onManageUnits, onEditTool, onAdjustQuantity, onDeleteTool }: ToolGridProps) {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="rounded-lg border bg-card overflow-hidden">
+            <div className="aspect-[4/3] bg-muted animate-pulse" />
+            <div className="p-3 space-y-2">
+              <div className="h-3 w-1/3 bg-muted rounded animate-pulse" />
+              <div className="h-4 w-2/3 bg-muted rounded animate-pulse" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (tools.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed bg-card/50 py-16 text-center">
+        <Wrench className="h-10 w-10 mx-auto text-muted-foreground/40" />
+        <p className="mt-3 text-sm text-muted-foreground">{emptyText}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+      {tools.map((tool) => (
+        <ToolGridCard
+          key={tool.id}
+          tool={tool}
+          canDelete={canDelete}
+          onView={onView}
+          onManageUnits={onManageUnits}
+          onEditTool={onEditTool}
+          onAdjustQuantity={onAdjustQuantity}
+          onDeleteTool={onDeleteTool}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ToolGridCard({ tool, canDelete, onView, onManageUnits, onEditTool, onAdjustQuantity, onDeleteTool }: {
+  tool: WarehouseTool;
+  canDelete: boolean;
+  onView?: (t: WarehouseTool) => void;
+  onManageUnits?: (t: WarehouseTool) => void;
+  onEditTool?: (t: WarehouseTool) => void;
+  onAdjustQuantity?: (t: WarehouseTool) => void;
+  onDeleteTool?: (t: WarehouseTool) => void;
+}) {
+  const available = Number(tool.available_quantity ?? 0);
+  const hasIssued = Number(tool.issued_quantity ?? 0) > 0;
+  const availTone = available > 0 ? "bg-success/15 text-success border-success/20" : "bg-destructive/15 text-destructive border-destructive/20";
+  const [imgError, setImgError] = useState(false);
+  const showImage = !!tool.image_url && !imgError;
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onView?.(tool)}
+      onKeyDown={(e) => { if (e.key === "Enter") onView?.(tool); }}
+      className="group text-left rounded-lg border bg-card overflow-hidden transition-all hover:border-primary/40 hover:shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+        {showImage ? (
+          <img
+            src={tool.image_url as string}
+            alt={tool.name}
+            loading="lazy"
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Wrench className="h-10 w-10 text-muted-foreground/30" />
+          </div>
+        )}
+        <Badge variant="outline" className={`absolute top-2 right-2 ${availTone}`}>{available} avail</Badge>
+      </div>
+      <div className="p-3 space-y-2">
+        <div>
+          <div className="font-mono text-[11px] text-muted-foreground truncate">{tool.tool_code}</div>
+          <h3 className="font-semibold text-sm leading-tight line-clamp-2 min-h-[2.5rem]" title={tool.name}>{tool.name}</h3>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MapPin className="h-3 w-3 shrink-0" />
+          <span className="truncate">{tool.location?.name || "—"}</span>
+        </div>
+        <div className="flex items-center justify-between gap-2 pt-1 border-t">
+          <div className="flex items-center gap-1.5 text-xs pt-1">
+            <Badge variant="outline" className="capitalize">{tool.condition}</Badge>
+            <span className="text-muted-foreground">{tool.total_quantity} total</span>
+          </div>
+          <div className="flex items-center gap-1 pt-1" onClick={stop}>
+            <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => onManageUnits?.(tool)} title="Manage units, QR, calibration & maintenance">
+              <Boxes className="h-3.5 w-3.5 mr-1" /> Units
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEditTool?.(tool)}>
+                  <Pencil className="h-4 w-4 mr-2" /> Edit Tool
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onAdjustQuantity?.(tool)}>
+                  <SlidersHorizontal className="h-4 w-4 mr-2" /> Adjust Quantity
+                </DropdownMenuItem>
+                {canDelete && !!onDeleteTool && !hasIssued && (
+                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDeleteTool(tool)}>
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete Tool
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

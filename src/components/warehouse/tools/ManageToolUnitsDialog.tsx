@@ -46,9 +46,24 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
   const [calUnit, setCalUnit] = useState<ToolUnit | null>(null);
   const [mntUnit, setMntUnit] = useState<ToolUnit | null>(null);
 
+  const capacity = Number(tool?.total_quantity ?? 0);
+  const remaining = Math.max(0, capacity - units.length);
+
   const handleGenerate = async () => {
     if (!tool) return;
-    const n = Math.max(1, parseInt(genCount, 10) || 1);
+    if (remaining <= 0) {
+      toast({
+        title: "No slots available",
+        description: `All ${capacity} units of this tool are already registered. Increase the tool quantity first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const requested = Math.max(1, parseInt(genCount, 10) || 1);
+    const n = Math.min(requested, remaining);
+    if (n < requested) {
+      toast({ title: "Capped to available slots", description: `Only ${remaining} unit(s) can be registered.` });
+    }
     await generateUnits.mutateAsync({
       count: n,
       base: { tool_id: tool.id, company_id: tool.company_id, serial_number: serial.trim() || undefined },
@@ -92,13 +107,21 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
         <div className="flex flex-wrap items-end gap-2 rounded-lg border p-3">
           <div className="space-y-1">
             <Label className="text-xs">Quantity</Label>
-            <Input type="number" min="1" className="w-24 h-9" value={genCount} onChange={(e) => setGenCount(e.target.value)} />
+            <Input
+              type="number"
+              min="1"
+              max={remaining || undefined}
+              className="w-24 h-9"
+              value={genCount}
+              onChange={(e) => setGenCount(e.target.value)}
+              disabled={remaining <= 0}
+            />
           </div>
           <div className="space-y-1 flex-1 min-w-[180px]">
             <Label className="text-xs">Serial number (optional, single unit)</Label>
             <Input className="h-9" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="e.g. SN-4471-A" />
           </div>
-          <Button onClick={handleGenerate} disabled={generateUnits.isPending} className="h-9">
+          <Button onClick={handleGenerate} disabled={generateUnits.isPending || remaining <= 0} className="h-9">
             {generateUnits.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
             Register units
           </Button>
@@ -106,6 +129,11 @@ export function ManageToolUnitsDialog({ tool, open, onOpenChange }: Props) {
             {printing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <QrCode className="h-4 w-4 mr-1" />}
             Print QR labels
           </Button>
+          <span className="text-xs text-muted-foreground ml-auto self-center">
+            {remaining > 0
+              ? <><span className="font-medium text-foreground">{remaining}</span> of {capacity} slot(s) available to register</>
+              : <>All {capacity} unit(s) registered</>}
+          </span>
         </div>
 
         {isLoading ? (

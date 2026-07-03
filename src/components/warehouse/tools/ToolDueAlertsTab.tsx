@@ -1,51 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Gauge, Wrench, Clock, CheckCircle2 } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useFormatDate } from "@/lib/formatters";
-
-interface DueItem {
-  tool_name: string;
-  unit_code: string;
-  next_due_date: string | null;
-  days_to_due: number | null;
-  due_state: string;
-}
-interface OverdueReturn {
-  issue_number: string;
-  tool_name: string;
-  issued_to_name: string | null;
-  job_reference: string | null;
-  expected_return_date: string | null;
-  days_overdue: number;
-}
-interface Summary {
-  calibration: { count: number; items: DueItem[] };
-  maintenance: { count: number; items: DueItem[] };
-  overdue_returns: { count: number; items: OverdueReturn[] };
-}
+import { useToolDueSummary } from "@/hooks/useToolDueSummary";
 
 export function ToolDueAlertsTab() {
   const { selectedCompany } = useCompany();
   const fmt = useFormatDate();
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["tool-due-summary", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("get_tool_due_summary", { p_company_id: selectedCompany!.id });
-      if (error) throw error;
-      return data as Summary;
-    },
-  });
+  const { summary: s, isLoading } = useToolDueSummary(selectedCompany?.id);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
-
-  const s = data ?? { calibration: { count: 0, items: [] }, maintenance: { count: 0, items: [] }, overdue_returns: { count: 0, items: [] } };
   const tone = (state: string, days: number | null) =>
     state === "overdue" || (days ?? 0) < 0 ? "text-destructive" : "text-warning";
 

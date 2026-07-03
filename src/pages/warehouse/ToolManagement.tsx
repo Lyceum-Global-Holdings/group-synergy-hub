@@ -8,7 +8,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus, FileBarChart, Gauge } from "lucide-react";
+import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus, FileBarChart, Gauge, CheckCircle2, Clock, Boxes } from "lucide-react";
+import { Command as CommandIcon, ChevronRight } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useToolDueSummary } from "@/hooks/useToolDueSummary";
+import { ToolCommandMenu } from "@/components/warehouse/tools/ToolCommandMenu";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { useToolReturns } from "@/hooks/useToolReturns";
@@ -48,24 +53,38 @@ export default function ToolManagement() {
   const [showManageUnits, setShowManageUnits] = useState(false);
   const [selectedToolForDelete, setSelectedToolForDelete] = useState<WarehouseTool | null>(null);
   const [showDeleteTool, setShowDeleteTool] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
 
   const { tools, isLoading: isLoadingTools, deleteTool, isDeleting } = useWarehouseTools();
   const { issues, activeIssues, overdueIssues, isLoading: isLoadingIssues } = useToolIssues();
   const { returns, isLoading: isLoadingReturns } = useToolReturns();
+  const { selectedCompany } = useCompany();
+  const { summary: due } = useToolDueSummary(selectedCompany?.id);
+
+  const availableCount = tools.reduce((s, t) => s + (Number(t.available_quantity) || 0), 0);
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Wrench className="h-8 w-8" />
-            Tool Management
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage tools, track issues and returns
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <div className="container mx-auto py-6 space-y-5">
+      {/* Hero header */}
+      <div className="rounded-xl border bg-gradient-to-br from-primary/5 via-background to-background p-5">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary text-primary-foreground shadow-sm">
+              <Wrench className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Tool Management</h1>
+              <p className="text-sm text-muted-foreground">
+                Serialized units · calibration · maintenance · issue &amp; return
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setCmdOpen(true)} className="text-muted-foreground">
+            <CommandIcon className="h-4 w-4 mr-2" />
+            Find action
+            <kbd className="ml-2 hidden sm:inline-flex h-5 items-center rounded border bg-muted px-1.5 text-[10px] font-medium">⌘K</kbd>
+          </Button>
           <Button asChild variant="outline">
             <Link to="/management/reports?template=WH-TOOL-LED-001">
               <FileBarChart className="h-4 w-4 mr-2" />
@@ -135,11 +154,52 @@ export default function ToolManagement() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
 
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Tools" value={tools.length} icon={<Boxes className="h-4 w-4" />} tone="primary" />
+        <StatCard label="Available" value={availableCount} icon={<CheckCircle2 className="h-4 w-4" />} tone="success" />
+        <StatCard label="On issue" value={activeIssues.length} icon={<ArrowRightLeft className="h-4 w-4" />} tone="info" />
+        <StatCard label="Overdue" value={overdueIssues.length} icon={<Clock className="h-4 w-4" />} tone="destructive" />
+        <StatCard label="Calibration due" value={due.calibration.count} icon={<Gauge className="h-4 w-4" />} tone="warning" />
+        <StatCard label="Maintenance due" value={due.maintenance.count} icon={<Wrench className="h-4 w-4" />} tone="warning" />
+      </div>
+
+      {/* Capability shortcuts — surface the deeper features */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <CapabilityCard
+          icon={<Boxes className="h-5 w-5" />}
+          title="Serialized units & QR"
+          desc="Register units, print QR labels, view per-unit history"
+          onClick={() => setActiveTab("inventory")}
+        />
+        <CapabilityCard
+          icon={<Gauge className="h-5 w-5" />}
+          title="Calibration"
+          desc="ISO/IEC 17025 · record & track due dates"
+          badge={due.calibration.count}
+          onClick={() => setActiveTab("due")}
+        />
+        <CapabilityCard
+          icon={<Wrench className="h-5 w-5" />}
+          title="Maintenance"
+          desc="ISO 55000 · service history & schedules"
+          badge={due.maintenance.count}
+          onClick={() => setActiveTab("due")}
+        />
+        <CapabilityCard
+          icon={<FileBarChart className="h-5 w-5" />}
+          title="Reports"
+          desc="Ledger, calibration, maintenance, cost"
+          onClick={() => setCmdOpen(true)}
+        />
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="bg-muted/60 p-1 h-auto flex-wrap gap-1">
           <TabsTrigger value="inventory" className="flex items-center gap-2">
             <Wrench className="h-4 w-4" />
             Tools Inventory
@@ -208,6 +268,19 @@ export default function ToolManagement() {
         </TabsContent>
       </Tabs>
 
+      <ToolCommandMenu
+        open={cmdOpen}
+        onOpenChange={setCmdOpen}
+        onAddTool={() => setShowCreateTool(true)}
+        onImportItemMaster={() => setShowImportFromItemMaster(true)}
+        onBulkImport={() => setShowBulkImport(true)}
+        onIssue={() => setShowIssueTool(true)}
+        onBulkIssue={() => setShowBulkIssueTool(true)}
+        onReturn={() => setShowReturnTool(true)}
+        onBulkReturn={() => setShowBulkReturnTool(true)}
+        onGoTab={setActiveTab}
+      />
+
       <CreateToolDialog open={showCreateTool} onOpenChange={setShowCreateTool} />
       <ManageToolUnitsDialog tool={selectedToolForUnits} open={showManageUnits} onOpenChange={setShowManageUnits} />
       <IssueToolDialog open={showIssueTool} onOpenChange={setShowIssueTool} tools={tools} />
@@ -253,5 +326,53 @@ export default function ToolManagement() {
         }}
       />
     </div>
+  );
+}
+
+function CapabilityCard({ icon, title, desc, badge, onClick }: {
+  icon: React.ReactNode; title: string; desc: string; badge?: number; onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group text-left rounded-lg border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex items-start gap-3">
+        <span className="p-2 rounded-md bg-primary/10 text-primary shrink-0">{icon}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold truncate">{title}</h3>
+            {badge != null && badge > 0 && (
+              <Badge variant="destructive" className="h-5 px-1.5">{badge}</Badge>
+            )}
+            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{desc}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+type StatTone = "primary" | "success" | "info" | "warning" | "destructive";
+
+function StatCard({ label, value, icon, tone }: { label: string; value: number; icon: React.ReactNode; tone: StatTone }) {
+  const toneMap: Record<StatTone, { chip: string; rail: string; val: string }> = {
+    primary: { chip: "bg-primary/10 text-primary", rail: "border-l-primary", val: "text-foreground" },
+    success: { chip: "bg-success/10 text-success", rail: "border-l-success", val: "text-foreground" },
+    info: { chip: "bg-info/10 text-info", rail: "border-l-info", val: "text-foreground" },
+    warning: { chip: "bg-warning/10 text-warning", rail: "border-l-warning", val: value > 0 ? "text-warning" : "text-foreground" },
+    destructive: { chip: "bg-destructive/10 text-destructive", rail: "border-l-destructive", val: value > 0 ? "text-destructive" : "text-foreground" },
+  };
+  const t = toneMap[tone];
+  return (
+    <Card className={`p-3.5 border-l-2 ${t.rail}`}>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className={`p-1.5 rounded-md ${t.chip}`}>{icon}</span>
+      </div>
+      <div className={`mt-1.5 text-2xl font-bold tabular-nums ${t.val}`}>{value.toLocaleString()}</div>
+    </Card>
   );
 }
