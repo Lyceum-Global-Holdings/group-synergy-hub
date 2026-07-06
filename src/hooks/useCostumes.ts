@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { Costume, CreateCostumeData } from "@/types/costumeRental";
 import { toast } from "sonner";
 
@@ -21,7 +22,7 @@ export function useCostumes(companyId?: string) {
     queryFn: async () => {
       let query = (supabase as any)
         .from("rental_costumes")
-        .select("*, category:rental_categories(id, name), units:rental_costume_units(id, status, condition, size)")
+        .select("*, category:rental_categories(id, name), units:rental_costume_units(id, unit_code, status, condition, size)")
         .order("created_at", { ascending: false });
       if (companyId) query = query.eq("company_id", companyId);
       const { data, error } = await query;
@@ -38,12 +39,12 @@ export function useCostumes(companyId?: string) {
 
   const createCostume = useMutation({
     mutationFn: async (input: CreateCostumeData) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data: code, error: codeErr } = await (supabase as any).rpc("generate_costume_code");
       if (codeErr) throw codeErr;
       const { data, error } = await (supabase as any)
         .from("rental_costumes")
-        .insert({ ...input, costume_code: code, created_by: user.data.user?.id })
+        .insert({ ...input, costume_code: code, created_by: user?.id })
         .select()
         .single();
       if (error) throw error;

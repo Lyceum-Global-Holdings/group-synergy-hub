@@ -24,20 +24,41 @@ export function AddToBucketDialog({ open, onOpenChange, costume }: Props) {
   const sizes = useMemo(() => costumeSizeOptions(costume), [costume]);
   const hasSizes = sizes.length > 1 || (sizes.length === 1 && sizes[0].size !== "");
 
+  // Physical units that can be reserved individually as a "preferred unit".
+  const availableUnits = useMemo(
+    () => (costume?.units ?? []).filter((u) => u.status === "available"),
+    [costume],
+  );
+
+  const NO_UNIT = "__none__";
   const [size, setSize] = useState("");
   const [qty, setQty] = useState(1);
+  const [unitId, setUnitId] = useState<string>(NO_UNIT); // NO_UNIT = add by size + quantity
 
   useEffect(() => {
     if (open) {
       setSize(sizes[0]?.size ?? "");
       setQty(1);
+      setUnitId(NO_UNIT);
     }
   }, [open, costume]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!costume) return null;
   const selected = sizes.find((s) => s.size === size);
+  const chosenUnit = availableUnits.find((u) => u.id === unitId);
 
   const confirm = () => {
+    if (chosenUnit) {
+      if (cart.hasUnit(chosenUnit.id)) {
+        toast.info(`${chosenUnit.unit_code} is already in the bucket`);
+        onOpenChange(false);
+        return;
+      }
+      cart.addUnit(costume.id, chosenUnit.id, chosenUnit.unit_code, chosenUnit.size ?? "");
+      toast.success(`Added ${costume.name} · ${chosenUnit.unit_code} to the bucket`);
+      onOpenChange(false);
+      return;
+    }
     cart.add(costume.id, size, qty);
     toast.success(`Added ${qty} × ${costume.name}${size ? ` (${size})` : ""} to the bucket`);
     onOpenChange(false);
@@ -58,7 +79,29 @@ export function AddToBucketDialog({ open, onOpenChange, costume }: Props) {
           </div>
         </div>
 
-        {hasSizes && (
+        {availableUnits.length > 0 && (
+          <div className="space-y-1">
+            <Label>Specific unit <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Select value={unitId} onValueChange={setUnitId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_UNIT}>Any unit — choose by size &amp; quantity</SelectItem>
+                {availableUnits.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.unit_code}{u.size ? ` · ${sizeLabel(u.size)}` : ""} · {u.condition}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {chosenUnit && (
+              <p className="text-xs text-muted-foreground">
+                Reserves <span className="font-medium">{chosenUnit.unit_code}</span> as the preferred unit — confirmed at checkout.
+              </p>
+            )}
+          </div>
+        )}
+
+        {!chosenUnit && hasSizes && (
           <div className="space-y-1">
             <Label>Size</Label>
             <Select value={size} onValueChange={setSize}>
@@ -74,13 +117,15 @@ export function AddToBucketDialog({ open, onOpenChange, costume }: Props) {
           </div>
         )}
 
-        <div className="space-y-1">
-          <Label>Quantity</Label>
-          <Input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} />
-          {selected && (
-            <p className="text-xs text-muted-foreground">{selected.available} unit(s) currently available{size ? ` in size ${size}` : ""}.</p>
-          )}
-        </div>
+        {!chosenUnit && (
+          <div className="space-y-1">
+            <Label>Quantity</Label>
+            <Input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} />
+            {selected && (
+              <p className="text-xs text-muted-foreground">{selected.available} unit(s) currently available{size ? ` in size ${size}` : ""}.</p>
+            )}
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

@@ -2,7 +2,10 @@
 
 export type CostumeStatus = 'active' | 'inactive' | 'retired';
 export type UnitCondition = 'new' | 'good' | 'fair' | 'needs_repair' | 'retired';
-export type UnitStatus = 'available' | 'reserved' | 'out' | 'maintenance' | 'retired';
+export type UnitStatus = 'available' | 'reserved' | 'out' | 'cleaning' | 'maintenance' | 'retired' | 'lost';
+export type UnitMaintenanceType = 'cleaning' | 'repair' | 'alteration' | 'inspection';
+export type UnitEventType =
+  'registered' | 'status_change' | 'condition_change' | 'maintenance' | 'disposed' | 'note';
 
 export interface RentalCategory {
   id: string;
@@ -80,6 +83,42 @@ export interface CostumeUnit {
   condition: UnitCondition;
   status: UnitStatus;
   notes: string | null;
+  acquired_date: string | null;
+  acquisition_cost: number | null;
+  disposed_at: string | null;
+  disposal_reason: string | null;
+  disposal_method: string | null;
+  disposal_value: number | null;
+  company_id: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RentalUnitEvent {
+  id: string;
+  unit_id: string;
+  event_type: UnitEventType;
+  event_date: string;
+  from_value: string | null;
+  to_value: string | null;
+  reference: string | null;
+  notes: string | null;
+  created_by: string | null;
+  company_id: string | null;
+  created_at: string;
+}
+
+export interface RentalUnitMaintenance {
+  id: string;
+  unit_id: string;
+  maintenance_type: UnitMaintenanceType;
+  maintenance_date: string;
+  performed_by: string | null;
+  provider: string | null;
+  cost: number;
+  description: string | null;
+  out_of_service: boolean;
   company_id: string;
   created_by: string | null;
   created_at: string;
@@ -124,10 +163,12 @@ export interface RentalOrderItem {
   rental_days: number;
   line_total: number;
   security_deposit: number;
+  preferred_unit_id: string | null;
   company_id: string;
   created_at: string;
   updated_at: string;
   costume?: Pick<Costume, 'id' | 'name' | 'costume_code' | 'image_url'> | null;
+  preferred_unit?: Pick<CostumeUnit, 'id' | 'unit_code' | 'size'> | null;
   assignments?: UnitAssignment[];
 }
 
@@ -173,6 +214,7 @@ export interface CreateRentalOrderItemInput {
   rental_days: number;
   line_total: number;
   security_deposit: number;
+  preferred_unit_id?: string | null;
 }
 
 export interface CreateRentalOrderData {

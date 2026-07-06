@@ -54,6 +54,27 @@ export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) 
     }
   }, [open, order.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pre-select each line's preferred unit once availability loads, if it's still
+  // available and not already claimed by another slot.
+  useEffect(() => {
+    if (!open || availableUnits.length === 0) return;
+    const availIds = new Set(availableUnits.map((u) => u.id));
+    setSlots((prev) => {
+      const claimed = new Set(prev.map((s) => s.unit_id).filter(Boolean));
+      let changed = false;
+      const next = prev.map((s) => {
+        if (s.unit_id) return s;
+        const pref = items.find((it) => it.id === s.order_item_id)?.preferred_unit_id;
+        if (pref && availIds.has(pref) && !claimed.has(pref)) {
+          claimed.add(pref); changed = true;
+          return { ...s, unit_id: pref };
+        }
+        return s;
+      });
+      return changed ? next : prev;
+    });
+  }, [open, availableUnits, items]);
+
   const chosen = new Set(slots.map((s) => s.unit_id).filter(Boolean));
   const unitsFor = (costumeId: string, size: string, currentUnitId: string) =>
     availableUnits.filter((u) =>

@@ -114,6 +114,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/tuh-modules/bill-of-materials' },
       { key: 'finished-goods', name: 'Finished Goods', description: 'Finished goods inventory management', url: '/tuh-modules/finished-goods' },
       { key: 'costume-catalog', name: 'Costume Catalog', description: 'Rental costume catalog and units', url: '/tuh-modules/costume-catalog' },
+      { key: 'costume-stock', name: 'Costume Stock & Maintenance', description: 'Unit lifecycle, maintenance and disposal', url: '/tuh-modules/costume-stock' },
       { key: 'costume-rental', name: 'Costume Rental', description: 'Costume rental orders and bookings', url: '/tuh-modules/costume-rental' }
     ]
   },

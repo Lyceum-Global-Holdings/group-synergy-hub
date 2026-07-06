@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function CostumeCartSheet({ open, onOpenChange, companyId }: Props) {
-  const { items, setQuantity, remove, clear } = useCostumeCart();
+  const { items, setQuantity, remove, removeUnit, clear } = useCostumeCart();
   const { costumes } = useCostumes(companyId);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -50,27 +50,39 @@ export function CostumeCartSheet({ open, onOpenChange, companyId }: Props) {
             )}
             {items.map((it) => {
               const c = byId.get(it.costume_id);
+              const isUnit = !!it.unit_id;
               return (
-                <div key={`${it.costume_id}-${it.size}`} className="flex items-center gap-3 rounded-lg border p-2.5">
+                <div key={it.unit_id ?? `${it.costume_id}-${it.size}`} className="flex items-center gap-3 rounded-lg border p-2.5">
                   <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
                     {c?.image_url ? <img src={c.image_url} alt="" className="h-full w-full object-cover" /> : <Shirt className="h-6 w-6 text-muted-foreground" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="text-sm font-medium truncate">{c?.name ?? "Costume"}</p>
-                      {it.size && <Badge variant="secondary" className="text-[10px] shrink-0">{it.size}</Badge>}
+                      {isUnit
+                        ? <Badge className="text-[10px] shrink-0">{it.unit_code}</Badge>
+                        : it.size && <Badge variant="secondary" className="text-[10px] shrink-0">{it.size}</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {c ? `${formatCurrency(c.daily_rate)}/day` : it.costume_id.slice(0, 8)}
                       {c && <span> · {formatCurrency(Number(c.daily_rate) * it.quantity)}/day total</span>}
+                      {isUnit && <span> · preferred unit</span>}
                     </p>
                   </div>
-                  <Input
-                    type="number" min={1} className="w-14 h-8"
-                    value={it.quantity}
-                    onChange={(e) => setQuantity(it.costume_id, it.size, Math.max(1, Number(e.target.value) || 1))}
-                  />
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(it.costume_id, it.size)} title="Remove">
+                  {isUnit ? (
+                    <span className="w-14 text-center text-sm text-muted-foreground">×1</span>
+                  ) : (
+                    <Input
+                      type="number" min={1} className="w-14 h-8"
+                      value={it.quantity}
+                      onChange={(e) => setQuantity(it.costume_id, it.size, Math.max(1, Number(e.target.value) || 1))}
+                    />
+                  )}
+                  <Button
+                    variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+                    onClick={() => (isUnit ? removeUnit(it.unit_id!) : remove(it.costume_id, it.size))}
+                    title="Remove"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

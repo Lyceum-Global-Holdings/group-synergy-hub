@@ -7,28 +7,22 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Printer, ShoppingCart, Check } from "lucide-react";
+import { Plus, Trash2, Printer, ShoppingCart, Check, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import AssetQRCode from "@/components/warehouse/AssetQRCode";
 import { generateBulkQRCodePdf } from "@/utils/bulkQRCodePdf";
 import { useCostumeUnits } from "@/hooks/useCostumeUnits";
 import { useCostumeCart } from "@/contexts/CostumeCartContext";
 import { AddToBucketDialog } from "./AddToBucketDialog";
-import type { Costume, CostumeUnit, UnitCondition, UnitStatus } from "@/types/costumeRental";
+import { UnitLifecycleDialog } from "./UnitLifecycleDialog";
+import { STATUS_META, conditionLabel } from "./unitLifecycle";
+import type { Costume, CostumeUnit, UnitCondition } from "@/types/costumeRental";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   costume: Costume | null;
 }
-
-const STATUS_VARIANT: Record<UnitStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  available: "default",
-  reserved: "secondary",
-  out: "secondary",
-  maintenance: "outline",
-  retired: "destructive",
-};
 
 export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
   const { units, createUnit, deleteUnit } = useCostumeUnits(costume?.id);
@@ -37,6 +31,7 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
   const [size, setSize] = useState("");
   const [printing, setPrinting] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [manageUnit, setManageUnit] = useState<CostumeUnit | null>(null);
   const inBucket = costume ? cart.quantityOfCostume(costume.id) : 0;
 
   // Default new-unit size to the costume's nominal size.
@@ -123,9 +118,15 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
             <div key={u.id} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
               <span className="font-mono">{u.unit_code}</span>
               {u.size ? <Badge variant="outline">{u.size}</Badge> : null}
-              <Badge variant={STATUS_VARIANT[u.status]} className="capitalize">{u.status}</Badge>
-              <span className="text-muted-foreground capitalize">{u.condition.replace("_", " ")}</span>
-              <div className="ml-auto flex items-center gap-2">
+              <Badge variant={STATUS_META[u.status].variant} className="capitalize">{STATUS_META[u.status].label}</Badge>
+              <span className="text-muted-foreground capitalize">{conditionLabel(u.condition)}</span>
+              <div className="ml-auto flex items-center gap-1">
+                <Button
+                  variant="outline" size="sm" onClick={() => setManageUnit(u)}
+                  title="Manage lifecycle — status, service, disposal, history"
+                >
+                  <SlidersHorizontal className="h-4 w-4 mr-1" /> Manage
+                </Button>
                 <AssetQRCode assetId={u.id} assetName={costume?.name ?? "Costume"} assetIdentifier={u.unit_code} />
                 <Button
                   variant="ghost" size="sm" className="text-destructive"
@@ -145,6 +146,12 @@ export function ManageUnitsDialog({ open, onOpenChange, costume }: Props) {
       open={addOpen}
       onOpenChange={setAddOpen}
       costume={costume ? { ...costume, units } : null}
+    />
+    <UnitLifecycleDialog
+      open={!!manageUnit}
+      onOpenChange={(o) => !o && setManageUnit(null)}
+      unit={manageUnit}
+      costumeName={costume?.name}
     />
     </>
   );

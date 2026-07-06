@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Search, Shirt, Tags, Pencil, Boxes, ShoppingCart, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ const STATUS_VARIANT = {
 };
 
 export default function CostumeCatalog() {
+  const navigate = useNavigate();
   const { selectedCompany } = useCompany();
   const companyId = selectedCompany?.id;
   const { costumes, isLoading } = useCostumes(companyId);
@@ -72,6 +74,9 @@ export default function CostumeCatalog() {
             {cart.count > 0 && (
               <Badge className="ml-2 px-1.5 py-0 h-5 min-w-5 justify-center">{cart.count}</Badge>
             )}
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/tuh-modules/costume-stock")}>
+            <Boxes className="h-4 w-4 mr-2" /> Stock
           </Button>
           <Button variant="outline" onClick={() => setCategoriesOpen(true)}>
             <Tags className="h-4 w-4 mr-2" /> Categories

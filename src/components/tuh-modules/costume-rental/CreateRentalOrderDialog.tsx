@@ -22,7 +22,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId?: string;
-  initialItems?: { costume_id: string; size: string; quantity: number }[];
+  initialItems?: { costume_id: string; size: string; quantity: number; unit_id?: string | null; unit_code?: string | null }[];
   onCreated?: () => void;
 }
 
@@ -31,6 +31,8 @@ interface LineRow {
   size: string;
   quantity: number;
   available?: number | null;
+  preferred_unit_id?: string | null;
+  unit_code?: string | null;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -57,7 +59,10 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
     if (open) {
       setCustomerId(""); setPickup(today()); setDue(addDays(today(), 1));
       setDiscount("0"); setTax("0"); setNotes("");
-      const seeded = (initialItems ?? []).map((i) => ({ costume_id: i.costume_id, size: i.size, quantity: i.quantity, available: null }));
+      const seeded = (initialItems ?? []).map((i) => ({
+        costume_id: i.costume_id, size: i.size, quantity: i.quantity, available: null,
+        preferred_unit_id: i.unit_id ?? null, unit_code: i.unit_code ?? null,
+      }));
       setLines(seeded);
       if (seeded.length > 0) refreshAvailability(seeded);
     }
@@ -140,6 +145,7 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
             rental_days: days,
             line_total: lineTotal(l),
             security_deposit: lineDeposit(l),
+            preferred_unit_id: l.preferred_unit_id ?? null,
           };
         }),
       });
@@ -198,7 +204,9 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
                     ))}
                   </SelectContent>
                 </Select>
-                {l.costume_id && hasSizes && (
+                {l.preferred_unit_id ? (
+                  <Badge variant="outline" className="whitespace-nowrap font-mono text-[11px]">{l.unit_code}</Badge>
+                ) : l.costume_id && hasSizes && (
                   <Select value={l.size} onValueChange={(v) => setLine(i, { size: v })}>
                     <SelectTrigger className="w-24"><SelectValue placeholder="Size" /></SelectTrigger>
                     <SelectContent>
@@ -210,6 +218,7 @@ export function CreateRentalOrderDialog({ open, onOpenChange, companyId, initial
                 )}
                 <Input
                   type="number" min={1} className="w-20" value={l.quantity}
+                  disabled={!!l.preferred_unit_id}
                   onChange={(e) => setLine(i, { quantity: Math.max(1, Number(e.target.value) || 1) })}
                 />
                 {l.costume_id && (
