@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { 
@@ -17,7 +18,7 @@ async function resolveAttendanceInsertContext(
   siteReportId: string,
   fallbackCompanyId?: string | null
 ): Promise<{ userId: string; companyId: string } | null> {
-  const { data: user, error: userError } = await supabase.auth.getUser();
+  const user = { user: getCachedUser() }; const userError = null;
   if (userError) throw userError;
 
   const userId = user.user?.id;
@@ -140,7 +141,7 @@ export function useCreateLabourAttendance() {
 
   return useMutation({
     mutationFn: async (data: CreateLabourAttendanceData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: result, error } = await supabase
         .from("site_report_labour_attendance")

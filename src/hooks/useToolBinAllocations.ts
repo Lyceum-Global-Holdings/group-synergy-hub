@@ -6,6 +6,7 @@
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { ToolBinAllocation } from "@/types/toolManagement";
@@ -95,7 +96,7 @@ export function useToolBinAllocations(toolId?: string) {
 
   const allocateMutation = useMutation({
     mutationFn: async (input: AllocateInput) => {
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       if (!userData.user) throw new Error("Not authenticated");
       const warehouseItemId = await resolveWarehouseItemId(input.tool_id);
 
@@ -162,7 +163,7 @@ export function useToolBinAllocations(toolId?: string) {
 
   const moveMutation = useMutation({
     mutationFn: async (input: MoveInput) => {
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       const warehouseItemId = await resolveWarehouseItemId(input.tool_id);
 
       // 1. Lock source allocation

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { assertUserCanEditLocation } from "./locationPermissionGuard";
@@ -17,7 +18,7 @@ export function useAddStockToExistingItem() {
 
   return useMutation({
     mutationFn: async (data: AddStockData) => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() }; const authError = null;
       if (authError || !authData.user) throw new Error("You must be logged in.");
       if (!selectedCompany?.id) throw new Error("No company selected.");
 

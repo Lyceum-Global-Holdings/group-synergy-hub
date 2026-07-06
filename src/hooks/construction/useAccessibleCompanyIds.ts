@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 
 /**
@@ -21,7 +22,7 @@ export function useAccessibleCompanyIds() {
   } = useQuery({
     queryKey: ["construction-accessible-company-memberships"],
     queryFn: async () => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() }; const authError = null;
       if (authError || !authData.user) return [];
 
       const { data, error: accessError } = await supabase

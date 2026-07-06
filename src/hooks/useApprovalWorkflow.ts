@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "sonner";
 import { ApprovalWorkflowEngine } from "@/lib/approvalWorkflow";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -52,7 +53,7 @@ export function useMyPendingApprovals() {
   return useQuery({
     queryKey: ['my-pending-approvals'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return [];
 
       // Get registrations with pending workflow entries assigned to current user
@@ -88,7 +89,7 @@ export function useApproveStage() {
       action: 'approve' | 'reject' | 'request_info';
       comments: string;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
       if (!selectedCompany) throw new Error('No company selected');
 

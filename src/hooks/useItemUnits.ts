@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { ItemUnit, CreateItemUnitData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,7 +27,7 @@ export const useItemUnits = () => {
 
   const createUnitMutation = useMutation({
     mutationFn: async (unitData: CreateItemUnitData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
@@ -115,7 +116,7 @@ export const useItemUnits = () => {
 
   const bulkImportUnitsMutation = useMutation({
     mutationFn: async (unitsData: CreateItemUnitData[]) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       // Add created_by to each unit

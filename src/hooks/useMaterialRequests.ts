@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { MaterialRequest, CreateMaterialRequestData } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -36,7 +37,7 @@ export const useMaterialRequests = () => {
   // Create material request
   const createRequestMutation = useMutation({
     mutationFn: async (requestData: CreateMaterialRequestData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { data, error } = await supabase
         .from('material_requests')
@@ -132,7 +133,7 @@ export const useMaterialRequests = () => {
       comments?: string;
       requiresManagementApproval?: boolean;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { error } = await supabase
         .from('material_requests')
@@ -166,7 +167,7 @@ export const useMaterialRequests = () => {
   // Management approval
   const managementApproveMutation = useMutation({
     mutationFn: async ({ id, comments }: { id: string; comments?: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { error } = await supabase
         .from('material_requests')

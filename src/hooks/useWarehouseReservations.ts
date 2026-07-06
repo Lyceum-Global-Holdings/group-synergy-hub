@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from 'sonner';
 import type { 
   WarehouseItemReservation, 
@@ -45,7 +46,7 @@ export function useWarehouseReservations() {
   // Create single reservation
   const createReservationMutation = useMutation({
     mutationFn: async (data: CreateReservationData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: reservation, error } = await supabase
         .from('warehouse_item_reservations')
@@ -72,7 +73,7 @@ export function useWarehouseReservations() {
   // Bulk create reservations for CPO
   const createBulkReservationsMutation = useMutation({
     mutationFn: async (request: BulkReservationRequest) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const reservations = request.items.map(item => ({
         warehouse_item_id: item.warehouse_item_id,

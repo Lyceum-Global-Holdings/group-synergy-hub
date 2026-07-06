@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { MaterialRequestItem } from "@/types/materialIssueReturn";
 
 interface MarkItemsReceivedDialogProps {
@@ -78,7 +79,7 @@ export function MarkItemsReceivedDialog({
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       for (const item of receiptItems) {

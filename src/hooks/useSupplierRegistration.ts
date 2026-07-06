@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { SupplierRegistrationRequest, DuplicateSupplier } from "@/types/supplierRegistration";
 import { toast } from "sonner";
 
@@ -49,12 +50,12 @@ export function useCreateRegistration() {
       company_id?: string;
       status?: string;
     }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data: result, error } = await supabase
         .from('supplier_registration_requests')
         .insert({
           ...data,
-          created_by: user.data.user?.id,
+          created_by: user?.id,
           status: data.status || 'draft',
         })
         .select()
@@ -104,12 +105,12 @@ export function useSubmitRegistration() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data, error } = await supabase
         .from('supplier_registration_requests')
         .update({
           status: 'pending_approval',
-          submitted_by: user.data.user?.id,
+          submitted_by: user?.id,
           submitted_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -123,7 +124,7 @@ export function useSubmitRegistration() {
         registration_request_id: id,
         stage: 'submitted',
         status: 'completed',
-        completed_by: user.data.user?.id,
+        completed_by: user?.id,
         completed_at: new Date().toISOString(),
       });
 
@@ -165,7 +166,7 @@ export function useApproveRegistration() {
 
   return useMutation({
     mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       // Get registration data
       const { data: registration, error: fetchError } = await supabase
@@ -217,7 +218,7 @@ export function useApproveRegistration() {
             payment_terms: supplierData.payment_terms || null,
             company_id: registration.company_id,
             status: 'active',
-            created_by: user.data.user?.id || null,
+            created_by: user?.id || null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as any)
@@ -274,7 +275,7 @@ export function useApproveRegistration() {
         .from('supplier_registration_requests')
         .update({
           status: 'approved',
-          reviewed_by: user.data.user?.id,
+          reviewed_by: user?.id,
           reviewed_at: new Date().toISOString(),
         })
         .eq('id', id);
@@ -286,7 +287,7 @@ export function useApproveRegistration() {
         registration_request_id: id,
         stage: 'approved',
         status: 'completed',
-        completed_by: user.data.user?.id,
+        completed_by: user?.id,
         completed_at: new Date().toISOString(),
         notes,
       });
@@ -309,13 +310,13 @@ export function useRejectRegistration() {
 
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { error } = await supabase
         .from('supplier_registration_requests')
         .update({
           status: 'rejected',
-          reviewed_by: user.data.user?.id,
+          reviewed_by: user?.id,
           reviewed_at: new Date().toISOString(),
           rejection_reason: reason,
         })
@@ -328,7 +329,7 @@ export function useRejectRegistration() {
         registration_request_id: id,
         stage: 'rejected',
         status: 'completed',
-        completed_by: user.data.user?.id,
+        completed_by: user?.id,
         completed_at: new Date().toISOString(),
         notes: reason,
       });

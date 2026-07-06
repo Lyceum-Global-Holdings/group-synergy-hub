@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 
 export interface BomFinishedGoodLink {
@@ -104,13 +105,13 @@ export function useBomFinishedGoodsLinks(bomId?: string) {
 
   const bulkLinkFinishedGoods = useMutation({
     mutationFn: async ({ bomId, finishedGoodIds }: { bomId: string; finishedGoodIds: string[] }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       // Create link records for each finished good
       const linkRecords = finishedGoodIds.map(fgId => ({
         bom_id: bomId,
         finished_good_id: fgId,
-        created_by: user.data.user?.id
+        created_by: user?.id
       }));
 
       const { data, error } = await supabase

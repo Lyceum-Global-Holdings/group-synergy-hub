@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import type { SupplierRiskFlag, CreateRiskFlagData, UpdateRiskFlagData } from "@/types/supplierRisk";
 
@@ -30,7 +31,7 @@ export const useSupplierRiskFlags = (supplierId?: string) => {
   // Create risk flag
   const createRiskFlag = useMutation({
     mutationFn: async (flagData: CreateRiskFlagData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
@@ -95,7 +96,7 @@ export const useSupplierRiskFlags = (supplierId?: string) => {
   // Resolve risk flag
   const resolveRiskFlag = useMutation({
     mutationFn: async ({ id, resolution_notes }: { id: string; resolution_notes?: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase

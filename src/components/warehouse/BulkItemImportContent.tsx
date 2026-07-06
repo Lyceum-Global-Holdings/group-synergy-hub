@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { parseCSV, downloadCSV, allocateAutoCodes } from '@/lib/bulkImport';
@@ -396,7 +397,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
     setIsImporting(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) {
         toast({ title: "Error", description: "You must be logged in to import items", variant: "destructive" });
         setIsImporting(false);

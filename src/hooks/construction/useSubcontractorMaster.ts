@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { SubcontractorMaster, CreateSubcontractorMasterData, UpdateSubcontractorMasterData } from "@/types/construction";
@@ -35,7 +36,7 @@ export function useCreateSubcontractorMaster() {
 
   return useMutation({
     mutationFn: async (data: CreateSubcontractorMasterData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: result, error } = await supabase
         .from("construction_subcontractor_master")

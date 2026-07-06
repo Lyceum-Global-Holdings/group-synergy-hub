@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { PutawayRecord, PutawayItem, CreatePutawayRecordData, CreatePutawayItemData } from '@/types/putaway';
 import { useToast } from '@/hooks/use-toast';
 
@@ -48,7 +49,7 @@ export const useCreatePutaway = () => {
 
   return useMutation({
     mutationFn: async (putawayData: CreatePutawayRecordData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
@@ -185,7 +186,7 @@ export const useCompletePutaway = () => {
 
   return useMutation({
     mutationFn: async (putawayId: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       // Get all pending items

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
 import type { 
@@ -114,7 +115,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
   // Create bin allocation
   const createAllocationMutation = useMutation({
     mutationFn: async (data: CreateBinAllocationData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       if (!selectedCompany?.id) {
         throw new Error('Please select a company first');
@@ -263,7 +264,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         throw new Error('Please select a company first');
       }
 
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       let consolidatedCount = 0;
 
       // ============ STEP 0: Consolidate duplicate allocations ============
@@ -461,7 +462,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         throw new Error('Please select a company first');
       }
 
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       // Step 1: Get all completed transfer items with their transfer details
       const { data: transferItems, error: transferError } = await supabase

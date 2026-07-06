@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useInvalidateWarehouseStock } from '@/hooks/useInvalidateWarehouseStock';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
@@ -136,9 +137,7 @@ export function MoveBinAllocationDialog({
 
     setIsSubmitting(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
 
       // 1. Create completed transfer header

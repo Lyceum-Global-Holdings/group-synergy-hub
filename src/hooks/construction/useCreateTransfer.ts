@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,7 +30,7 @@ export function useCreateTransfer() {
       isSubmitting = true;
 
       try {
-        const { data: user, error: authError } = await supabase.auth.getUser();
+        const user = { user: getCachedUser() }; const authError = null;
         
         if (authError || !user.user) {
           throw new Error("You must be logged in to create transfers");

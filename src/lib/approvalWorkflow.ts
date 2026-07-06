@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import type { Database } from "@/integrations/supabase/types";
 import { SupplierRegistrationRequest } from "@/types/supplierRegistration";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
@@ -236,7 +237,7 @@ export class ApprovalWorkflowEngine {
    * Complete the approval process
    */
   private async completeApproval(registrationId: string, companyId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = getCachedUser();
 
     // Get registration data
     const { data: registration } = await supabase

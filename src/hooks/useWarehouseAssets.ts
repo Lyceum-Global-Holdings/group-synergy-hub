@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { WarehouseAsset, CreateWarehouseAssetData } from '@/types/warehouse';
 import { useToast } from '@/hooks/use-toast';
 
@@ -128,7 +129,7 @@ export const useWarehouseAssets = (companyId?: string) => {
 
   const createAssetMutation = useMutation({
     mutationFn: async (assetData: CreateWarehouseAssetData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const sanitizedData = {
@@ -312,7 +313,7 @@ export const useWarehouseAssets = (companyId?: string) => {
 
   const createBulkAssetsMutation = useMutation({
     mutationFn: async (assetsData: CreateWarehouseAssetData[]) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const assetsWithUser = assetsData.map(asset => ({

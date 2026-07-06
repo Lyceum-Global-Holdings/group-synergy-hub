@@ -20,6 +20,7 @@ import {
 import { CheckCircle, XCircle, FileCheck, Truck, Package, ArrowDown, ArrowUp, Download, FileText, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -96,7 +97,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId, onEdit
         nameById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.full_name ?? '']));
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       const generatedBy = user
         ? (await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()).data
             ?.full_name ?? user.email

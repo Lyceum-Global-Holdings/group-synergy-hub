@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
@@ -96,7 +97,7 @@ export function useStockAudit() {
   // Log a snapshot of the current audit state
   const logSnapshotMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user || !selectedCompany?.id) return;
       if (auditItems.length === 0) return;
 

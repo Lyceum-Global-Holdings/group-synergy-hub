@@ -35,13 +35,14 @@ import { useIsAdmin, useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+import { getCachedUser } from "@/lib/currentUser";
 export default function ProjectMaster() {
   const { data: isSuperAdmin } = useSuperAdmin();
   const { data: isAdmin } = useIsAdmin();
   const { data: hasConstructionAccess } = useQuery({
     queryKey: ["has-construction-access"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return false;
       const { data } = await supabase.rpc("has_construction_access", { _user_id: user.id });
       return data === true;

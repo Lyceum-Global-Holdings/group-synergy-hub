@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "sonner";
 import type { BlanketPoRelease, CreateBpoReleaseData, BpoReleaseStatus } from "@/types/blanketPurchaseOrder";
 
@@ -56,7 +57,7 @@ export function useCreateBpoRelease() {
 
   return useMutation({
     mutationFn: async (data: CreateBpoReleaseData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       const { items, ...releaseData } = data;
@@ -118,7 +119,7 @@ export function useUpdateBpoReleaseStatus() {
 
   return useMutation({
     mutationFn: async ({ id, status, bpoId }: { id: string; status: BpoReleaseStatus; bpoId: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       const updateData: any = { release_status: status };

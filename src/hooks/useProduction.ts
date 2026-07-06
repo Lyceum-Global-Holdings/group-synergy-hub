@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { DEFAULT_SECTORS } from "@/constants/productionSectors";
@@ -133,7 +134,7 @@ export function useCreateProductionOrder() {
       notes?: string;
       stages: { stage_name: string; sequence_order: number; stage_template_id?: string }[];
     }) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       const { data: order, error } = await supabase
         .from("production_orders")
@@ -238,7 +239,7 @@ export function useCreateBatchProductionOrders() {
         bom_id?: string;
       }[];
     }) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       const createdOrders: any[] = [];
 
       for (const item of input.items) {
@@ -346,7 +347,7 @@ export function useUpdateProductionStage() {
       }
       if (input.status === "completed") {
         updates.completed_at = new Date().toISOString();
-        const { data: user } = await supabase.auth.getUser();
+        const user = { user: getCachedUser() };
         updates.completed_by = user?.user?.id || null;
       }
 
@@ -472,7 +473,7 @@ export function useUpsertDailyEntry() {
       wastage_qty: number;
       notes?: string;
     }) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       // Upsert the daily entry. Stage totals (output/wastage) and the rolled
       // input are recomputed server-side by the sync_production_order trigger,

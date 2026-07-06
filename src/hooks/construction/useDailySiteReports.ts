@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { DailySiteReport, CreateDailySiteReportData, UpdateDailySiteReportData, SiteReportActivity } from "@/types/construction";
@@ -58,7 +59,7 @@ export function useCreateDailySiteReport() {
 
   return useMutation({
     mutationFn: async (data: Record<string, any>) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       // Generate report_number: DSR-YYYYMMDD-XXXX
       const datePart = (data.report_date || format(new Date(), "yyyy-MM-dd")).replace(/-/g, "");
@@ -198,7 +199,7 @@ export function useGenerateSiteReports() {
 
   return useMutation({
     mutationFn: async ({ projectId, reportType, startDate, endDate }: GenerateReportParams) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       if (!selectedCompany?.id) {
         throw new Error("No company selected");

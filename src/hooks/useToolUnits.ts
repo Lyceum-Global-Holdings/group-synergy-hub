@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "@/hooks/use-toast";
 import type { ToolUnit, ToolUnitEvent, CreateToolUnitInput, ToolUnitStatus, ToolUnitCondition } from "@/types/toolUnits";
 
@@ -29,10 +30,10 @@ export function useToolUnits(toolId?: string) {
 
   const createUnit = useMutation({
     mutationFn: async (input: CreateToolUnitInput) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data, error } = await db
         .from("tool_units")
-        .insert({ ...input, created_by: user.data.user?.id })
+        .insert({ ...input, created_by: user?.id })
         .select()
         .single();
       if (error) throw error;
@@ -45,8 +46,8 @@ export function useToolUnits(toolId?: string) {
   /** Register N units at once (unit codes auto-assigned by the DB trigger). */
   const generateUnits = useMutation({
     mutationFn: async ({ count, base }: { count: number; base: CreateToolUnitInput }) => {
-      const user = await supabase.auth.getUser();
-      const rows = Array.from({ length: Math.max(1, count) }, () => ({ ...base, created_by: user.data.user?.id }));
+      const user = getCachedUser();
+      const rows = Array.from({ length: Math.max(1, count) }, () => ({ ...base, created_by: user?.id }));
       const { data, error } = await db.from("tool_units").insert(rows).select();
       if (error) throw error;
       return (data ?? []) as ToolUnit[];

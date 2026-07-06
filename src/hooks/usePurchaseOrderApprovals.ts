@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 import { PoApproval, PoStatus } from '@/types/purchaseOrder';
 
@@ -10,7 +11,7 @@ export function useSubmitPurchaseOrder() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const currentUser = await supabase.auth.getUser();
+      const currentUser = getCachedUser();
       
       // Update PO status to pending_approval
       const { error: poError } = await supabase
@@ -25,7 +26,7 @@ export function useSubmitPurchaseOrder() {
         .from('po_approvals')
         .insert({
           po_id: id,
-          approver_id: currentUser.data.user?.id!,
+          approver_id: currentUser?.id!,
           action: 'pending_approval',
           comments: 'Submitted for approval'
         });
@@ -65,12 +66,12 @@ export function useApprovePurchaseOrder() {
       action: 'approved' | 'rejected'; 
       comments?: string; 
     }) => {
-      const currentUser = await supabase.auth.getUser();
+      const currentUser = getCachedUser();
       
       // Update PO status and approval details
       const updateData: any = { 
         status: action,
-        approved_by: currentUser.data.user?.id,
+        approved_by: currentUser?.id,
         approved_date: new Date().toISOString()
       };
 
@@ -86,7 +87,7 @@ export function useApprovePurchaseOrder() {
         .from('po_approvals')
         .insert([{
           po_id: id,
-          approver_id: currentUser.data.user?.id!,
+          approver_id: currentUser?.id!,
           action: action as any,
           comments: comments
         }]);

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { SafetyIncident, SafetyInspection, CreateSafetyIncidentData, UpdateSafetyIncidentData, CreateSafetyInspectionData, UpdateSafetyInspectionData } from "@/types/construction";
@@ -51,7 +52,7 @@ export function useCreateSafetyIncident() {
 
   return useMutation({
     mutationFn: async (data: CreateSafetyIncidentData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const insertData = {
         ...data,
@@ -166,7 +167,7 @@ export function useCreateSafetyInspection() {
 
   return useMutation({
     mutationFn: async (data: CreateSafetyInspectionData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const insertData = {
         ...data,

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { CreateProjectData, UpdateProjectData } from "@/types/construction";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
@@ -48,7 +49,7 @@ export function useCreateProject() {
 
   return useMutation({
     mutationFn: async (data: CreateProjectData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       const companyIds = data.company_ids || (selectedCompany?.id ? [selectedCompany.id] : []);
 
       const insertData = cleanForDb({

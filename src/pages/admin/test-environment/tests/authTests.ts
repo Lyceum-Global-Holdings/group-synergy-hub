@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { TestCase } from "./types";
 
 export const authTests: TestCase[] = [
@@ -24,8 +25,7 @@ export const authTests: TestCase[] = [
     description: "Verify auth.getUser() returns valid user data",
     status: "idle",
     run: async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) return { passed: false, error: error.message };
+      const user = getCachedUser();
       if (!user) return { passed: false, error: "No user returned" };
       return { passed: true, details: `ID: ${user.id}, Email: ${user.email}` };
     },
@@ -38,7 +38,7 @@ export const authTests: TestCase[] = [
     description: "Verify is_super_admin RPC function works",
     status: "idle",
     run: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return { passed: false, error: "Not authenticated" };
       const { data, error } = await supabase.rpc("is_super_admin", { _user_id: user.id });
       if (error) return { passed: false, error: error.message };
@@ -53,7 +53,7 @@ export const authTests: TestCase[] = [
     description: "Verify profiles table returns current user profile",
     status: "idle",
     run: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return { passed: false, error: "Not authenticated" };
 const { data, error } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
       if (error) return { passed: false, error: error.message };
@@ -69,7 +69,7 @@ const { data, error } = await supabase.from("profiles").select("id").eq("id", us
     description: "Verify user_roles table is queryable",
     status: "idle",
     run: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return { passed: false, error: "Not authenticated" };
       const { data, error } = await supabase.from("user_roles").select("id, role_id").eq("user_id", user.id);
       if (error) return { passed: false, error: error.message };

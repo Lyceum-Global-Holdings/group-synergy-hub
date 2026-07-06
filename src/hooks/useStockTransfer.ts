@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import type { 
   StockTransferRequest, 
@@ -62,7 +63,7 @@ export const useCreateStockTransfer = () => {
 
   return useMutation({
     mutationFn: async (data: CreateStockTransferData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       // For bin-to-bin transfers, we store bin info at item level
@@ -189,7 +190,7 @@ export const useApproveStockTransfer = () => {
 
   return useMutation({
     mutationFn: async (transferId: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       const { error } = await supabase
@@ -229,7 +230,7 @@ export const useCompleteStockTransfer = () => {
     mutationFn: async (transferId: string) => {
       console.log('[CompleteTransfer] Starting completion for transfer:', transferId);
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
       console.log('[CompleteTransfer] User authenticated:', user.id);
 

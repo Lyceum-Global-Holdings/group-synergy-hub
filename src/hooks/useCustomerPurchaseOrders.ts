@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { CustomerPurchaseOrder, CreateCustomerPoData } from "@/types/customer";
 import { toast } from "sonner";
 
@@ -31,7 +32,7 @@ export function useCustomerPurchaseOrders(companyId?: string) {
 
   const createCustomerPO = useMutation({
     mutationFn: async (poData: CreateCustomerPoData) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       // Create customer PO
       const insertData = {
@@ -41,7 +42,7 @@ export function useCustomerPurchaseOrders(companyId?: string) {
         po_date: poData.po_date || new Date().toISOString().split('T')[0],
         delivery_date: poData.delivery_date,
         notes: poData.notes,
-        created_by: user.data.user?.id
+        created_by: user?.id
       };
       
       const { data: cpo, error: cpoError } = await supabase
@@ -126,7 +127,7 @@ export function useCustomerPurchaseOrders(companyId?: string) {
 
   const approveCPO = useMutation({
     mutationFn: async ({ id, action, comments }: { id: string; action: 'approved' | 'rejected'; comments?: string }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       // Update CPO status and approval fields
       const newStatus = action === 'approved' ? 'confirmed' : 'rejected';
@@ -134,7 +135,7 @@ export function useCustomerPurchaseOrders(companyId?: string) {
         .from('customer_purchase_orders')
         .update({
           status: newStatus,
-          approved_by: user.data.user?.id,
+          approved_by: user?.id,
           approved_date: new Date().toISOString(),
           approval_comments: comments,
           pending_approval: false
@@ -150,7 +151,7 @@ export function useCustomerPurchaseOrders(companyId?: string) {
         .from('customer_po_approvals')
         .insert({
           cpo_id: id,
-          approver_id: user.data.user?.id,
+          approver_id: user?.id,
           action,
           comments
         });
@@ -194,14 +195,14 @@ export function useCustomerPurchaseOrders(companyId?: string) {
 
   const cancelCPO = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { data, error } = await supabase
         .from('customer_purchase_orders')
         .update({
           status: 'cancelled',
           approval_comments: reason || 'Order cancelled',
-          approved_by: user.data.user?.id,
+          approved_by: user?.id,
           approved_date: new Date().toISOString(),
           pending_approval: false
         })

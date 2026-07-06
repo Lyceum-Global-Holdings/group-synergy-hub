@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from '@/contexts/CompanyContext';
 import { toast } from 'sonner';
 
@@ -124,7 +125,7 @@ export function useAllocateSupplier() {
       credit_limit?: number;
       is_preferred?: boolean;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { data: result, error } = await supabase
         .from('company_suppliers')
@@ -165,7 +166,7 @@ export function useUpdateSupplierAllocation() {
       credit_limit?: number;
       is_preferred?: boolean;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const updateData: any = {
         status: data.status,
@@ -244,7 +245,7 @@ export function useBulkAllocateSupplier() {
         notes?: string;
       }>;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const allocationsToInsert = data.allocations.map(allocation => ({
         supplier_id: data.supplier_id,
@@ -306,7 +307,7 @@ export function useUpdateBulkAllocations() {
       }>;
       allocations_to_remove?: string[];
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
 
       // Delete removed allocations
       if (data.allocations_to_remove && data.allocations_to_remove.length > 0) {

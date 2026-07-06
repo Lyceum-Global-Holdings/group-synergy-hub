@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
+import { getCachedUser } from "@/lib/currentUser";
 interface InvokeOptions {
   body?: any;
   companyId?: string;
@@ -99,9 +100,7 @@ async function logError(
   status: "open" | "auto_resolved"
 ): Promise<void> {
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = getCachedUser();
 
     await supabase.from("system_error_logs").insert({
       company_id: options.companyId || null,

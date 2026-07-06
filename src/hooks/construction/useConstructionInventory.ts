@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAccessibleCompanyIds } from "./useAccessibleCompanyIds";
@@ -71,7 +72,7 @@ export function useCreateItemMaster() {
 
   return useMutation({
     mutationFn: async (data: CreateItemMasterData) => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() }; const authError = null;
 
       if (authError || !authData.user) {
         throw new Error("You must be logged in to create items. Please sign in and try again.");
@@ -129,7 +130,7 @@ export function useCreateItemMasterWithSerial() {
 
   return useMutation({
     mutationFn: async (data: CreateItemMasterWithSerialData) => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() }; const authError = null;
 
       if (authError || !authData.user) {
         throw new Error("You must be logged in to create items. Please sign in and try again.");
@@ -229,7 +230,7 @@ export function useCreateItemMasterWithStock() {
 
   return useMutation({
     mutationFn: async (data: CreateItemMasterWithStockData) => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() }; const authError = null;
 
       if (authError || !authData.user) {
         throw new Error("You must be logged in to create items. Please sign in and try again.");
@@ -390,7 +391,7 @@ export function useCreateSerialNumber() {
 
   return useMutation({
     mutationFn: async (data: CreateSerialNumberData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       const { data: result, error } = await supabase
         .from("construction_serial_numbers")
@@ -520,7 +521,7 @@ export function useAddStock() {
 
   return useMutation({
     mutationFn: async (data: AddStockData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       // Check if stock record exists for this item+location
       const { data: existing } = await supabase
@@ -920,7 +921,7 @@ export function useBulkCreateItemMaster() {
 
   return useMutation({
     mutationFn: async (data: BulkCreateItemMasterData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       const itemsWithMeta = data.items.map(item => ({
         ...item,
@@ -965,7 +966,7 @@ export function useBulkCreateItemMasterWithSerials() {
 
   return useMutation({
     mutationFn: async (data: BulkCreateItemMasterWithSerialsData) => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() }; const authError = null;
       
       // Validate authentication
       if (authError || !authData.user) {
@@ -1099,7 +1100,7 @@ export function useBulkCreateItemMasterWithStock() {
 
   return useMutation({
     mutationFn: async (data: BulkCreateItemMasterWithStockData) => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() }; const authError = null;
       
       // Validate authentication
       if (authError || !authData.user) {

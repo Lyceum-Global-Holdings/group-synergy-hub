@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { RentalOrder, CreateRentalOrderData } from "@/types/costumeRental";
 import { toast } from "sonner";
 
@@ -30,7 +31,7 @@ export function useRentalOrders(companyId?: string) {
 
   const createOrder = useMutation({
     mutationFn: async (input: CreateRentalOrderData) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data: number, error: numErr } = await (supabase as any).rpc("generate_rental_number");
       if (numErr) throw numErr;
 
@@ -45,7 +46,7 @@ export function useRentalOrders(companyId?: string) {
           tax_amount: input.tax_amount ?? 0,
           notes: input.notes ?? null,
           company_id: input.company_id,
-          created_by: user.data.user?.id,
+          created_by: user?.id,
         })
         .select()
         .single();

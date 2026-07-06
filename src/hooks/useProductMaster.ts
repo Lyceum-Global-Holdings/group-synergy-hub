@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 
 export interface ProductMaster {
@@ -106,7 +107,7 @@ export function useProductMaster(companyId?: string) {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: CreateProductMasterData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: result, error } = await supabase
         .from('product_master')

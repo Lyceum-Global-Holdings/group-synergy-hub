@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { RepairStatus } from "@/types/construction-inventory";
 
@@ -19,7 +20,7 @@ export function useUpdateRepairStatus() {
     mutationFn: async (data: UpdateRepairStatusData) => {
       console.log("Updating repair status:", data);
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       // 1. Update repair record status

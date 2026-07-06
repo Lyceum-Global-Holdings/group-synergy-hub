@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "@/hooks/use-toast";
 import { useCurrentUserRoles } from "./useCurrentUserRoles";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
@@ -66,7 +67,7 @@ export const useApprovePOAsMerchandiser = () => {
 
   return useMutation({
     mutationFn: async ({ poId, comments }: ApproveAsMerchandiserParams) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       const userId = user.id;
@@ -120,7 +121,7 @@ export const useSendDeptHeadApprovalEmail = () => {
 
   return useMutation({
     mutationFn: async ({ poId, poNumber, deptHeadEmail }: SendDeptHeadEmailParams) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       // Send email to department head
@@ -160,7 +161,7 @@ export const useApprovePOAsDeptHead = () => {
 
   return useMutation({
     mutationFn: async ({ poId, comments }: ApproveAsDeptHeadParams) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       const userId = user.id;
@@ -216,7 +217,7 @@ export const useRejectPO = () => {
 
   return useMutation({
     mutationFn: async ({ poId, reason, approvalLevel }: RejectPoParams) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       const userId = user.id;

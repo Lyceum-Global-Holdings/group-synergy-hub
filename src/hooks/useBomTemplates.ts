@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { BomTemplate } from '@/types/bom';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,7 +22,7 @@ export function useBomTemplates(companyId?: string) {
 
   const createTemplate = useMutation({
     mutationFn: async (templateData: Partial<BomTemplate>) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data, error } = await supabase
         .from('bom_templates')
         .insert({
@@ -31,7 +32,7 @@ export function useBomTemplates(companyId?: string) {
           is_public: templateData.is_public || false,
           company_id: templateData.company_id,
           template_data: templateData.template_data || {},
-          created_by: user.data.user?.id
+          created_by: user?.id
         } as any)
         .select()
         .single();

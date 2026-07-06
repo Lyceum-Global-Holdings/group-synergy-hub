@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser, getCachedUserId } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 import { PurchaseOrder, CreatePoData, PoSummary, CreateReceiptData } from '@/types/purchaseOrder';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -11,16 +12,7 @@ export function usePurchaseOrders() {
   return useQuery({
     queryKey: ['purchase-orders', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      console.log('Fetching purchase orders...');
-      
-      // Check authentication
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('Current user:', user?.id, user?.email);
-      
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw authError;
-      }
+      // Auth is enforced by RLS server-side; no client round-trip needed.
 
       let query = supabase
         .from('purchase_orders')
@@ -187,7 +179,7 @@ export function useCreatePurchaseOrder() {
           buyer_id: data.buyer_id,
           notes: data.notes,
           company_id: selectedCompany.id,
-          created_by: (await supabase.auth.getUser()).data.user?.id!,
+          created_by: getCachedUserId()!,
         })
         .select()
         .single();
@@ -346,7 +338,7 @@ export function useCreateGoodsReceipt() {
 
   return useMutation({
     mutationFn: async (data: CreateReceiptData) => {
-      const currentUser = await supabase.auth.getUser();
+      const currentUser = getCachedUser();
       
       // Create receipt
       const { data: receipt, error: receiptError } = await supabase
@@ -355,7 +347,7 @@ export function useCreateGoodsReceipt() {
           po_id: data.po_id,
           receipt_number: data.receipt_number,
           received_date: data.received_date,
-          received_by: currentUser.data.user?.id!,
+          received_by: currentUser?.id!,
           notes: data.notes,
         })
         .select()

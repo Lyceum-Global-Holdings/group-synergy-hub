@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+import { getCachedUser } from "@/lib/currentUser";
 export interface UserProfile {
   id: string;
   user_id: string;
@@ -14,7 +15,7 @@ export const useCurrentUserProfile = () => {
   return useQuery({
     queryKey: ["current-user-profile"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return null;
 
       const { data, error } = await supabase

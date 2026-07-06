@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 
 export interface FinishedGoodsBatch {
@@ -60,7 +61,7 @@ export function useFinishedGoodsBatches() {
   // Create finished goods batch
   const createBatchMutation = useMutation({
     mutationFn: async (data: CreateFinishedGoodsBatchData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: result, error } = await supabase
         .from('finished_goods_batches')
@@ -152,7 +153,7 @@ export function useFinishedGoodsBatches() {
   // Approve finished goods batch
   const approveBatchMutation = useMutation({
     mutationFn: async ({ id, comments }: { id: string; comments?: string }) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       // Update batch approval status
       const { data: batch, error: batchError } = await supabase
@@ -203,7 +204,7 @@ export function useFinishedGoodsBatches() {
   // Reject finished goods batch
   const rejectBatchMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       // Update batch approval status
       const { data: batch, error: batchError } = await supabase

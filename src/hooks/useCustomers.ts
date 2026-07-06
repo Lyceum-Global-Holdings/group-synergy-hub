@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { Customer, CreateCustomerData } from "@/types/customer";
 import { toast } from "sonner";
 
@@ -27,10 +28,10 @@ export function useCustomers(companyId?: string) {
 
   const createCustomer = useMutation({
     mutationFn: async (customerData: CreateCustomerData) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const insertData = {
         ...customerData,
-        created_by: user.data.user?.id
+        created_by: user?.id
       };
       
       const { data, error } = await supabase

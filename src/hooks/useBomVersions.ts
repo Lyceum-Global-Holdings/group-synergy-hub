@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { BomVersion } from '@/types/bom';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,7 +26,7 @@ export function useBomVersions(bomId?: string) {
 
   const createVersion = useMutation({
     mutationFn: async (versionData: Partial<BomVersion>) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data, error } = await supabase
         .from('bom_versions')
         .insert({
@@ -35,7 +36,7 @@ export function useBomVersions(bomId?: string) {
           changes_summary: versionData.changes_summary,
           previous_version_id: versionData.previous_version_id,
           version_data: versionData.version_data,
-          created_by: user.data.user?.id
+          created_by: user?.id
         } as any)
         .select()
         .single();

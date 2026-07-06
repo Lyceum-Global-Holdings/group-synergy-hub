@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { MaterialDemand, MaterialDemandItem, CreateMaterialDemandData, DemandCalculationInput, PODemandCalculationInput, CPODemandCalculationInput, DemandAnalysisResult, MRPReport } from '@/types/materialDemand';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
@@ -46,7 +47,7 @@ export const useMaterialDemand = (companyId?: string) => {
 
   const createDemandMutation = useMutation({
     mutationFn: async (demandData: CreateMaterialDemandData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       // Calculate net requirement
@@ -332,7 +333,7 @@ export const useDemandCalculation = (companyId?: string) => {
 
   const calculateBOMDemandMutation = useMutation({
     mutationFn: async (input: DemandCalculationInput): Promise<DemandAnalysisResult[]> => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       console.log('=== Multi-level BOM Demand Calculation Started ===');
@@ -570,7 +571,7 @@ export const useDemandCalculation = (companyId?: string) => {
       console.log('=== Enhanced PO Demand Calculation Started ===');
       console.log('Input:', input);
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       // Validate input
@@ -883,7 +884,7 @@ export const useDemandCalculation = (companyId?: string) => {
       console.log('=== CPO Demand Calculation Started ===');
       console.log('Input:', input);
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       // Validate input

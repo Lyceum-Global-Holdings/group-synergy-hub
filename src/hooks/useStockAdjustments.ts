@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 
 export interface AdjustmentBatch {
@@ -101,7 +102,7 @@ export const useStockAdjustments = (filters?: AdjustmentFilters) => {
   // Create batch
   const createBatchMutation = useMutation({
     mutationFn: async (batchData: CreateBatchData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
@@ -166,7 +167,7 @@ export const useStockAdjustments = (filters?: AdjustmentFilters) => {
   // Approve batch
   const approveBatchMutation = useMutation({
     mutationFn: async (batchId: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import type {
   CycleCount,
@@ -111,7 +112,7 @@ export const useCreateCycleCount = () => {
 
   return useMutation({
     mutationFn: async (data: CreateCycleCountData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       const { data: cycleCount, error } = await supabase
@@ -179,7 +180,7 @@ export const useUpdateCycleCountItem = () => {
       countId: string;
       data: UpdateCycleCountItemData 
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       const { error } = await supabase
@@ -274,7 +275,7 @@ export const usePostCycleCountAdjustments = () => {
 
   return useMutation({
     mutationFn: async ({ countId, itemIds }: { countId: string; itemIds: string[] }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       // Get items with variance

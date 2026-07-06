@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
@@ -67,9 +68,7 @@ export const useIsAdmin = () => {
   return useQuery({
     queryKey: ["admin-status"],
     queryFn: async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return false;
 
       const { data, error } = await supabase.rpc("is_admin", { _user_id: user.id });

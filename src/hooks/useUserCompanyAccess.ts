@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+import { getCachedUser } from "@/lib/currentUser";
 export interface UserCompanyAccess {
   id: string;
   user_id: string;
@@ -55,7 +56,7 @@ export const useAssignCompaniesToUser = () => {
       if (companyIds.length === 0) return [];
 
       // Insert new company access entries
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       const entries = companyIds.map((companyId) => ({
         user_id: userId,
         company_id: companyId,
@@ -92,7 +93,7 @@ export const useAddCompanyAccess = () => {
       companyId: string;
       accessType?: string;
     }) => {
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       
       const { data, error } = await supabase
         .from("user_company_access")

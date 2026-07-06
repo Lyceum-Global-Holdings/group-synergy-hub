@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { LabourMaster, CreateLabourMasterData, UpdateLabourMasterData } from "@/types/construction";
@@ -89,7 +90,7 @@ export function useCreateLabourMaster() {
 
   return useMutation({
     mutationFn: async (data: CreateLabourMasterData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: result, error } = await supabase
         .from("construction_labour_master")
@@ -122,7 +123,7 @@ export function useBulkCreateLabourMaster() {
 
   return useMutation({
     mutationFn: async (items: Omit<CreateLabourMasterData, 'company_id' | 'created_by'>[]) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const recordsToInsert = items.map((item) => ({
         ...item,

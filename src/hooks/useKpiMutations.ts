@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { KpiDefinition } from "@/types/kpi";
 import { toast } from "sonner";
 
@@ -8,7 +9,7 @@ export function useKpiMutations() {
 
   const createKpi = useMutation({
     mutationFn: async (kpi: Partial<KpiDefinition>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase

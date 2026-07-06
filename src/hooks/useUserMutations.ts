@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from 'sonner';
 
 export const useDeleteUser = () => {
@@ -8,7 +9,7 @@ export const useDeleteUser = () => {
   return useMutation({
     mutationFn: async (userId: string) => {
       // Verify super admin status first
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
       
       const { data: isSuperAdmin, error: checkError } = await supabase

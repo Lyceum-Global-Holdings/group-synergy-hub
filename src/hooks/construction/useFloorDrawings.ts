@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { FloorDrawing, CreateFloorDrawingData } from "@/types/construction";
@@ -30,7 +31,7 @@ export function useCreateFloorDrawing() {
 
   return useMutation({
     mutationFn: async (data: CreateFloorDrawingData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       // Get company_id from the project if selectedCompany is not set
       let companyId = selectedCompany?.id;
@@ -105,7 +106,7 @@ export function useDeleteFloorDrawing() {
 }
 
 export async function uploadFloorDrawingImage(file: File, projectId: string): Promise<string> {
-  const { data: user } = await supabase.auth.getUser();
+  const user = { user: getCachedUser() };
   const fileExt = file.name.split(".").pop();
   const fileName = `${user.user?.id}/${projectId}/${Date.now()}.${fileExt}`;
 

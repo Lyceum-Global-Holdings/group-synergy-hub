@@ -46,6 +46,7 @@ import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { WarehouseItem } from "@/types/itemBin";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { StockTransferRequest } from "@/types/stockTransfer";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 
@@ -233,7 +234,7 @@ export function ItemTransferDialog({
     
     setIsCompleting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       // Call the FIFO transfer RPC

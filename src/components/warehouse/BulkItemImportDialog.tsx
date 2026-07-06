@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useQueryClient } from '@tanstack/react-query';
 import { parseCSV, downloadCSV, allocateAutoCodes } from '@/lib/bulkImport';
 
@@ -396,7 +397,7 @@ export function BulkItemImportDialog() {
       const createdItems = await bulkCreateItemsAsync(validData);
       
       // Step 2: Create bin allocations for items with initial stock
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const binAllocations: Array<{
         warehouse_item_id: string;

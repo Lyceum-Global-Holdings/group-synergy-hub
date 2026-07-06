@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import type { ChartOfAccount, CreateAccountData } from "@/types/generalLedger";
@@ -30,7 +31,7 @@ export const useChartOfAccounts = () => {
         throw new Error("Please select a company before creating an account");
       }
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("chart_of_accounts")

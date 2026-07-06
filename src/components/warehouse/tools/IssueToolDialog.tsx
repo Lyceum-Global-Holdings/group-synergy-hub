@@ -38,6 +38,7 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToolAllocationsForTool } from "@/hooks/useToolBinAllocations";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -116,7 +117,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
         }
       } else {
         // Legacy path: no bin allocations exist for this tool
-        const { data: userData } = await supabase.auth.getUser();
+        const userData = { user: getCachedUser() };
         if (!userData.user) throw new Error("Not authenticated");
         const issueNumber = `TI-${Date.now().toString(36).toUpperCase()}`;
         const { error: insertErr } = await supabase.from("tool_issues").insert({

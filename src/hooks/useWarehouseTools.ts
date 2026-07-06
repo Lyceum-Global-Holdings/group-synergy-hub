@@ -2,6 +2,7 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import type { WarehouseTool, CreateWarehouseToolData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -75,7 +76,7 @@ export function useWarehouseTools() {
 
   const createToolMutation = useMutation({
     mutationFn: async (toolData: CreateWarehouseToolData) => {
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       if (!userData.user) throw new Error("Not authenticated");
 
       // Generate tool code if not provided
@@ -112,7 +113,7 @@ export function useWarehouseTools() {
 
   const createBulkToolsMutation = useMutation({
     mutationFn: async (toolsData: CreateWarehouseToolData[]) => {
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       if (!userData.user) throw new Error("Not authenticated");
 
       const toolsWithDefaults = toolsData.map((tool, index) => ({

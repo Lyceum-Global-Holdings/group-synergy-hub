@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "@/hooks/use-toast";
 
 export type MaterialAttachmentParentType =
@@ -104,7 +105,7 @@ export async function commitBufferedAttachments(
   buffered: BufferedAttachment[],
 ): Promise<void> {
   if (!buffered.length) return;
-  const { data: authData } = await supabase.auth.getUser();
+  const authData = { user: getCachedUser() };
   const uploadedBy = authData.user?.id ?? null;
   const rows = buffered.map((b) => ({
     parent_type: parentType,
@@ -159,7 +160,7 @@ export function useMaterialAttachments(
       const err = validateAttachmentFile(file);
       if (err) throw new Error(err);
       const buffered = await uploadAttachmentFile(companyId, parentId, file);
-      const { data: authData } = await supabase.auth.getUser();
+      const authData = { user: getCachedUser() };
       const { error } = await supabase
         .from("material_document_attachments")
         .insert({

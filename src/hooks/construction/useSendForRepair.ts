@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { useRef } from "react";
@@ -30,7 +31,7 @@ export function useSendForRepair() {
       isSubmitting = true;
 
       try {
-        const { data: user } = await supabase.auth.getUser();
+        const user = { user: getCachedUser() };
 
         // First, check if any of the serial numbers already have active repair records
         const { data: existingRepairs, error: checkError } = await supabase

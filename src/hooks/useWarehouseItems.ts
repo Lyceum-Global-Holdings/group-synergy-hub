@@ -1,13 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { WarehouseItem, CreateWarehouseItemData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
-export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disableFetch?: boolean }) => {
+export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disableFetch?: boolean; includeBins?: boolean }) => {
   const skipCompanyFilter = options?.skipCompanyFilter ?? false;
   const disableFetch = options?.disableFetch ?? false;
+  // Per-item bin allocations require fetching + JS-joining the entire
+  // warehouse_bin_allocations table. Off by default: only the inventory master
+  // (which reads item.bins) opts in; every other consumer just needs the items.
+  const includeBins = options?.includeBins ?? false;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
@@ -18,7 +23,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-items', skipCompanyFilter ? 'all' : selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
+    queryKey: ['warehouse-items', skipCompanyFilter ? 'all' : selectedCompany?.id, isViewingAllCompanies, includeBins, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
       // Cursor-based batching to bypass the 1,000-row Supabase limit
       const BATCH_SIZE = 1000;
@@ -67,7 +72,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
       const itemIds = data?.map((item: any) => item.id) || [];
       let itemsWithBins = data || [];
 
-      if (itemIds.length > 0) {
+      if (includeBins && itemIds.length > 0) {
         // Fetch all bins with location_id for permission filtering
         let binsQuery = supabase
           .from('warehouse_bins')
@@ -162,7 +167,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
   const createItemMutation = useMutation({
     mutationFn: async (itemData: CreateWarehouseItemData & { initialStock?: number; initialUnitCost?: number }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       if (!selectedCompany?.id) {
@@ -414,7 +419,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
   const bulkCreateItemsMutation = useMutation({
     mutationFn: async (itemsData: CreateWarehouseItemData[]) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       if (!selectedCompany?.id) {

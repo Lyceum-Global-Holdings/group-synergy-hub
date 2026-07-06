@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DataTable, DataTableColumn } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -83,7 +84,7 @@ export default function AccessManagement() {
 
   const grantMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { error } = await supabase.from("social_media_access").insert({
         company_id: selectedCompany!.id,
         account_id: form.account_id,
@@ -113,7 +114,7 @@ export default function AccessManagement() {
 
   const updateAccessMutation = useMutation({
     mutationFn: async ({ accessId, oldLevel, newLevel }: { accessId: string; oldLevel: string; newLevel: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { error } = await supabase.from("social_media_access").update({
         access_level: newLevel,
       }).eq("id", accessId);
@@ -136,7 +137,7 @@ export default function AccessManagement() {
 
   const revokeMutation = useMutation({
     mutationFn: async (accessId: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { error } = await supabase.from("social_media_access").update({
         is_active: false,
         access_revoked_at: new Date().toISOString(),

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserId } from "@/lib/currentUser";
 import {
   DEFAULT_SUPPLIER_FORM_SCHEMA,
   SupplierFormSchema,
@@ -39,7 +40,7 @@ export function useSaveSupplierPortalSettings() {
             company_id: input.company_id,
             public_base_url: input.public_base_url || null,
             is_active: true,
-            updated_by: (await supabase.auth.getUser()).data.user?.id,
+            updated_by: getCachedUserId(),
           },
           { onConflict: "company_id" },
         );
@@ -85,7 +86,7 @@ export function useSaveSupplierFormConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { company_id: string; schema: SupplierFormSchema; publish: boolean }) => {
-      const userId = (await supabase.auth.getUser()).data.user?.id;
+      const userId = getCachedUserId();
       // Find current max version
       const { data: existing } = await supabase
         .from("supplier_registration_form_config")

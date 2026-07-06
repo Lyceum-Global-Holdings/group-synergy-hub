@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { UnifiedApproval, ApprovalFilters, ApprovalPriority } from "@/types/approval";
 import { differenceInDays } from "date-fns";
 
@@ -11,7 +12,7 @@ export const useApprovalConsole = (filters?: ApprovalFilters) => {
   return useQuery({
     queryKey: ['approval-console', filters],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('No user found');
 
       // Call the secure database function to get all approvals.

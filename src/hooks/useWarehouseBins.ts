@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { WarehouseBin, CreateWarehouseBinData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
@@ -63,7 +64,7 @@ export const useWarehouseBins = (options: UseWarehouseBinsOptions = {}) => {
 
   const createBinMutation = useMutation({
     mutationFn: async (binData: CreateWarehouseBinData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { location_ids, location_id, is_global_template, ...rest } = binData;

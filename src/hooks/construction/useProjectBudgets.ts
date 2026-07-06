@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { ProjectBudgetItem, CreateProjectBudgetItemData, UpdateProjectBudgetItemData, BudgetTransaction } from "@/types/construction";
@@ -48,7 +49,7 @@ export function useCreateProjectBudgetItem() {
 
   return useMutation({
     mutationFn: async (data: CreateProjectBudgetItemData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: result, error } = await supabase
         .from("project_budget_items")
@@ -129,7 +130,7 @@ export function useCreateBudgetTransaction() {
 
   return useMutation({
     mutationFn: async (data: Omit<BudgetTransaction, "id" | "created_at">) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       const { data: result, error } = await supabase
         .from("budget_transactions")

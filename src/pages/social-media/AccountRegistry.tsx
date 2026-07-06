@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DataTable, DataTableColumn } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -123,7 +124,7 @@ export default function AccountRegistry() {
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = getCachedUser();
         const { error } = await supabase
           .from("social_media_accounts")
           .insert({ ...payload, added_by: user?.id });

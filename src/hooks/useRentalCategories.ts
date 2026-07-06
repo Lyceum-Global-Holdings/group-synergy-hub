@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { RentalCategory, CreateRentalCategoryData } from "@/types/costumeRental";
 import { toast } from "sonner";
 
@@ -22,10 +23,10 @@ export function useRentalCategories(companyId?: string) {
 
   const createCategory = useMutation({
     mutationFn: async (input: CreateRentalCategoryData) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       const { data, error } = await (supabase as any)
         .from("rental_categories")
-        .insert({ ...input, created_by: user.data.user?.id })
+        .insert({ ...input, created_by: user?.id })
         .select()
         .single();
       if (error) throw error;

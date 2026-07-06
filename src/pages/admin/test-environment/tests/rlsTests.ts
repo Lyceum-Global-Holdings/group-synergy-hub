@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { TestCase } from "./types";
 
 export const rlsTests: TestCase[] = [
@@ -24,7 +25,7 @@ export const rlsTests: TestCase[] = [
     id: "RLS-003", name: "can_access_company RPC", category: "RLS & Security", priority: "critical",
     description: "Verify can_access_company function works", status: "idle",
     run: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return { passed: false, error: "Not authenticated" };
       const { data: profile } = await supabase.from("profiles").select("company_id").eq("id", user.id).maybeSingle();
       if (!profile?.company_id) return { passed: false, error: "No company_id on profile" };
@@ -37,7 +38,7 @@ export const rlsTests: TestCase[] = [
     id: "RLS-004", name: "has_role RPC", category: "RLS & Security", priority: "critical",
     description: "Verify has_role function works", status: "idle",
     run: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return { passed: false, error: "Not authenticated" };
       const { data, error } = await supabase.rpc("has_role", { _user_id: user.id, _app_role: "super_admin" });
       if (error) return { passed: false, error: error.message };

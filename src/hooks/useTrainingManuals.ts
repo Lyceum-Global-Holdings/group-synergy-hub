@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 
 export interface TrainingManual {
@@ -54,7 +55,7 @@ export const useCreateManual = () => {
 
   return useMutation({
     mutationFn: async (manual: Omit<TrainingManual, "id" | "created_at" | "updated_at" | "created_by" | "updated_by">) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase
@@ -93,7 +94,7 @@ export const useUpdateManual = () => {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TrainingManual> }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase

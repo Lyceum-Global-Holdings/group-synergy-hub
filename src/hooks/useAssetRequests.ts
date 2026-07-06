@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser, getCachedUserId } from "@/lib/currentUser";
 import { toast } from "sonner";
 import { AssetRequest, AssetRequestItem, AssetRequestWithItems } from "@/types/assetRequest";
 
@@ -29,7 +30,7 @@ export const useAssetRequests = () => {
       request: Partial<AssetRequest>;
       items: Partial<AssetRequestItem>[];
     }) => {
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       const userId = userData.user?.id;
       if (!userId) throw new Error("You must be signed in to create a request");
 
@@ -143,7 +144,7 @@ export const useAssetRequests = () => {
       await supabase.from("asset_request_workflow_history").insert({
         request_id: id,
         workflow_stage: "submitted",
-        performed_by: (await supabase.auth.getUser()).data.user?.id,
+        performed_by: getCachedUserId(),
       });
     },
     onSuccess: () => {
@@ -162,7 +163,7 @@ export const useAssetRequests = () => {
       comments?: string;
       itemApprovals: { item_id: string; quantity_approved: number }[];
     }) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       // Update request
       const { error: requestError } = await supabase
@@ -210,7 +211,7 @@ export const useAssetRequests = () => {
   // HOD Reject
   const hodRejectMutation = useMutation({
     mutationFn: async (values: { id: string; reason: string }) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       const { error } = await supabase
         .from("asset_requests")
@@ -249,7 +250,7 @@ export const useAssetRequests = () => {
       purchase_notes?: string;
       itemPurchases: { item_id: string; quantity: number; unit_price?: number }[];
     }) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       // Get request details
       const { data: request, error: requestFetchError } = await supabase
@@ -384,7 +385,7 @@ export const useAssetRequests = () => {
   // Add to Asset List
   const addToAssetListMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       // Get request details
       const { data: request, error: requestFetchError } = await supabase
@@ -478,7 +479,7 @@ export const useAssetRequests = () => {
   // Mark as Delivered
   const markAsDeliveredMutation = useMutation({
     mutationFn: async (values: { id: string; notes?: string }) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       const { error } = await supabase
         .from("asset_requests")
@@ -507,7 +508,7 @@ export const useAssetRequests = () => {
   // Confirm Receipt (with auto-transfer to department)
   const confirmReceiptMutation = useMutation({
     mutationFn: async (values: { id: string; notes?: string }) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       // Get request details
       const { data: request, error: requestError } = await supabase
@@ -581,7 +582,7 @@ export const useAssetRequests = () => {
   // Accept Request
   const acceptRequestMutation = useMutation({
     mutationFn: async (id: string) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       const { error } = await supabase
         .from("asset_requests")
@@ -618,7 +619,7 @@ export const useAssetRequests = () => {
       items: { item_id: string; quantity: number; reason: string }[];
       notes?: string;
     }) => {
-      const user = (await supabase.auth.getUser()).data.user;
+      const user = getCachedUser();
 
       const { error } = await supabase.from("asset_request_returns").insert({
         request_id: values.request_id,
@@ -627,7 +628,7 @@ export const useAssetRequests = () => {
         return_reason: values.items[0]?.reason || "Return requested",
         return_notes: values.notes,
         returned_by: user?.id,
-        company_id: (await supabase.auth.getUser()).data.user?.user_metadata?.company_id,
+        company_id: getCachedUser()?.user_metadata?.company_id,
       });
 
       if (error) throw error;

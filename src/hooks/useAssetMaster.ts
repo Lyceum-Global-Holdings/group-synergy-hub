@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { AssetMaster, CreateAssetMasterData } from '@/types/assetMaster';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,7 +27,7 @@ export const useAssetMaster = () => {
 
   const createAssetMasterMutation = useMutation({
     mutationFn: async (assetData: CreateAssetMasterData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase

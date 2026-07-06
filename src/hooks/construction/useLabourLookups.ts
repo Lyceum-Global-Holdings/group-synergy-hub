@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { LabourCategory, LabourCompany } from "@/types/construction";
@@ -46,7 +47,7 @@ export function useCreateLabourCategory() {
 
   return useMutation({
     mutationFn: async (name: string) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       // Check for duplicate (case-insensitive)
       const { data: existing } = await supabase
@@ -124,7 +125,7 @@ export function useCreateLabourCompany() {
 
   return useMutation({
     mutationFn: async (name: string) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       // Check for duplicate (case-insensitive)
       const { data: existing } = await supabase

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import type { RfqRfpRequest, CreateRfqRfpData, SupplierQuote, CreateQuoteData } from "@/types/rfqRfp";
 
@@ -77,7 +78,7 @@ export function useCreateRfqRfpRequest() {
       const { items, invited_supplier_ids, ...requestData } = data;
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       // Create the request
@@ -243,7 +244,7 @@ export function useCreateSupplierQuote() {
       const { items, ...quoteData } = data;
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
       // Create the quote

@@ -14,6 +14,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from 'sonner';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 
@@ -447,7 +448,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
     const failMessages: string[] = [];
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
 
       // Process rows in parallel batches of 10 for speed
       const BATCH_SIZE = 10;

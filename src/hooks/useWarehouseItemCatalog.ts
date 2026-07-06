@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { CatalogItem, CreateCatalogItemData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 
@@ -61,7 +62,7 @@ export function useWarehouseItemCatalog(options?: { disableFetch?: boolean }) {
         _autoCodeCategory?: string | null;
       },
     ) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { _autoCodeCategory, ...payload } = itemData;
@@ -186,7 +187,7 @@ export function useWarehouseItemCatalog(options?: { disableFetch?: boolean }) {
 
   const bulkCreateMutation = useMutation({
     mutationFn: async (itemsData: CreateCatalogItemData[]) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const withUser = itemsData.map(item => ({ ...item, created_by: user.id }));

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 
 interface AssetTransferData {
@@ -20,7 +21,7 @@ export const useAssetTransferMutation = () => {
 
   return useMutation({
     mutationFn: async (transferData: AssetTransferData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
       // First, record the transfer in asset_transfers table

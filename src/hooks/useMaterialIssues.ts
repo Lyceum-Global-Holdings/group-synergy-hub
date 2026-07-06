@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { MaterialIssueNote, CreateMaterialIssueData } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -38,7 +39,7 @@ export const useMaterialIssues = () => {
 
   const createMaterialIssueMutation = useMutation({
     mutationFn: async (issueData: CreateMaterialIssueData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       // Generate MIN number

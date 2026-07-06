@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { WarehouseTool, ToolAdjustment } from "@/types/toolManagement";
@@ -21,7 +22,7 @@ export function useToolAdjustments() {
 
   const createAdjustmentMutation = useMutation({
     mutationFn: async (data: CreateToolAdjustmentData) => {
-      const { data: userData } = await supabase.auth.getUser();
+      const userData = { user: getCachedUser() };
       if (!userData.user) throw new Error("Not authenticated");
 
       const { tool, adjustmentType, quantity, reason, notes } = data;

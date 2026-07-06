@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { Company, CreateCompanyData, UpdateCompanyData } from '@/types/company';
 import { useToast } from '@/hooks/use-toast';
 import { useSuperAdmin, useIsAdmin } from '@/hooks/useSuperAdmin';
@@ -26,7 +27,7 @@ export function useCompanies() {
     staleTime: 0, // Always consider data stale to ensure fresh fetch
     refetchOnMount: 'always', // Force refetch when component mounts
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) return [];
 
       console.log('[useCompanies] Fetching - isSuperAdmin:', isSuperAdmin, 'isAdmin:', isAdmin, 'company_id:', userProfile?.company_id);
@@ -131,7 +132,7 @@ export function useCompanies() {
 
   const createCompanyMutation = useMutation({
     mutationFn: async (companyData: CreateCompanyData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { data, error } = await supabase
         .from('companies')

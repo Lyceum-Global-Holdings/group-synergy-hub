@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { flattenWarehouseItem } from '@/lib/flattenWarehouseItem';
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "@/hooks/use-toast";
 import {
   SupplierEvaluation,
@@ -75,7 +76,7 @@ export const useCreateSupplierEvaluation = () => {
 
   return useMutation({
     mutationFn: async (data: CreateSupplierEvaluationData): Promise<SupplierEvaluation> => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       if (!user?.user?.id) throw new Error("User not authenticated");
 
       const evaluationData = {

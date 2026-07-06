@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import type { BlacklistReview, CreateBlacklistReviewData } from "@/types/supplierRisk";
 
@@ -31,7 +32,7 @@ export const useBlacklistReviews = (blacklistId?: string) => {
   // Create review
   const createReview = useMutation({
     mutationFn: async (reviewData: CreateBlacklistReviewData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase

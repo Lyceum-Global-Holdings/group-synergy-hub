@@ -28,6 +28,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { MaterialIssueItem } from '@/types/materialIssueReturn';
 import { useMaterialReturns } from '@/hooks/useMaterialReturns';
 import { useQueryClient } from '@tanstack/react-query';
@@ -112,7 +113,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
   const handleReceive = async () => {
     setReceiving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
 
       // Get user profile for name

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { ItemCategory, CreateItemCategoryData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 import { useMemo } from 'react';
@@ -65,7 +66,7 @@ export const useItemCategories = (companyId?: string) => {
 
   const createCategoryMutation = useMutation({
     mutationFn: async (categoryData: CreateItemCategoryData & { company_id?: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
@@ -99,7 +100,7 @@ export const useItemCategories = (companyId?: string) => {
 
   const bulkImportCategoriesMutation = useMutation({
     mutationFn: async (categoriesData: Array<CreateItemCategoryData & { level: number; parentName?: string; company_id?: string }>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const categoriesByLevel = categoriesData.reduce((acc, category) => {
@@ -328,7 +329,7 @@ export const useItemCategories = (companyId?: string) => {
   const excludeCategoryMutation = useMutation({
     mutationFn: async (categoryId: string) => {
       if (!companyId) throw new Error('No company selected');
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { error } = await supabase
         .from('company_excluded_categories')
@@ -389,7 +390,7 @@ export const useItemCategories = (companyId?: string) => {
   const bulkUpdateVisibilityMutation = useMutation({
     mutationFn: async ({ toExclude, toRestore }: { toExclude: string[], toRestore: string[] }) => {
       if (!companyId) throw new Error('No company selected');
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
 
       // Restore categories (delete exclusions)
       if (toRestore.length > 0) {

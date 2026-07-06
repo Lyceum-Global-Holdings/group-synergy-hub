@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 
 export interface FinishedGood {
@@ -109,7 +110,7 @@ export function useFinishedGoods(companyId?: string) {
   // Create finished good
   const createProductMutation = useMutation({
     mutationFn: async (data: CreateFinishedGoodData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
       
       // Check for duplicate product code if company_id is provided
       if (data.company_id && data.product_code) {

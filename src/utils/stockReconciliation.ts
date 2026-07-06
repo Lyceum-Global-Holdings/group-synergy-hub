@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
+import { getCachedUser } from "@/lib/currentUser";
 export interface ReconcileItemInput {
   id: string;
   item_code: string;
@@ -64,7 +65,7 @@ export async function reconcileItem(
       return { itemId: item.id, itemCode: item.item_code, action: 'failed', message: allocError.message };
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = getCachedUser();
 
     // 3. No allocations → create one
     if (!allocations || allocations.length === 0) {
@@ -156,7 +157,7 @@ export async function reconcileItems(
   overrides?: Map<string, ReconcileOverride>,
   locationId?: string | null,
 ): Promise<{ results: ReconcileResult[]; fixed: number; created: number; blocked: number; failed: number }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = getCachedUser();
 
   // Build overrides JSONB: { "item-uuid": { "locationId": "...", "binId": "..." } }
   const overridesObj: Record<string, { locationId: string; binId: string }> = {};

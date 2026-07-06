@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "sonner";
 
 export function useCpoWorkflow(cpoId?: string) {
@@ -27,7 +28,7 @@ export function useCpoWorkflow(cpoId?: string) {
 
   const createMaterialDemandFromCPO = useMutation({
     mutationFn: async ({ cpoId, analysisDate }: { cpoId: string; analysisDate: string }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       // Create material demand calculation entry
       const { data, error } = await supabase
@@ -38,7 +39,7 @@ export function useCpoWorkflow(cpoId?: string) {
           demand_source: 'customer_po',
           reference_id: cpoId,
           demand_date: analysisDate,
-          created_by: user.data.user?.id
+          created_by: user?.id
         })
         .select()
         .single();
@@ -52,7 +53,7 @@ export function useCpoWorkflow(cpoId?: string) {
           cpo_id: cpoId,
           material_demand_id: data.id,
           workflow_stage: 'material_demand_planned',
-          stage_completed_by: user.data.user?.id,
+          stage_completed_by: user?.id,
           notes: 'Material demand planning completed'
         });
       
@@ -93,7 +94,7 @@ export function useCpoWorkflow(cpoId?: string) {
         estimated_total_price: number;
       }>;
     }) => {
-      const user = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       // Generate PR number (using same function as regular PRs)
       const { data: prData, error: prError } = await supabase.rpc('generate_pr_number');
@@ -110,8 +111,8 @@ export function useCpoWorkflow(cpoId?: string) {
           requested_date: new Date().toISOString().split('T')[0],
           required_date: requiredDate,
           justification: justification || `Material requirements for Customer PO`,
-          requested_by: user.data.user?.id,
-          created_by: user.data.user?.id
+          requested_by: user?.id,
+          created_by: user?.id
         })
         .select()
         .single();
@@ -144,7 +145,7 @@ export function useCpoWorkflow(cpoId?: string) {
           cpo_id: cpoId,
           pr_id: pr.id,
           workflow_stage: 'pr_created',
-          stage_completed_by: user.data.user?.id,
+          stage_completed_by: user?.id,
           notes: `Purchase Requisition ${prData} created`
         });
       

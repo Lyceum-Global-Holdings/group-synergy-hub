@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 import { 
   SalesOrder, 
@@ -152,7 +153,7 @@ export const usePickPack = () => {
   // Create Sales Order from CPO
   const createSalesOrderMutation = useMutation({
     mutationFn: async (data: CreateSalesOrderData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data: salesOrder, error } = await supabase
@@ -188,7 +189,7 @@ export const usePickPack = () => {
   // Create Pick List
   const createPickListMutation = useMutation({
     mutationFn: async (data: CreatePickListData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { data: pickList, error } = await supabase
@@ -224,7 +225,7 @@ export const usePickPack = () => {
   // Create Pick List With Items (auto-generates items from sales order)
   const createPickListWithItemsMutation = useMutation({
     mutationFn: async (pickListData: CreatePickListData & { sales_order_id: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const { sales_order_id, ...basePickListData } = pickListData;
@@ -428,7 +429,7 @@ export const usePickPack = () => {
       status: string; 
       notes?: string 
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       const updateData: any = {
@@ -581,7 +582,7 @@ export const usePickPack = () => {
       orderData: any; 
       items: any[]
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
 
       // Create sales order
@@ -646,7 +647,7 @@ export const usePickPack = () => {
       items: any[];
       postImmediately?: boolean;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
 
       // Always create as draft first to ensure trigger fires on UPDATE
@@ -721,7 +722,7 @@ export const usePickPack = () => {
   // Update Issue Status
   const updateIssueStatusMutation = useMutation({
     mutationFn: async ({ issueId, status }: { issueId: string; status: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
 
       const { error } = await supabase
@@ -756,7 +757,7 @@ export const usePickPack = () => {
   // Accept Issue Mutation
   const acceptIssueMutation = useMutation({
     mutationFn: async ({ issueId }: { issueId: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase

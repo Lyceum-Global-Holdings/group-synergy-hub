@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 import { 
   DeliveryOrder, 
@@ -99,7 +100,7 @@ export const useDeliveryOrders = () => {
       deliveryOrderData: CreateDeliveryOrderData; 
       items: CreateDeliveryOrderItemData[] 
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) throw new Error('User not authenticated');
 
       // 1. Create delivery order
@@ -173,7 +174,7 @@ export const useDeliveryOrders = () => {
       };
 
       if (status === 'approved') {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = getCachedUser();
         updateData.approved_by = user?.id;
         updateData.approved_date = new Date().toISOString();
         if (notes) updateData.approval_notes = notes;

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 import { ProductMaster } from './useProductMaster';
 import { CreateFinishedGoodData } from './useFinishedGoods';
@@ -83,7 +84,7 @@ export function useBulkGenerateVariants() {
       const existingCodes = new Set(existingProducts?.map(p => p.product_code) || []);
 
       // Get current user
-      const { data: user } = await supabase.auth.getUser();
+      const user = { user: getCachedUser() };
 
       // Process in chunks of 50
       const chunkSize = 50;

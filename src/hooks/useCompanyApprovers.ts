@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
 import type { CompanyApprover } from "@/types/company";
 
@@ -44,7 +45,7 @@ export const useAddCompanyApprover = () => {
   
   return useMutation({
     mutationFn: async (approverData: CompanyApproverFormData) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       
       const { data, error } = await supabase
         .from('company_approvers')

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+import { getCachedUser } from "@/lib/currentUser";
 interface UserRole {
   id: string;
   role: string;
@@ -50,7 +51,7 @@ export const useCurrentUserRoles = () => {
   return useQuery({
     queryKey: ["current-user-roles"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       if (!user) {
         console.log('[useCurrentUserRoles] No user found');
         return [];

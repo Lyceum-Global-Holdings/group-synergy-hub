@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUser } from "@/lib/currentUser";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DataTable, DataTableColumn } from "@/components/shared/DataTable";
 import { Button } from "@/components/ui/button";
@@ -92,7 +93,7 @@ export default function NDACompliance() {
   const signMutation = useMutation({
     mutationFn: async () => {
       if (!selectedAccess) return;
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = getCachedUser();
       const existingNda = ndaMap.get(selectedAccess.id as string);
       const payload = {
         company_id: selectedCompany!.id,
