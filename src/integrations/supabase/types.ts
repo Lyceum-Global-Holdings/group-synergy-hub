@@ -14619,6 +14619,7 @@ export type Database = {
           daily_rate: number
           id: string
           line_total: number
+          preferred_unit_id: string | null
           quantity: number
           rental_days: number
           rental_order_id: string
@@ -14633,6 +14634,7 @@ export type Database = {
           daily_rate?: number
           id?: string
           line_total?: number
+          preferred_unit_id?: string | null
           quantity?: number
           rental_days?: number
           rental_order_id: string
@@ -14647,6 +14649,7 @@ export type Database = {
           daily_rate?: number
           id?: string
           line_total?: number
+          preferred_unit_id?: string | null
           quantity?: number
           rental_days?: number
           rental_order_id?: string
@@ -14667,6 +14670,13 @@ export type Database = {
             columns: ["costume_id"]
             isOneToOne: false
             referencedRelation: "rental_costumes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_order_items_preferred_unit_id_fkey"
+            columns: ["preferred_unit_id"]
+            isOneToOne: false
+            referencedRelation: "rental_costume_units"
             referencedColumns: ["id"]
           },
           {
@@ -19264,6 +19274,78 @@ export type Database = {
           },
         ]
       }
+      tool_calibrations: {
+        Row: {
+          calibration_date: string
+          certificate_number: string | null
+          certificate_url: string | null
+          company_id: string | null
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          interval_months: number | null
+          next_due_date: string | null
+          notes: string | null
+          performed_by: string | null
+          provider: string | null
+          result: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          calibration_date?: string
+          certificate_number?: string | null
+          certificate_url?: string | null
+          company_id?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interval_months?: number | null
+          next_due_date?: string | null
+          notes?: string | null
+          performed_by?: string | null
+          provider?: string | null
+          result?: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          calibration_date?: string
+          certificate_number?: string | null
+          certificate_url?: string | null
+          company_id?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interval_months?: number | null
+          next_due_date?: string | null
+          notes?: string | null
+          performed_by?: string | null
+          provider?: string | null
+          result?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_calibrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_calibrations_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "tool_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_issues: {
         Row: {
           approved_by: string | null
@@ -19279,6 +19361,7 @@ export type Database = {
           issue_number: string
           issued_to: string | null
           issued_to_name: string
+          job_reference: string | null
           notes: string | null
           purpose: string | null
           quantity_issued: number
@@ -19287,6 +19370,7 @@ export type Database = {
           tool_code_snapshot: string | null
           tool_id: string | null
           tool_name_snapshot: string | null
+          unit_id: string | null
           updated_at: string | null
           warehouse_item_id: string | null
         }
@@ -19304,6 +19388,7 @@ export type Database = {
           issue_number: string
           issued_to?: string | null
           issued_to_name: string
+          job_reference?: string | null
           notes?: string | null
           purpose?: string | null
           quantity_issued?: number
@@ -19312,6 +19397,7 @@ export type Database = {
           tool_code_snapshot?: string | null
           tool_id?: string | null
           tool_name_snapshot?: string | null
+          unit_id?: string | null
           updated_at?: string | null
           warehouse_item_id?: string | null
         }
@@ -19329,6 +19415,7 @@ export type Database = {
           issue_number?: string
           issued_to?: string | null
           issued_to_name?: string
+          job_reference?: string | null
           notes?: string | null
           purpose?: string | null
           quantity_issued?: number
@@ -19337,6 +19424,7 @@ export type Database = {
           tool_code_snapshot?: string | null
           tool_id?: string | null
           tool_name_snapshot?: string | null
+          unit_id?: string | null
           updated_at?: string | null
           warehouse_item_id?: string | null
         }
@@ -19363,6 +19451,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tool_issues_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "tool_units"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tool_issues_warehouse_item_id_fkey"
             columns: ["warehouse_item_id"]
             isOneToOne: false
@@ -19381,6 +19476,75 @@ export type Database = {
             columns: ["warehouse_item_id"]
             isOneToOne: false
             referencedRelation: "warehouse_items_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_maintenance: {
+        Row: {
+          company_id: string | null
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          interval_months: number | null
+          maintenance_date: string
+          maintenance_type: string
+          next_due_date: string | null
+          out_of_service: boolean
+          performed_by: string | null
+          provider: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          interval_months?: number | null
+          maintenance_date?: string
+          maintenance_type?: string
+          next_due_date?: string | null
+          out_of_service?: boolean
+          performed_by?: string | null
+          provider?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          interval_months?: number | null
+          maintenance_date?: string
+          maintenance_type?: string
+          next_due_date?: string | null
+          out_of_service?: boolean
+          performed_by?: string | null
+          provider?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_maintenance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_maintenance_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "tool_units"
             referencedColumns: ["id"]
           },
         ]
@@ -19474,6 +19638,151 @@ export type Database = {
             columns: ["warehouse_item_id"]
             isOneToOne: false
             referencedRelation: "warehouse_items_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_unit_events: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          event_date: string
+          event_type: string
+          from_value: string | null
+          id: string
+          notes: string | null
+          reference: string | null
+          to_value: string | null
+          unit_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date?: string
+          event_type: string
+          from_value?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          to_value?: string | null
+          unit_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date?: string
+          event_type?: string
+          from_value?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          to_value?: string | null
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_unit_events_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "tool_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_units: {
+        Row: {
+          asset_tag: string | null
+          bin_id: string | null
+          company_id: string | null
+          condition: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string | null
+          next_calibration_due: string | null
+          next_maintenance_due: string | null
+          notes: string | null
+          purchase_cost: number | null
+          purchase_date: string | null
+          serial_number: string | null
+          status: string
+          tool_id: string
+          unit_code: string | null
+          updated_at: string
+          warranty_expiry: string | null
+        }
+        Insert: {
+          asset_tag?: string | null
+          bin_id?: string | null
+          company_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          next_calibration_due?: string | null
+          next_maintenance_due?: string | null
+          notes?: string | null
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          serial_number?: string | null
+          status?: string
+          tool_id: string
+          unit_code?: string | null
+          updated_at?: string
+          warranty_expiry?: string | null
+        }
+        Update: {
+          asset_tag?: string | null
+          bin_id?: string | null
+          company_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          next_calibration_due?: string | null
+          next_maintenance_due?: string | null
+          notes?: string | null
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          serial_number?: string | null
+          status?: string
+          tool_id?: string
+          unit_code?: string | null
+          updated_at?: string
+          warranty_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_units_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_units_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_units_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_units_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_tools"
             referencedColumns: ["id"]
           },
         ]
@@ -21332,6 +21641,8 @@ export type Database = {
       warehouse_tools: {
         Row: {
           available_quantity: number
+          calibration_interval_months: number | null
+          calibration_required: boolean
           catalog_item_id: string | null
           category_id: string | null
           company_id: string | null
@@ -21339,10 +21650,13 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          fixed_asset_id: string | null
           id: string
           image_url: string | null
+          is_serialized: boolean
           issued_quantity: number
           location_id: string | null
+          maintenance_interval_months: number | null
           name: string
           notes: string | null
           tool_code: string
@@ -21354,6 +21668,8 @@ export type Database = {
         }
         Insert: {
           available_quantity?: number
+          calibration_interval_months?: number | null
+          calibration_required?: boolean
           catalog_item_id?: string | null
           category_id?: string | null
           company_id?: string | null
@@ -21361,10 +21677,13 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          fixed_asset_id?: string | null
           id?: string
           image_url?: string | null
+          is_serialized?: boolean
           issued_quantity?: number
           location_id?: string | null
+          maintenance_interval_months?: number | null
           name: string
           notes?: string | null
           tool_code: string
@@ -21376,6 +21695,8 @@ export type Database = {
         }
         Update: {
           available_quantity?: number
+          calibration_interval_months?: number | null
+          calibration_required?: boolean
           catalog_item_id?: string | null
           category_id?: string | null
           company_id?: string | null
@@ -21383,10 +21704,13 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          fixed_asset_id?: string | null
           id?: string
           image_url?: string | null
+          is_serialized?: boolean
           issued_quantity?: number
           location_id?: string | null
+          maintenance_interval_months?: number | null
           name?: string
           notes?: string | null
           tool_code?: string
@@ -21416,6 +21740,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_tools_fixed_asset_id_fkey"
+            columns: ["fixed_asset_id"]
+            isOneToOne: false
+            referencedRelation: "asset_master"
             referencedColumns: ["id"]
           },
           {
@@ -23017,6 +23348,10 @@ export type Database = {
         Args: { p_company_id?: string }
         Returns: Json
       }
+      get_dashboard_sankey_flow: {
+        Args: { p_company_id: string; p_location_id?: string }
+        Returns: Json
+      }
       get_dashboard_sourcing_pulse: {
         Args: { p_company_id?: string }
         Returns: Json
@@ -23269,6 +23604,7 @@ export type Database = {
               unit_id: string
             }[]
           }
+      get_tool_due_summary: { Args: { p_company_id: string }; Returns: Json }
       get_trial_balance: {
         Args: { p_as_of_date: string; p_company_id: string }
         Returns: {
@@ -23869,6 +24205,7 @@ export type Database = {
         Returns: undefined
       }
       recompute_stock_ledger_balances: { Args: never; Returns: Json }
+      recompute_tool_counts: { Args: { p_tool_id: string }; Returns: undefined }
       reconcile_bin_allocations: {
         Args: { p_company_id?: string; p_location_id?: string }
         Returns: {
@@ -23906,6 +24243,82 @@ export type Database = {
               message: string
             }[]
           }
+      record_tool_calibration: {
+        Args: {
+          p_calibration_date?: string
+          p_certificate_number?: string
+          p_certificate_url?: string
+          p_cost?: number
+          p_interval_months?: number
+          p_next_due_date?: string
+          p_notes?: string
+          p_performed_by?: string
+          p_provider?: string
+          p_result?: string
+          p_unit_id: string
+        }
+        Returns: {
+          calibration_date: string
+          certificate_number: string | null
+          certificate_url: string | null
+          company_id: string | null
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          interval_months: number | null
+          next_due_date: string | null
+          notes: string | null
+          performed_by: string | null
+          provider: string | null
+          result: string
+          unit_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tool_calibrations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_tool_maintenance: {
+        Args: {
+          p_cost?: number
+          p_description?: string
+          p_interval_months?: number
+          p_maintenance_date?: string
+          p_maintenance_type?: string
+          p_next_due_date?: string
+          p_out_of_service?: boolean
+          p_performed_by?: string
+          p_provider?: string
+          p_unit_id: string
+        }
+        Returns: {
+          company_id: string | null
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          interval_months: number | null
+          maintenance_date: string
+          maintenance_type: string
+          next_due_date: string | null
+          out_of_service: boolean
+          performed_by: string | null
+          provider: string | null
+          unit_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tool_maintenance"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_workflow_action: {
         Args: {
           p_comments?: string
@@ -25075,6 +25488,58 @@ export type Database = {
           three_way_match_status: string
         }[]
       }
+      report_tool_calibration_due: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_status?: string
+        }
+        Returns: {
+          days_to_due: number
+          due_state: string
+          last_calibration_date: string
+          location_name: string
+          next_due_date: string
+          serial_number: string
+          tool_code: string
+          tool_name: string
+          unit_code: string
+          unit_status: string
+        }[]
+      }
+      report_tool_calibration_history: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_result?: string
+        }
+        Returns: {
+          calibration_date: string
+          certificate_number: string
+          cost: number
+          next_due_date: string
+          performed_by: string
+          provider: string
+          result: string
+          tool_code: string
+          tool_name: string
+          unit_code: string
+        }[]
+      }
+      report_tool_cost: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          calibration_cost: number
+          calibration_count: number
+          maintenance_cost: number
+          maintenance_count: number
+          tool_code: string
+          tool_name: string
+          total_cost: number
+        }[]
+      }
       report_tool_ledger: {
         Args: {
           p_company_id: string
@@ -25097,6 +25562,46 @@ export type Database = {
           status: string
           tool_code: string
           tool_name: string
+        }[]
+      }
+      report_tool_maintenance_due: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_status?: string
+        }
+        Returns: {
+          days_to_due: number
+          due_state: string
+          last_service_date: string
+          location_name: string
+          next_due_date: string
+          serial_number: string
+          tool_code: string
+          tool_name: string
+          unit_code: string
+          unit_status: string
+        }[]
+      }
+      report_tool_maintenance_history: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_type?: string
+        }
+        Returns: {
+          cost: number
+          description: string
+          maintenance_date: string
+          maintenance_type: string
+          next_due_date: string
+          performed_by: string
+          provider: string
+          tool_code: string
+          tool_name: string
+          unit_code: string
         }[]
       }
       report_trial_balance: {
