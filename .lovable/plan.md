@@ -1,31 +1,36 @@
-Do I know what the issue is? Yes: the remaining white-screen risk is in the post-login route/bootstrap path, not the visible login form. I found a concrete route mismatch: `MfaEnforcementGate` sends users to `/auth/mfa-setup`, but the app only registers MFA setup at `/account/mfa`. I’ll also harden startup recovery because a white screen can occur before normal route UI appears.
+## Problem
 
-Plan:
-1. Correct the MFA setup redirect
-   - Change the expired/enforced MFA redirect and banner action from `/auth/mfa-setup` to the existing `/account/mfa` route.
-   - Keep `/auth/mfa` reserved for MFA challenge after password login.
+Users with the `user` role cannot see any rows on the **Material Returns** tab (empty "No results"), while Material Issues on the same screen work fine.
 
-2. Make auth redirects safer after login
-   - Sanitize any `redirect` query parameter before navigating.
-   - Prevent redirects to scanner/base-name paths from the main `stores.lgh.lk` app unless the user is actually in the scanner shell.
-   - Fall back to `/` when the stored `from` route is invalid or shell-incompatible.
+## Root cause
 
-3. Add a real top-level blank-screen fallback
-   - Wrap `createRoot(...).render()` in a startup guard so failures before React route rendering show a recovery screen instead of a blank page.
-   - Include safe recovery actions: reload and return to `/auth?app=main`.
+The RLS SELECT policy on `material_return_notes` is stricter than the sibling table `material_issue_notes`:
 
-4. Strengthen stale deploy/chunk recovery
-   - Expand the dynamic-import recovery to handle more browser chunk-load error variants.
-   - Clear the one-shot reload guard only after the app has successfully rendered, so users are not stuck on a bad cached deployment.
+- `material_issue_notes` SELECT: `can_access_company(company_id)` — any user with company access sees the row.
+- `material_return_notes` SELECT: `can_access_company(company_id) AND (is_admin(auth.uid()) OR (location_id IS NOT NULL AND user_has_location_access(auth.uid(), location_id)))`
 
-5. Verify the fix
-   - Re-run the login/post-login route flow locally with Playwright using the current `/auth` path.
-   - Check that `/`, `/auth`, `/account/mfa`, and scanner paths render a visible UI instead of a blank screen.
+Regular `user`-role accounts typically don't have explicit per-location grants, so every MRN is filtered out for them. Additionally, 4 of the 24 existing MRN rows have `location_id IS NULL`, which the policy also excludes even for users who do have location access.
 
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
+## Fix
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Align the MRN SELECT policy with MIN so visibility is purely company-scoped (matches how the Material Issues tab already behaves and matches user expectation that anyone in the company can see returns raised in that company). Keep the stricter INSERT/UPDATE/DELETE policies unchanged — writing/approving still requires location access or admin.
+
+### Migration
+
+```sql
+DROP POLICY "Users can view material return notes scoped by location"
+  ON public.material_return_notes;
+
+CREATE POLICY "Users can view material return notes in their company"
+  ON public.material_return_notes
+  FOR SELECT
+  USING (can_access_company(company_id));
+```
+
+No client-side changes are needed — `useMaterialReturns` already queries by `company_id` and the optional global location filter.
+
+## Verification
+
+1. Sign in as a `user`-role account that belongs to the company and open **Warehouse → Material Issue / Return → Material Returns** — the list populates.
+2. Confirm the same account still **cannot** create/approve/delete an MRN outside their allowed locations (INSERT/UPDATE/DELETE policies untouched).
+3. Admin/super_admin behaviour unchanged.
