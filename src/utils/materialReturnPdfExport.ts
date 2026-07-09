@@ -1,5 +1,6 @@
 import type { Company } from '@/types/company';
 import type { MaterialReturnNote, MaterialReturnItem } from '@/types/materialIssueReturn';
+import { formatCurrency } from '@/lib/utils';
 
 type ReturnItemRow = MaterialReturnItem & {
   item_code?: string | null;
@@ -56,19 +57,11 @@ async function urlToDataUrl(url: string): Promise<string | null> {
   }
 }
 
+// Format money using the app-wide currency helper. Falls back to the system
+// currency (LKR / "Rs.") when the company has no currency configured — never USD.
 const fmtMoney = (v: number | null | undefined, currency?: string | null) => {
   if (v == null || Number.isNaN(Number(v))) return '—';
-  const n = Number(v);
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return n.toFixed(2);
-  }
+  return formatCurrency(Number(v), currency || 'LKR');
 };
 
 export async function downloadMaterialReturnPdf(opts: GenerateOptions): Promise<void> {
