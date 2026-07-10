@@ -124,7 +124,16 @@ export const useGrnSummary = (companyId?: string, locationId?: string | null) =>
         .eq('company_id', companyId || '');
 
       if (locationId) {
-        query = (query as any).eq('location_id', locationId);
+        const { data: subtree } = await supabase.rpc(
+          'get_location_subtree_ids' as any,
+          { p_location_id: locationId },
+        );
+        const ids = ((subtree as any[]) || []).map((r) => r.id ?? r).filter(Boolean);
+        if (ids.length > 0) {
+          query = (query as any).in('location_id', ids);
+        } else {
+          query = (query as any).eq('location_id', locationId);
+        }
       }
 
       const { data, error } = await query;
