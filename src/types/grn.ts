@@ -67,6 +67,10 @@ export interface GoodsReceiptNote {
   received_by?: string;
   approved_by?: string;
   approved_date?: string;
+  rejection_reason?: GrnRejectionReason | null;
+  rejection_notes?: string | null;
+  rejected_by?: string | null;
+  rejected_date?: string | null;
   created_at: string;
   updated_at: string;
   grn_items?: GrnItem[];
@@ -105,6 +109,14 @@ export interface GrnItem {
   line_discount_amount?: number;
   net_unit_price?: number;
   quality_status: QualityStatus;
+  // Per-line disposition (ISO 9001 §8.7). Goods are presumed fully accepted
+  // until inspected; quantity_accepted + quantity_rejected === quantity_received.
+  quantity_accepted: number;
+  quantity_rejected: number;
+  rejection_reason?: GrnRejectionReason | null;
+  rejection_notes?: string | null;
+  inspected_by?: string | null;
+  inspected_at?: string | null;
   remarks?: string;
   created_at: string;
   warehouse_item?: {

@@ -33,6 +33,12 @@ export const useGoodsReceiptNotes = (companyId?: string, locationId?: string | n
             unit_price,
             total_cost,
             quality_status,
+            quantity_accepted,
+            quantity_rejected,
+            rejection_reason,
+            rejection_notes,
+            inspected_by,
+            inspected_at,
             remarks,
             batch_number,
             manufacturing_date,
@@ -96,6 +102,12 @@ export const useGrnById = (id: string) => {
             unit_price,
             total_cost,
             quality_status,
+            quantity_accepted,
+            quantity_rejected,
+            rejection_reason,
+            rejection_notes,
+            inspected_by,
+            inspected_at,
             remarks,
             batch_number,
             manufacturing_date,
@@ -454,6 +466,9 @@ export const useSubmitGoodsReceiptNote = () => {
 };
 
 export interface GrnBinAllocationInput {
+  // Allocations are keyed by GRN line, not by item: one GRN can carry two lines
+  // of the same item (different batches), which must cost independently.
+  grn_item_id: string;
   warehouse_item_id: string;
   bin_id: string;
   location_id?: string | null;
@@ -488,8 +503,9 @@ export const useApproveGoodsReceiptNote = () => {
       }
 
       const payload = binAllocations
-        .filter((a) => a.warehouse_item_id && a.bin_id && a.quantity > 0)
+        .filter((a) => a.grn_item_id && a.warehouse_item_id && a.bin_id && a.quantity > 0)
         .map((a) => ({
+          grn_item_id: a.grn_item_id,
           warehouse_item_id: a.warehouse_item_id,
           bin_id: a.bin_id,
           location_id: a.location_id ?? null,
@@ -590,6 +606,76 @@ export const useRejectGoodsReceiptNote = () => {
     },
     onError: (error: Error) => {
       toast({ title: 'Rejection failed', description: error.message, variant: 'destructive' });
+    },
+  });
+};
+
+/**
+ * Record a line's inspection outcome: how much of the received quantity is
+ * accepted vs rejected, with a reason code (ISO 9001 §8.7). Only the accepted
+ * quantity is released to stock at approval.
+ */
+export const useSetGrnItemDisposition = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (input: {
+      grnItemId: string;
+      quantityAccepted: number;
+      quantityRejected: number;
+      reason?: GrnRejectionReason | null;
+      notes?: string | null;
+    }) => {
+      const { data, error } = await supabase.rpc('set_grn_item_disposition' as any, {
+        p_grn_item_id: input.grnItemId,
+        p_qty_accepted: input.quantityAccepted,
+        p_qty_rejected: input.quantityRejected,
+        p_reason: input.reason ?? null,
+        p_notes: input.notes ?? null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-note'] });
+      queryClient.invalidateQueries({ queryKey: ['grn'] });
+      queryClient.invalidateQueries({ queryKey: ['grn-summary'] });
+      toast({ title: 'Inspection recorded', description: 'The line disposition has been saved.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Could not record inspection', description: error.message, variant: 'destructive' });
+    },
+  });
+};
+
+/**
+ * Raise a draft supplier return (MRN) for a GRN's rejected quantities —
+ * the ISO 9001 §8.7 "return to supplier" disposition.
+ */
+export const useCreateSupplierReturnFromGrn = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (grnId: string) => {
+      const { data, error } = await supabase.rpc('create_supplier_return_from_grn' as any, {
+        p_grn_id: grnId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['material-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['goods-receipt-note'] });
+      toast({
+        title: 'Supplier return created',
+        description: 'A draft return note was raised for the rejected quantities.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Could not create return', description: error.message, variant: 'destructive' });
     },
   });
 };

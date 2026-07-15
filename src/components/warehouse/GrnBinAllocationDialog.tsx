@@ -50,9 +50,15 @@ interface GrnItem {
   item_name: string;
   item_code?: string;
   quantity_received: number;
+  /** Only the accepted quantity is released to bins (ISO 9001 §8.6). */
+  quantity_accepted?: number;
   warehouse_item_id?: string | null;
   unit_of_measure?: string;
 }
+
+/** Accepted qty, falling back to received for lines that predate inspection. */
+const acceptedQty = (i: { quantity_received: number; quantity_accepted?: number }) =>
+  i.quantity_accepted ?? i.quantity_received;
 
 export interface BinAllocation {
   grn_item_id: string;
@@ -100,7 +106,7 @@ export function GrnBinAllocationDialog({
   });
 
   const allocatableItems = useMemo(
-    () => items.filter((i) => i.quantity_received > 0),
+    () => items.filter((i) => acceptedQty(i) > 0),
     [items],
   );
 
@@ -285,7 +291,7 @@ export function GrnBinAllocationDialog({
           globalLocationId ??
           activeBins.find((b) => b.id === r.binId)?.location_id ??
           null,
-        quantity: it.quantity_received,
+        quantity: acceptedQty(it),
       });
       if (!it.warehouse_item_id || it.warehouse_item_id !== r.warehouseItemId) {
         itemLinks[it.id] = r.warehouseItemId;
@@ -313,7 +319,7 @@ export function GrnBinAllocationDialog({
             <TableRow>
               <TableHead>Item</TableHead>
               <TableHead>Warehouse Item</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-right">Accepted qty</TableHead>
               <TableHead>UOM</TableHead>
               <TableHead>Destination Bin</TableHead>
             </TableRow>
@@ -424,7 +430,14 @@ export function GrnBinAllocationDialog({
                         </Popover>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">{item.quantity_received}</TableCell>
+                    <TableCell className="text-right">
+                      {acceptedQty(item)}
+                      {acceptedQty(item) !== item.quantity_received && (
+                        <span className="block text-[10px] text-muted-foreground">
+                          of {item.quantity_received} received
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{item.unit_of_measure || '-'}</TableCell>
                     <TableCell>
                       <Select

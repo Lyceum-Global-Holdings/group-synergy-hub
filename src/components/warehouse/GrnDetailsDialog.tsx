@@ -21,16 +21,19 @@ import {
   useDeleteGoodsReceiptNote,
   useRejectGoodsReceiptNote,
   useReopenGoodsReceiptNote,
+  useSetGrnItemDisposition,
+  useCreateSupplierReturnFromGrn,
 } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
-import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS } from '@/types/grn';
+import { GrnStatus, GrnRejectionReason, GRN_REJECTION_REASON_LABELS, GrnItem } from '@/types/grn';
 import { format } from 'date-fns';
 import { useState } from 'react';
-import { FileText, Eye, Download, Building2, User, CalendarDays, Receipt, Package, Boxes } from 'lucide-react';
+import { FileText, Eye, Download, Building2, User, CalendarDays, Receipt, Package, Boxes, ClipboardCheck, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GrnDocument } from './GrnDocument';
 import { GrnBinAllocationDialog, BinAllocation } from './GrnBinAllocationDialog';
 import { RejectGrnDialog } from './RejectGrnDialog';
+import { InspectGrnItemDialog } from './InspectGrnItemDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -84,9 +87,12 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
   const deleteGrn = useDeleteGoodsReceiptNote();
   const rejectGrn = useRejectGoodsReceiptNote();
   const reopenGrn = useReopenGoodsReceiptNote();
+  const setDisposition = useSetGrnItemDisposition();
+  const createSupplierReturn = useCreateSupplierReturnFromGrn();
   const [showDocument, setShowDocument] = useState(false);
   const [showBinAllocation, setShowBinAllocation] = useState(false);
   const [showReject, setShowReject] = useState(false);
+  const [inspectItem, setInspectItem] = useState<GrnItem | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   const handleViewInvoice = async () => {
@@ -141,6 +147,9 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
     await approveGrn.mutateAsync({
       id: grn.id,
       binAllocations: allocations.map((a) => ({
+        // Keep grn_item_id: allocations are line-scoped, so two lines of the
+        // same item (different batches) cost independently.
+        grn_item_id: a.grn_item_id,
         warehouse_item_id: a.warehouse_item_id,
         bin_id: a.bin_id,
         location_id: a.location_id,
@@ -165,7 +174,15 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
   const items: any[] = grn.grn_items || [];
   const hasBatch = items.some((i) => i.batch_number);
   const totalReceived = items.reduce((s, i) => s + (Number(i.quantity_received) || 0), 0);
+  const totalAccepted = items.reduce((s, i) => s + (Number(i.quantity_accepted ?? i.quantity_received) || 0), 0);
+  const totalRejected = items.reduce((s, i) => s + (Number(i.quantity_rejected) || 0), 0);
   const grandTotal = items.reduce((s, i) => s + (Number(i.total_cost) || 0), 0);
+  // Lines can only be inspected while the GRN is pending approval.
+  const canInspect = grn.status === 'submitted' && isAdmin;
+  const canReturnToSupplier =
+    isAdmin && totalRejected > 0 && (grn.status === 'approved' || grn.status === 'completed');
+  // Item columns: base 10 (+3 batch, +1 inspect).
+  const itemColSpan = 10 + (hasBatch ? 3 : 0) + (canInspect ? 1 : 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -341,11 +358,14 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                           <TableHead>UOM</TableHead>
                           <TableHead className="text-right">Ordered</TableHead>
                           <TableHead className="text-right">Received</TableHead>
+                          <TableHead className="text-right">Accepted</TableHead>
+                          <TableHead className="text-right">Rejected</TableHead>
                           <TableHead className="text-right">Unit price</TableHead>
                           <TableHead className="text-right">Disc.</TableHead>
                           <TableHead className="text-right">Net total</TableHead>
                           <TableHead>Quality</TableHead>
                           {hasBatch && <><TableHead>Batch #</TableHead><TableHead>Mfg</TableHead><TableHead>Expiry</TableHead></>}
+                          {canInspect && <TableHead className="text-right">Inspect</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -361,6 +381,10 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                               <TableCell className="text-muted-foreground">{item.unit_of_measure || '-'}</TableCell>
                               <TableCell className="text-right">{item.quantity_ordered || '-'}</TableCell>
                               <TableCell className="text-right font-medium">{item.quantity_received}</TableCell>
+                              <TableCell className="text-right">{item.quantity_accepted ?? item.quantity_received}</TableCell>
+                              <TableCell className={cn('text-right', Number(item.quantity_rejected) > 0 && 'text-destructive font-medium')}>
+                                {Number(item.quantity_rejected) > 0 ? item.quantity_rejected : '—'}
+                              </TableCell>
                               <TableCell className="text-right">{Number(item.unit_price).toFixed(2)}</TableCell>
                               <TableCell className="text-right text-muted-foreground">{Number(item.line_discount_amount || 0) > 0 ? `−${Number(item.line_discount_amount).toFixed(2)}` : '—'}</TableCell>
                               <TableCell className="text-right font-medium">{Number(item.total_cost).toFixed(2)}</TableCell>
@@ -368,6 +392,11 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                                 <Badge variant={item.quality_status === 'good' ? 'default' : item.quality_status === 'damaged' ? 'secondary' : 'destructive'} className="capitalize">
                                   {item.quality_status}
                                 </Badge>
+                                {item.rejection_reason && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    {GRN_REJECTION_REASON_LABELS[item.rejection_reason as GrnRejectionReason]}
+                                  </p>
+                                )}
                               </TableCell>
                               {hasBatch && (
                                 <>
@@ -376,11 +405,18 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                                   <TableCell className="text-xs">{item.expiry_date ? format(new Date(item.expiry_date), 'dd MMM yy') : '-'}</TableCell>
                                 </>
                               )}
+                              {canInspect && (
+                                <TableCell className="text-right">
+                                  <Button variant="outline" size="sm" onClick={() => setInspectItem(item as GrnItem)}>
+                                    <ClipboardCheck className="h-3.5 w-3.5 mr-1" /> Inspect
+                                  </Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           );
                         })}
                         {items.length === 0 && (
-                          <TableRow><TableCell colSpan={hasBatch ? 11 : 8} className="text-center text-muted-foreground py-8">No items.</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={itemColSpan} className="text-center text-muted-foreground py-8">No items.</TableCell></TableRow>
                         )}
                       </TableBody>
                       {items.length > 0 && (
@@ -390,10 +426,14 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                             <TableCell />
                             <TableCell />
                             <TableCell className="text-right">{totalReceived.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{totalAccepted.toLocaleString()}</TableCell>
+                            <TableCell className={cn('text-right', totalRejected > 0 && 'text-destructive')}>
+                              {totalRejected > 0 ? totalRejected.toLocaleString() : '—'}
+                            </TableCell>
                             <TableCell />
                             <TableCell />
                             <TableCell className="text-right">{grandTotal.toFixed(2)}</TableCell>
-                            <TableCell colSpan={hasBatch ? 4 : 1} />
+                            <TableCell colSpan={1 + (hasBatch ? 3 : 0) + (canInspect ? 1 : 0)} />
                           </TableRow>
                         </tfoot>
                       )}
@@ -424,6 +464,16 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                     <Button onClick={handleApprove}>Approve GRN</Button>
                   </>
                 )}
+                {canReturnToSupplier && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => createSupplierReturn.mutate(grn.id)}
+                    disabled={createSupplierReturn.isPending}
+                  >
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    {createSupplierReturn.isPending ? 'Creating…' : 'Return rejected to supplier'}
+                  </Button>
+                )}
               </div>
             </div>
           </>
@@ -437,6 +487,18 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
         companyId={grn.company_id}
         onConfirm={handleBinAllocationConfirm}
         isLoading={approveGrn.isPending}
+      />
+
+      <InspectGrnItemDialog
+        open={!!inspectItem}
+        onOpenChange={(o) => !o && setInspectItem(null)}
+        item={inspectItem}
+        isLoading={setDisposition.isPending}
+        onConfirm={async (input) => {
+          if (!inspectItem) return;
+          await setDisposition.mutateAsync({ grnItemId: inspectItem.id, ...input });
+          setInspectItem(null);
+        }}
       />
 
       <RejectGrnDialog
