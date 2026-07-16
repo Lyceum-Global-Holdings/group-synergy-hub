@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Trash2, ClipboardPaste } from "lucide-react";
+import { Plus, Trash2, ClipboardPaste, ArrowRight, ArrowLeftRight, PackageOpen } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { PasteTransferItemsDialog, type PastedTransferItem } from "./stock-transfer/PasteTransferItemsDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +26,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -103,44 +106,68 @@ export function CreateStockTransferDialog({
     return bins.filter(b => editLocationIds.has(b.location_id));
   }, [bins, permissions]);
 
-  // Group bins by location for easier selection
-  const getBinDisplayName = (bin: typeof bins[0]) => {
-    const location = locations.find(l => l.id === bin.location_id);
-    const locationName = location?.name || "Unassigned";
-    return `${bin.bin_code} - ${bin.name} (${locationName})`;
-  };
+  // Group bins by location so long bin lists stay scannable in the dropdowns.
+  const binsByLocation = useMemo(() => {
+    const groups = new Map<string, typeof bins>();
+    for (const bin of editableBins) {
+      const name = locations.find((l) => l.id === bin.location_id)?.name || "Unassigned";
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name)!.push(bin);
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [editableBins, locations]);
 
   const handleAddItem = () => {
-    if (!selectedItem || !itemQuantity) return;
+    const qty = parseFloat(itemQuantity);
+    if (!selectedItem || !qty || qty <= 0) return;
 
     const fromBinId = form.getValues("from_bin_id");
     const toBinId = form.getValues("to_bin_id");
+    if (!fromBinId || !toBinId) return; // entry row is disabled until bins are chosen
 
-    if (!fromBinId || !toBinId) {
-      form.setError("root", {
-        message: "Please select source and destination bins first",
-      });
-      return;
-    }
-
-    setTransferItems([
-      ...transferItems,
-      {
-        warehouse_item_id: selectedItem.id,
-        item_name: selectedItem.name,
-        quantity_requested: parseFloat(itemQuantity),
-        unit_of_measure: selectedItem.unit_of_measure,
-        from_bin_id: fromBinId,
-        to_bin_id: toBinId,
-      },
-    ]);
+    form.clearErrors("root");
+    // Same item added twice → merge quantities (matches the paste behaviour).
+    setTransferItems((prev) => {
+      const idx = prev.findIndex(
+        (p) => p.warehouse_item_id === selectedItem.id && p.from_bin_id === fromBinId && p.to_bin_id === toBinId,
+      );
+      if (idx >= 0) {
+        return prev.map((p, i) =>
+          i === idx ? { ...p, quantity_requested: p.quantity_requested + qty } : p,
+        );
+      }
+      return [
+        ...prev,
+        {
+          warehouse_item_id: selectedItem.id,
+          item_name: selectedItem.name,
+          quantity_requested: qty,
+          unit_of_measure: selectedItem.unit_of_measure,
+          from_bin_id: fromBinId,
+          to_bin_id: toBinId,
+        },
+      ];
+    });
 
     setSelectedItem(null);
     setItemQuantity("");
   };
 
   const handleRemoveItem = (index: number) => {
-    setTransferItems(transferItems.filter((_, i) => i !== index));
+    setTransferItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleItemQtyChange = (index: number, qty: number) => {
+    setTransferItems((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, quantity_requested: qty } : p)),
+    );
+  };
+
+  const swapBins = () => {
+    const from = form.getValues("from_bin_id");
+    const to = form.getValues("to_bin_id");
+    form.setValue("from_bin_id", to, { shouldValidate: true });
+    form.setValue("to_bin_id", from, { shouldValidate: true });
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -207,6 +234,20 @@ export function CreateStockTransferDialog({
 
   const selectedFromBin = editableBins.find(b => b.id === form.watch("from_bin_id"));
   const selectedToBin = editableBins.find(b => b.id === form.watch("to_bin_id"));
+  const binsChosen = !!selectedFromBin && !!selectedToBin;
+  const totalUnits = transferItems.reduce((s, it) => s + (it.quantity_requested || 0), 0);
+
+  const renderBinOptions = () =>
+    binsByLocation.map(([locationName, group]) => (
+      <SelectGroup key={locationName}>
+        <SelectLabel>{locationName}</SelectLabel>
+        {group.map((bin) => (
+          <SelectItem key={bin.id} value={bin.id}>
+            {bin.bin_code} — {bin.name}
+          </SelectItem>
+        ))}
+      </SelectGroup>
+    ));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -299,71 +340,75 @@ export function CreateStockTransferDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="font-semibold">Source Bin</h3>
+            {/* Route: source → destination, with a one-click swap. */}
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
                 <FormField
                   control={form.control}
                   name="from_bin_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>From Bin *</FormLabel>
+                      <FormLabel>From bin *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select source bin" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
-                          {editableBins.map((bin) => (
-                            <SelectItem key={bin.id} value={bin.id}>
-                              {getBinDisplayName(bin)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+                        <SelectContent>{renderBinOptions()}</SelectContent>
                       </Select>
+                      <div className="min-h-5">
+                        {selectedFromBin && (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {selectedFromBin.current_quantity || 0} in bin
+                          </Badge>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {selectedFromBin && (
-                  <p className="text-xs text-muted-foreground">
-                    Current Qty: {selectedFromBin.current_quantity || 0}
-                  </p>
-                )}
-              </div>
 
-              <div className="space-y-4">
-                <h3 className="font-semibold">Destination Bin</h3>
+                <div className="flex flex-col items-center gap-1 pt-8">
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={swapBins}
+                    disabled={!form.watch("from_bin_id") && !form.watch("to_bin_id")}
+                    title="Swap source and destination"
+                  >
+                    <ArrowLeftRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
                 <FormField
                   control={form.control}
                   name="to_bin_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>To Bin *</FormLabel>
+                      <FormLabel>To bin *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select destination bin" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
-                          {editableBins.map((bin) => (
-                            <SelectItem key={bin.id} value={bin.id}>
-                              {getBinDisplayName(bin)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+                        <SelectContent>{renderBinOptions()}</SelectContent>
                       </Select>
+                      <div className="min-h-5">
+                        {selectedToBin && (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {selectedToBin.current_quantity || 0} in bin
+                          </Badge>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {selectedToBin && (
-                  <p className="text-xs text-muted-foreground">
-                    Current Qty: {selectedToBin.current_quantity || 0}
-                  </p>
-                )}
               </div>
             </div>
 
@@ -388,7 +433,7 @@ export function CreateStockTransferDialog({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Additional notes" {...field} />
+                    <Textarea placeholder="Additional notes" rows={2} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -407,15 +452,9 @@ export function CreateStockTransferDialog({
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={!binsChosen}
+                  title={binsChosen ? "Paste code, qty, uom rows copied from Excel" : "Select both bins first"}
                   onClick={() => {
-                    const fromBinId = form.getValues("from_bin_id");
-                    const toBinId = form.getValues("to_bin_id");
-                    if (!fromBinId || !toBinId) {
-                      form.setError("root", {
-                        message: "Please select source and destination bins first",
-                      });
-                      return;
-                    }
                     form.clearErrors("root");
                     setPasteOpen(true);
                   }}
@@ -425,57 +464,106 @@ export function CreateStockTransferDialog({
                 </Button>
               </div>
 
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <ItemSelector
-                    value={selectedItem?.id}
-                    onSelect={setSelectedItem}
-                  />
+              {!binsChosen ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground text-center">
+                  Select the source and destination bins above to start adding items.
                 </div>
-                <Input
-                  type="number"
-                  placeholder="Quantity"
-                  value={itemQuantity}
-                  onChange={(e) => setItemQuantity(e.target.value)}
-                  className="w-32"
-                />
-                <Button type="button" onClick={handleAddItem}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <ItemSelector
+                        value={selectedItem?.id}
+                        onSelect={setSelectedItem}
+                      />
+                    </div>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="Qty"
+                      value={itemQuantity}
+                      onChange={(e) => setItemQuantity(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddItem();
+                        }
+                      }}
+                      className="w-28"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddItem}
+                      disabled={!selectedItem || !(parseFloat(itemQuantity) > 0)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add
+                    </Button>
+                  </div>
 
-              {transferItems.length > 0 && (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="text-left p-2">Item</th>
-                        <th className="text-right p-2">Quantity</th>
-                        <th className="text-center p-2">Unit</th>
-                        <th className="text-center p-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transferItems.map((item, index) => (
-                        <tr key={index} className="border-t">
-                          <td className="p-2">{item.item_name}</td>
-                          <td className="text-right p-2">{item.quantity_requested}</td>
-                          <td className="text-center p-2">{item.unit_of_measure}</td>
-                          <td className="text-center p-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveItem(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                  {transferItems.length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-6 flex flex-col items-center gap-1.5 text-center">
+                      <PackageOpen className="h-6 w-6 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        No items yet. Search above and press Enter, or paste a list from Excel.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="text-left p-2 w-8">#</th>
+                            <th className="text-left p-2">Item</th>
+                            <th className="text-right p-2 w-28">Quantity</th>
+                            <th className="text-center p-2 w-20">Unit</th>
+                            <th className="w-12"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {transferItems.map((item, index) => (
+                            <tr key={`${item.warehouse_item_id}-${index}`} className="border-t">
+                              <td className="p-2 text-muted-foreground">{index + 1}</td>
+                              <td className="p-2">{item.item_name}</td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={item.quantity_requested}
+                                  onChange={(e) =>
+                                    handleItemQtyChange(index, Math.max(1, Number(e.target.value) || 1))
+                                  }
+                                  className="w-24 h-8 ml-auto text-right"
+                                />
+                              </td>
+                              <td className="p-2 text-center text-muted-foreground">{item.unit_of_measure}</td>
+                              <td className="p-2 text-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={() => handleRemoveItem(index)}
+                                  title="Remove item"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-muted/50 border-t">
+                          <tr>
+                            <td className="p-2 font-medium" colSpan={2}>
+                              {transferItems.length} item{transferItems.length === 1 ? "" : "s"}
+                            </td>
+                            <td className="p-2 text-right font-medium">{totalUnits}</td>
+                            <td colSpan={2}></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -483,17 +571,31 @@ export function CreateStockTransferDialog({
               <p className="text-sm text-destructive">{form.formState.errors.root.message}</p>
             )}
 
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createTransfer.isPending}>
-                {isAdminOrHigher ? "Create & Approve Transfer" : "Submit for Approval"}
-              </Button>
+            <div className="flex items-center justify-between gap-2 border-t pt-4">
+              <p className="text-sm text-muted-foreground">
+                {transferItems.length > 0
+                  ? `${transferItems.length} item${transferItems.length === 1 ? "" : "s"} · ${totalUnits} unit${totalUnits === 1 ? "" : "s"}`
+                  : "Add at least one item to continue"}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createTransfer.isPending || createItem.isPending || transferItems.length === 0}
+                >
+                  {createTransfer.isPending || createItem.isPending
+                    ? "Creating…"
+                    : isAdminOrHigher
+                      ? "Create & Approve Transfer"
+                      : "Submit for Approval"}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
