@@ -25,12 +25,16 @@ import { StockTransferDetailsDialog } from "@/components/warehouse/StockTransfer
 import { BulkAdjustmentDialog } from "@/components/warehouse/BulkAdjustmentDialog";
 import { StockMovementReportDialog } from "@/components/warehouse/StockMovementReportDialog";
 import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import type { StockTransferRequest } from "@/types/stockTransfer";
 import { format } from "date-fns";
 
 export default function StockTransfer() {
   const navigate = useNavigate();
   const { canDelete } = useIsAdminOrHigher();
+  const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -39,7 +43,11 @@ export default function StockTransfer() {
   const [showBulkAdjustmentDialog, setShowBulkAdjustmentDialog] = useState(false);
   const [showMovementReportDialog, setShowMovementReportDialog] = useState(false);
 
-  const { data: allTransfers = [], isLoading } = useStockTransferRequests();
+  const { data: allTransfers = [], isLoading } = useStockTransferRequests(
+    undefined,
+    selectedCompany?.id ?? null,
+    globalLocationId,
+  );
 
   const draftTransfers = allTransfers.filter((t) => t.status === "draft");
   const pendingTransfers = allTransfers.filter((t) => t.status === "pending_approval");

@@ -10,9 +10,13 @@ import type {
   TransferStatus
 } from "@/types/stockTransfer";
 
-export const useStockTransferRequests = (status?: TransferStatus) => {
+export const useStockTransferRequests = (
+  status?: TransferStatus,
+  companyId?: string | null,
+  locationId?: string | null,
+) => {
   return useQuery({
-    queryKey: ["stock-transfer-requests", status],
+    queryKey: ["stock-transfer-requests", status, companyId, locationId],
     queryFn: async () => {
       let query = supabase
         .from("stock_transfer_requests")
@@ -29,6 +33,25 @@ export const useStockTransferRequests = (status?: TransferStatus) => {
 
       if (status) {
         query = query.eq("status", status);
+      }
+      if (companyId) {
+        query = query.eq("company_id", companyId);
+      }
+      // Location scoping: show transfers touching the selected location or any
+      // of its sub-locations (either end of the route). Legacy rows with no
+      // location stamped at all stay visible rather than silently vanishing.
+      if (locationId) {
+        const { data: subtree } = await supabase.rpc(
+          "get_location_subtree_ids" as any,
+          { p_location_id: locationId },
+        );
+        const ids = ((subtree as any[]) || []).map((r) => r.id ?? r).filter(Boolean);
+        const list = (ids.length > 0 ? ids : [locationId]).join(",");
+        query = (query as any).or(
+          `from_location_id.in.(${list}),to_location_id.in.(${list}),` +
+          `from_sublocation_id.in.(${list}),to_sublocation_id.in.(${list}),` +
+          `and(from_location_id.is.null,to_location_id.is.null)`,
+        );
       }
 
       const { data, error } = await query;

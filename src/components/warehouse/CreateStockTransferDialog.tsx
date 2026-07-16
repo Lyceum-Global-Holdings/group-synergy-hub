@@ -39,6 +39,7 @@ import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
 
 const formSchema = z.object({
@@ -99,6 +100,8 @@ export function CreateStockTransferDialog({
   const { selectedCompany } = useCompany();
   const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
 
+  const { globalLocationId } = useLocationFilter();
+
   // Filter bins to only show those at locations user can edit
   const editableBins = useMemo(() => {
     if (!permissions || permissions.viewAllLocations) return bins;
@@ -106,16 +109,52 @@ export function CreateStockTransferDialog({
     return bins.filter(b => editLocationIds.has(b.location_id));
   }, [bins, permissions]);
 
+  // Scope bins to the active company via their location's company (bins
+  // themselves may carry a null company_id). Falls back to the permission-
+  // filtered list if no location in the company matches (legacy data).
+  const companyBins = useMemo(() => {
+    if (!selectedCompany?.id) return editableBins;
+    const companyLocationIds = new Set(
+      locations.filter((l: any) => l.company_id === selectedCompany.id).map((l) => l.id),
+    );
+    if (companyLocationIds.size === 0) return editableBins;
+    return editableBins.filter((b) => b.location_id && companyLocationIds.has(b.location_id));
+  }, [editableBins, locations, selectedCompany?.id]);
+
+  // Source bins are additionally restricted to the location selected in the
+  // header (including its sub-locations): stock can only leave where you are.
+  const fromBins = useMemo(() => {
+    if (!globalLocationId) return companyBins;
+    const byParent = new Map<string, string[]>();
+    for (const l of locations) {
+      const parent = (l as any).parent_id as string | null;
+      if (!parent) continue;
+      if (!byParent.has(parent)) byParent.set(parent, []);
+      byParent.get(parent)!.push(l.id);
+    }
+    const subtree = new Set<string>([globalLocationId]);
+    const stack = [globalLocationId];
+    while (stack.length > 0) {
+      for (const child of byParent.get(stack.pop()!) ?? []) {
+        if (!subtree.has(child)) {
+          subtree.add(child);
+          stack.push(child);
+        }
+      }
+    }
+    return companyBins.filter((b) => b.location_id && subtree.has(b.location_id));
+  }, [companyBins, locations, globalLocationId]);
+
   // Group bins by location so long bin lists stay scannable in the dropdowns.
-  const binsByLocation = useMemo(() => {
+  const groupBinsByLocation = (list: typeof bins) => {
     const groups = new Map<string, typeof bins>();
-    for (const bin of editableBins) {
+    for (const bin of list) {
       const name = locations.find((l) => l.id === bin.location_id)?.name || "Unassigned";
       if (!groups.has(name)) groups.set(name, []);
       groups.get(name)!.push(bin);
     }
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [editableBins, locations]);
+  };
 
   const handleAddItem = () => {
     const qty = parseFloat(itemQuantity);
@@ -237,8 +276,15 @@ export function CreateStockTransferDialog({
   const binsChosen = !!selectedFromBin && !!selectedToBin;
   const totalUnits = transferItems.reduce((s, it) => s + (it.quantity_requested || 0), 0);
 
-  const renderBinOptions = () =>
-    binsByLocation.map(([locationName, group]) => (
+  const renderBinOptions = (list: typeof bins) => {
+    if (list.length === 0) {
+      return (
+        <SelectItem value="__none__" disabled>
+          No bins available for the selected location
+        </SelectItem>
+      );
+    }
+    return groupBinsByLocation(list).map(([locationName, group]) => (
       <SelectGroup key={locationName}>
         <SelectLabel>{locationName}</SelectLabel>
         {group.map((bin) => (
@@ -248,6 +294,7 @@ export function CreateStockTransferDialog({
         ))}
       </SelectGroup>
     ));
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -355,7 +402,7 @@ export function CreateStockTransferDialog({
                             <SelectValue placeholder="Select source bin" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>{renderBinOptions()}</SelectContent>
+                        <SelectContent>{renderBinOptions(fromBins)}</SelectContent>
                       </Select>
                       <div className="min-h-5">
                         {selectedFromBin && (
@@ -396,7 +443,7 @@ export function CreateStockTransferDialog({
                             <SelectValue placeholder="Select destination bin" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>{renderBinOptions()}</SelectContent>
+                        <SelectContent>{renderBinOptions(companyBins)}</SelectContent>
                       </Select>
                       <div className="min-h-5">
                         {selectedToBin && (
