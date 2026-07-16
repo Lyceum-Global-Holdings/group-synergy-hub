@@ -66,6 +66,12 @@ const formSchema = z.object({
   remarks: z.string().optional(),
 });
 
+// A GRN line in dialog state: the insert payload plus a client-only stable row
+// id used for React keys and async-callback targeting (see the items state).
+type GrnRow = CreateGrnItemData & { _rid: string };
+const newRid = () =>
+  globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+
 // Net line value after the per-line discount (gross − capped discount).
 const grnLineNet = (it: CreateGrnItemData): number => {
   const gross = (Number(it.quantity_received) || 0) * (Number(it.unit_price) || 0);
@@ -97,7 +103,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   const [transportCost, setTransportCost] = useState<number>(0);
   const generateBatch = useGenerateBatchNumber();
 
-  const [items, setItems] = useState<CreateGrnItemData[]>([]);
+  // Rows carry a client-only stable id (_rid). Async callbacks (item lookup,
+  // batch-number generation) and React keys target rows by _rid, never by array
+  // index or a stale closure — indexes shift on removal and closures go stale
+  // while a request is in flight, which used to duplicate some lines and drop
+  // others. _rid is stripped before insert (the create hook maps explicit columns).
+  const [items, setItems] = useState<GrnRow[]>([]);
   const [selectedPoId, setSelectedPoId] = useState<string>(poId || '');
   const [invoiceDocumentUrl, setInvoiceDocumentUrl] = useState<string>('');
   const [itemComboboxOpen, setItemComboboxOpen] = useState<number | null>(null);
@@ -133,7 +144,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     setTaxType((editingDraft.tax_type as any) || 'none');
     setTaxValue(Number(editingDraft.tax_value) || 0);
     setTransportCost(Number(editingDraft.transport_cost) || 0);
-    const hydratedItems: CreateGrnItemData[] = (editingDraft.grn_items || []).map((row: any) => ({
+    const hydratedItems: GrnRow[] = (editingDraft.grn_items || []).map((row: any) => ({
+      _rid: newRid(),
       po_item_id: row.po_item_id ?? undefined,
       warehouse_item_id: row.warehouse_item_id ?? undefined,
       catalog_item_id: row.catalog_item_id ?? undefined,
@@ -269,10 +281,11 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
         }, {} as Record<string, { is_batch_tracked: boolean; is_serialized: boolean; track_secondary_quantity: boolean; secondary_uom: string | null }>);
       }
 
-      const poItems: CreateGrnItemData[] =
+      const poItems: GrnRow[] =
         selectedPo.items?.map((item: any) => {
           const flags = item.warehouse_item_id ? trackingFlags[item.warehouse_item_id] : null;
           return {
+            _rid: newRid(),
             po_item_id: item.id,
             warehouse_item_id: item.warehouse_item_id,
             item_code: item.item_code,
@@ -320,7 +333,14 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
             return it;
           })
         );
-        setItems(updates);
+        // Merge by _rid instead of replacing the array: the user may have edited
+        // rows while the batch codes were being generated.
+        setItems((prev) =>
+          prev.map((r) => {
+            const u = updates.find((x) => x._rid === r._rid);
+            return u && !r.batch_number ? { ...r, batch_number: u.batch_number } : r;
+          })
+        );
       }
     };
 
@@ -328,9 +348,10 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   }, [selectedPoId, pos, form]);
 
   const handleAddManualItem = () => {
-    setItems([
-      ...items,
+    setItems((prev) => [
+      ...prev,
       {
+        _rid: newRid(),
         item_name: '',
         unit_of_measure: 'pcs',
         quantity_received: 0,
@@ -348,7 +369,21 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
   };
 
   const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Patch one row by its stable id. Safe to call from async callbacks: it uses
+  // a functional update and targets the row by _rid, so it cannot clobber edits
+  // made while a request was in flight or hit the wrong row after a removal.
+  const patchRowByRid = (rid: string, patch: Partial<GrnRow>) => {
+    setItems((prev) =>
+      prev.map((r) => {
+        if (r._rid !== rid) return r;
+        const next = { ...r, ...patch };
+        next.total_cost = grnLineNet(next);
+        return next;
+      })
+    );
   };
 
   const handleItemChange = (
@@ -356,49 +391,59 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     field: keyof CreateGrnItemData,
     value: any
   ) => {
-    const newItems = [...items];
-    const item = newItems[index];
+    const current = items[index];
+    if (!current) return;
+    const rid = current._rid;
 
     // Validation for quantity_received
-    if (field === 'quantity_received' && item.quantity_ordered) {
-      const qtyRemaining = item.quantity_ordered - (item.quantity_already_received || 0) - (item.quantity_pending_approval || 0);
-      
+    if (field === 'quantity_received' && current.quantity_ordered) {
+      const qtyRemaining = current.quantity_ordered - (current.quantity_already_received || 0) - (current.quantity_pending_approval || 0);
+
       if (value > qtyRemaining) {
         alert(`Cannot receive ${value} units. Only ${qtyRemaining} units remaining for this item.`);
         return; // Don't update if validation fails
       }
     }
 
-    newItems[index] = { ...newItems[index], [field]: value };
-
     // Auto-fill item details when warehouse item is selected
+    let autofill: Partial<GrnRow> = {};
     if (field === 'warehouse_item_id') {
       const selectedItem = warehouseItems.find(wi => wi.id === value);
       if (selectedItem) {
-        newItems[index].item_name = selectedItem.name;
-        newItems[index].is_batch_tracked = selectedItem.is_batch_tracked || false;
-        newItems[index].is_serialized = selectedItem.is_serialized || false;
-        newItems[index].track_secondary_quantity = (selectedItem as any).track_secondary_quantity || false;
-        newItems[index].secondary_uom = (selectedItem as any).secondary_uom || '';
-        if (selectedItem.unit_cost) {
-          newItems[index].unit_price = Number(selectedItem.unit_cost);
-        }
-        // Auto-generate batch number for batch-tracked items
-        if (selectedItem.is_batch_tracked && selectedCompany?.id && !newItems[index].batch_number) {
+        autofill = {
+          item_name: selectedItem.name,
+          is_batch_tracked: selectedItem.is_batch_tracked || false,
+          is_serialized: selectedItem.is_serialized || false,
+          track_secondary_quantity: (selectedItem as any).track_secondary_quantity || false,
+          secondary_uom: (selectedItem as any).secondary_uom || '',
+          ...(selectedItem.unit_cost ? { unit_price: Number(selectedItem.unit_cost) } : {}),
+        };
+        // Auto-generate batch number for batch-tracked items. The async result
+        // lands on this row via _rid — never through a stale array snapshot.
+        if (selectedItem.is_batch_tracked && selectedCompany?.id && !current.batch_number) {
           generateBatch
             .mutateAsync({ companyId: selectedCompany.id, warehouseItemId: value })
-            .then((code) => handleItemChange(index, 'batch_number', code))
+            .then((code) =>
+              setItems((prev) =>
+                prev.map((r) => (r._rid === rid && !r.batch_number ? { ...r, batch_number: code } : r))
+              )
+            )
             .catch(() => { /* user can click Gen to retry */ });
         }
       }
     }
 
-    // Auto-calculate net line total (gross − per-line discount).
-    if (['quantity_received', 'unit_price', 'discount_type', 'discount_value'].includes(field)) {
-      newItems[index].total_cost = grnLineNet(newItems[index]);
-    }
-
-    setItems(newItems);
+    setItems((prev) =>
+      prev.map((r) => {
+        if (r._rid !== rid) return r;
+        const next = { ...r, [field]: value, ...autofill };
+        // Auto-calculate net line total (gross − per-line discount).
+        if (['quantity_received', 'unit_price', 'discount_type', 'discount_value'].includes(field)) {
+          next.total_cost = grnLineNet(next);
+        }
+        return next;
+      })
+    );
   };
 
   const getItemStatus = (item: CreateGrnItemData): { label: string; variant: 'default' | 'secondary' | 'destructive' } => {
@@ -440,6 +485,16 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     if (validItems.length === 0) {
       alert('Please add at least one item with quantity received > 0');
       return;
+    }
+
+    // Zero-quantity lines are excluded from the note. Say so instead of
+    // dropping them silently — a silent drop reads as "my item disappeared".
+    const skipped = items.filter((item) => !(item.quantity_received > 0));
+    if (skipped.length > 0) {
+      toast.info(
+        `${skipped.length} line(s) with zero quantity were not saved: ` +
+          skipped.map((s) => s.item_name || s.item_code || 'unnamed').join(', ')
+      );
     }
 
     // Validate batch-tracked items have batch numbers
@@ -625,7 +680,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
               </TableHeader>
               <TableBody>
                 {items.map((item, index) => (
-                  <TableRow key={index}>
+                  <TableRow key={item._rid}>
                     <TableCell>
                       {item.po_item_id ? (
                         <div className="flex flex-col">
@@ -718,35 +773,39 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                                                 .maybeSingle();
                                               const warehouseItemId = existing?.id ?? undefined;
 
-                                              const newItems = [...items];
-                                              newItems[index] = {
-                                                ...newItems[index],
+                                              // Patch THIS row by its stable id. This handler awaited a
+                                              // network call, so the `items` closure is stale — writing
+                                              // a copied array back here used to erase selections made
+                                              // on other rows while the request was in flight.
+                                              patchRowByRid(item._rid, {
                                                 warehouse_item_id: warehouseItemId,
                                                 catalog_item_id: wi.id,
                                                 item_name: wi.name,
                                                 item_code: wi.item_code,
-                                                unit_of_measure: (wi as any).unit_name || newItems[index].unit_of_measure,
+                                                unit_of_measure: (wi as any).unit_name || item.unit_of_measure,
                                                 is_batch_tracked: (wi as any).is_batch_tracked || false,
                                                 is_serialized: (wi as any).is_serialized || false,
                                                 track_secondary_quantity: (existing as any)?.track_secondary_quantity || false,
                                                 secondary_uom: (existing as any)?.secondary_uom || '',
-                                                unit_price: (wi as any).unit_cost ? Number((wi as any).unit_cost) : newItems[index].unit_price,
-                                              };
-                                              const qty = newItems[index].quantity_received || 0;
-                                              const price = newItems[index].unit_price || 0;
-                                              newItems[index].total_cost = qty * price;
-                                              setItems(newItems);
+                                                ...((wi as any).unit_cost ? { unit_price: Number((wi as any).unit_cost) } : {}),
+                                              });
                                               setItemSearch('');
                                               // Auto-generate batch number only if a per-company
                                               // inventory row already exists. Otherwise the batch
                                               // number is assigned at approval time.
-                                              if ((wi as any).is_batch_tracked && !newItems[index].batch_number && warehouseItemId) {
+                                              if ((wi as any).is_batch_tracked && !item.batch_number && warehouseItemId) {
                                                 try {
                                                   const code = await generateBatch.mutateAsync({
                                                     companyId: selectedCompany.id,
                                                     warehouseItemId,
                                                   });
-                                                  handleItemChange(index, 'batch_number', code);
+                                                  setItems((prev) =>
+                                                    prev.map((r) =>
+                                                      r._rid === item._rid && !r.batch_number
+                                                        ? { ...r, batch_number: code }
+                                                        : r
+                                                    )
+                                                  );
                                                 } catch {
                                                   /* user can click Gen to retry */
                                                 }
