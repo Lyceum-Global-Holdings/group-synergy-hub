@@ -487,6 +487,24 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
       return;
     }
 
+    // Every line must identify an item — linked to the item master or at least
+    // named. Blank manual rows used to save with only a quantity, producing
+    // "-" lines on the note that could never be approved.
+    const unidentified = validItems
+      .map((item, i) => ({ item, row: i + 1 }))
+      .filter(({ item }) =>
+        !item.warehouse_item_id &&
+        !item.catalog_item_id &&
+        !item.item_name?.trim() &&
+        !item.item_code?.trim()
+      );
+    if (unidentified.length > 0) {
+      toast.error(
+        `Row ${unidentified.map((u) => u.row).join(', ')}: select an item from the item master (or remove the line) before saving.`
+      );
+      return;
+    }
+
     // Zero-quantity lines are excluded from the note. Say so instead of
     // dropping them silently — a silent drop reads as "my item disappeared".
     const skipped = items.filter((item) => !(item.quantity_received > 0));
