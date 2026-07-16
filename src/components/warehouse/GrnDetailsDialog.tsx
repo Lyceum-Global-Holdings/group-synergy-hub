@@ -186,7 +186,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden max-h-[92vh] flex flex-col">
+      <DialogContent className="max-w-[95vw] xl:max-w-7xl p-0 gap-0 overflow-hidden max-h-[92vh] flex flex-col">
         {showDocument ? (
           <div className="overflow-y-auto p-6">
             <GrnDocument grn={grn} onClose={() => setShowDocument(false)} />
@@ -350,7 +350,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange, onEditDraft }: Grn
                 </TabsContent>
 
                 <TabsContent value="items" className="mt-0">
-                  <div className="rounded-lg border overflow-hidden">
+                  <div className="rounded-lg border overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-muted/50 sticky top-0">
                         <TableRow>
