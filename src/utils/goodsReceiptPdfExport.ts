@@ -171,8 +171,8 @@ export async function downloadGrnPdf(opts: GenerateOptions): Promise<void> {
   const items = grn.grn_items ?? [];
   const body = items.map((it, i) => [
     String(i + 1),
-    it.item_code ?? '—',
-    it.item_name ?? '—',
+    it.item_code || (it as any).catalog?.item_code || '—',
+    it.item_name || (it as any).catalog?.name || '—',
     it.unit_of_measure ?? '',
     it.quantity_ordered != null ? String(it.quantity_ordered) : '—',
     String(it.quantity_received ?? 0),

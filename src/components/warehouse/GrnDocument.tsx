@@ -219,8 +219,8 @@ export function GrnDocument({ grn, onClose }: GrnDocumentProps) {
                     {grn.grn_items?.map((item, index) => (
                       <TableRow key={item.id}>
                         <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">{item.item_name}</TableCell>
-                        <TableCell>{item.item_code || '-'}</TableCell>
+                        <TableCell className="font-medium">{item.item_name || (item as any).catalog?.name || '-'}</TableCell>
+                        <TableCell>{item.item_code || (item as any).catalog?.item_code || '-'}</TableCell>
                         <TableCell>{item.unit_of_measure}</TableCell>
                         <TableCell className="text-right">{item.quantity_ordered || '-'}</TableCell>
                         <TableCell className="text-right font-medium">{item.quantity_received}</TableCell>
