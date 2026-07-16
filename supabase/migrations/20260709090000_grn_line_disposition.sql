@@ -366,9 +366,13 @@ BEGIN
       IF v_line.catalog_item_id IS NOT NULL THEN
         v_target_item := public.ensure_warehouse_item_for_company(v_company, v_line.catalog_item_id);
       ELSIF v_line.item_code IS NOT NULL THEN
-        SELECT id INTO v_target_item
-          FROM public.warehouse_items
-         WHERE company_id = v_company AND item_code = v_line.item_code
+        -- item_code lives on warehouse_item_catalog; warehouse_items only carries
+        -- catalog_item_id. The previous version selected warehouse_items.item_code,
+        -- a column that does not exist, so this branch threw at runtime.
+        SELECT wi.id INTO v_target_item
+          FROM public.warehouse_items wi
+          JOIN public.warehouse_item_catalog c ON c.id = wi.catalog_item_id
+         WHERE wi.company_id = v_company AND c.item_code = v_line.item_code
          LIMIT 1;
         IF v_target_item IS NULL THEN
           SELECT public.ensure_warehouse_item_for_company(v_company, c.id) INTO v_target_item
