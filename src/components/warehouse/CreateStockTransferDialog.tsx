@@ -35,7 +35,7 @@ import {
 import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useStockTransfer";
 import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
-import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useWarehouseLocations, useEffectiveLocationsForCompany } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -109,17 +109,18 @@ export function CreateStockTransferDialog({
     return bins.filter(b => editLocationIds.has(b.location_id));
   }, [bins, permissions]);
 
-  // Scope bins to the active company via their location's company (bins
-  // themselves may carry a null company_id). Falls back to the permission-
-  // filtered list if no location in the company matches (legacy data).
+  // Scope bins to the active company using the canonical effective-locations
+  // resolver (locations can be shared/inherited across companies, so a naive
+  // company_id comparison hides them). While the RPC loads — or if it returns
+  // nothing — fall back to the permission-filtered list rather than a blank
+  // dropdown.
+  const { data: effectiveLocations = [] } = useEffectiveLocationsForCompany(selectedCompany?.id);
   const companyBins = useMemo(() => {
-    if (!selectedCompany?.id) return editableBins;
-    const companyLocationIds = new Set(
-      locations.filter((l: any) => l.company_id === selectedCompany.id).map((l) => l.id),
-    );
-    if (companyLocationIds.size === 0) return editableBins;
-    return editableBins.filter((b) => b.location_id && companyLocationIds.has(b.location_id));
-  }, [editableBins, locations, selectedCompany?.id]);
+    if (!selectedCompany?.id || effectiveLocations.length === 0) return editableBins;
+    const companyLocationIds = new Set(effectiveLocations.map((l) => l.id));
+    const scoped = editableBins.filter((b) => b.location_id && companyLocationIds.has(b.location_id));
+    return scoped.length > 0 ? scoped : editableBins;
+  }, [editableBins, effectiveLocations, selectedCompany?.id]);
 
   // Source bins are additionally restricted to the location selected in the
   // header (including its sub-locations): stock can only leave where you are.
