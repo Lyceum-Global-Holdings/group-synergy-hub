@@ -1082,7 +1082,9 @@ export function LocationReportAnalytics({
         condition: a.condition,
         status: a.status,
         purchase_date: a.purchase_date,
-        current_value: a.current_value,
+        // Canonical value resolution, matching the Assets List table and the
+        // analytics KPIs: current value, else purchase price.
+        current_value: a.current_value ?? a.purchase_price,
       }));
   };
 
