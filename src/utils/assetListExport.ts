@@ -154,5 +154,42 @@ export function downloadAssetListPdf(rows: AssetListExportRow[], meta: AssetList
     },
   });
 
+  // ── Signature block: Approved by / Confirmed by / Received ────────────────
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const blockHeight = 86;
+  let y = ((doc as any).lastAutoTable?.finalY ?? 72) + 40;
+  if (y + blockHeight > pageHeight - 30) {
+    doc.addPage();
+    y = 60;
+  }
+
+  const signatories = ["Approved by", "Confirmed by", "Received"];
+  const gap = 30;
+  const colWidth = (pageWidth - margin * 2 - gap * (signatories.length - 1)) / signatories.length;
+
+  signatories.forEach((label, i) => {
+    const x = margin + i * (colWidth + gap);
+    doc.setDrawColor(120);
+    doc.setLineDashPattern([1.5, 1.5], 0);
+    doc.line(x, y, x + colWidth, y); // signature line
+    doc.setLineDashPattern([], 0);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
+    doc.text(label, x, y + 14);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(90);
+    doc.text("Name:", x, y + 30);
+    doc.setLineDashPattern([1, 1.5], 0);
+    doc.line(x + 30, y + 31, x + colWidth, y + 31);
+    doc.text("Date:", x, y + 46);
+    doc.line(x + 30, y + 47, x + colWidth, y + 47);
+    doc.setLineDashPattern([], 0);
+    doc.setTextColor(0);
+  });
+
   doc.save(`Asset_List_By_Location_${stamp()}.pdf`);
 }
