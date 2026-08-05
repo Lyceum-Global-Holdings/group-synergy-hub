@@ -52,6 +52,17 @@ import {
 import { WarehouseAsset, WarehouseLocation, AssetCategory } from "@/types/warehouse";
 import { toast } from "@/hooks/use-toast";
 import { writeExcelFromJSON } from "@/utils/excelUtils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  downloadAssetListCsv,
+  downloadAssetListPdf,
+  type AssetListExportRow,
+} from "@/utils/assetListExport";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -124,7 +135,7 @@ export function LocationReportAnalytics({
   locations,
   categories,
 }: LocationReportAnalyticsProps) {
-  const { formatCurrency } = useCompany();
+  const { formatCurrency, selectedCompany } = useCompany();
   const [reportType, setReportType] = useState<ReportType>("location");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedSublocation, setSelectedSublocation] = useState<string>("all");
@@ -1051,6 +1062,55 @@ export function LocationReportAnalytics({
     );
   }
 
+  // Flat asset register rows for the location-wise list export, honouring the
+  // tab's current location / sub-location / status filters.
+  const buildAssetListRows = (): AssetListExportRow[] => {
+    const locationName = (id: string | null) =>
+      id ? locations.find((l) => l.id === id)?.name ?? "Unknown" : null;
+    return assets
+      .filter((a) => selectedLocation === "all" || a.location_id === selectedLocation)
+      .filter((a) => selectedSublocation === "all" || a.sublocation_id === selectedSublocation)
+      .filter((a) => selectedStatus === "all" || a.status === selectedStatus)
+      .map((a) => ({
+        asset_tag: a.asset_tag ?? a.asset_id,
+        name: a.name,
+        category: a.category ?? null,
+        brand: a.brand,
+        serial_number: a.serial_number,
+        location: locationName(a.location_id) ?? "Unassigned",
+        sublocation: locationName(a.sublocation_id),
+        condition: a.condition,
+        status: a.status,
+        purchase_date: a.purchase_date,
+        current_value: a.current_value,
+      }));
+  };
+
+  const assetListScopeLabel = [
+    selectedLocation === "all" ? "All Locations" : locations.find((l) => l.id === selectedLocation)?.name,
+    selectedSublocation === "all" ? null : locations.find((l) => l.id === selectedSublocation)?.name,
+    selectedStatus === "all" ? null : `Status: ${selectedStatus}`,
+  ].filter(Boolean).join(" · ");
+
+  const handleAssetList = (kind: "csv" | "pdf") => {
+    const rows = buildAssetListRows();
+    if (rows.length === 0) {
+      toast({ title: "Nothing to export", description: "No assets match the current filters.", variant: "destructive" });
+      return;
+    }
+    const meta = {
+      companyName: selectedCompany?.name ?? null,
+      scopeLabel: assetListScopeLabel,
+      formatCurrency,
+    };
+    if (kind === "csv") downloadAssetListCsv(rows, meta);
+    else downloadAssetListPdf(rows, meta);
+    toast({
+      title: "Asset list exported",
+      description: `${rows.length} asset(s), grouped by location (${kind.toUpperCase()}).`,
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Export */}
@@ -1062,6 +1122,22 @@ export function LocationReportAnalytics({
           </p>
         </div>
         <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Asset List
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleAssetList("csv")}>
+                Download CSV — grouped by location
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAssetList("pdf")}>
+                Download PDF — grouped by location
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={handleExportPdf} disabled={isExportingPdf}>
             <FileText className="mr-2 h-4 w-4" />
             {isExportingPdf ? "Exporting..." : "Export PDF"}
