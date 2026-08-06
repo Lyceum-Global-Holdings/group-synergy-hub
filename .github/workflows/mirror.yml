@@ -47,6 +47,11 @@ jobs:
         if: steps.cfg.outputs.configured == 'true'
         with:
           fetch-depth: 0
+          # Critical: checkout persists its GITHUB_TOKEN as an Authorization
+          # header for ALL github.com requests from this clone, which overrides
+          # the credentials in our push URL — and GITHUB_TOKEN cannot see the
+          # mirror repo ("Repository not found"). Disable it.
+          persist-credentials: false
 
       - name: Push ref to mirror
         if: steps.cfg.outputs.configured == 'true'
