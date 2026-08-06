@@ -1,0 +1,56 @@
+name: Mirror to group-synergy-hub
+
+# Keeps the clean-named sibling repo in sync with this one.
+#
+#   Lyceum-Global-Holdings/group-synergy-hub-635158f0  (THIS repo — canonical:
+#     Lovable syncs into it, all development lands here)
+#        │  every push (any branch or tag)
+#        ▼
+#   Lyceum-Global-Holdings/group-synergy-hub           (read-only mirror)
+#
+# One-way by design: the mirror is force-updated, so anything committed directly
+# to group-synergy-hub will be overwritten on the next sync. Develop here.
+#
+# Auth: needs a MIRROR_TOKEN secret (fine-grained PAT with Contents read/write
+# on Lyceum-Global-Holdings/group-synergy-hub). Until it exists, the job
+# reports "skipped" instead of failing — same pattern as deploy.yml.
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: 🔁 Sync mirror repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check mirror config
+        id: cfg
+        run: |
+          if [ -n "${{ secrets.MIRROR_TOKEN }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  MIRROR_TOKEN not set — mirror sync skipped."
+            echo "    Create a fine-grained PAT (Contents: read/write on"
+            echo "    Lyceum-Global-Holdings/group-synergy-hub) and add it as the"
+            echo "    MIRROR_TOKEN secret to enable automatic syncing."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.configured == 'true'
+        with:
+          fetch-depth: 0
+
+      - name: Push ref to mirror
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          git push --force \
+            "https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/Lyceum-Global-Holdings/group-synergy-hub.git" \
+            "${GITHUB_REF}:${GITHUB_REF}"
