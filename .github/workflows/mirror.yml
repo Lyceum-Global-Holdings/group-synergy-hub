@@ -43,6 +43,15 @@ jobs:
             echo "    MIRROR_TOKEN secret to enable automatic syncing."
           fi
 
+      - name: Diagnose token access
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          echo "token owner: $(curl -s -H "Authorization: Bearer ${{ secrets.MIRROR_TOKEN }}" https://api.github.com/user | jq -r '.login // "unknown"')"
+          code=$(curl -s -o /tmp/repo.json -w '%{http_code}' -H "Authorization: Bearer ${{ secrets.MIRROR_TOKEN }}" \
+            https://api.github.com/repos/Lyceum-Global-Holdings/group-synergy-hub)
+          echo "repo visibility check: HTTP $code"
+          jq -r '.full_name // .message' /tmp/repo.json
+
       - uses: actions/checkout@v4
         if: steps.cfg.outputs.configured == 'true'
         with:
