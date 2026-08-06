@@ -10,7 +10,7 @@ The pipeline:
 push to main → CI (lint/typecheck/test/build) ✓
             → Publish & Deploy workflow:
                  1. builds the production image
-                 2. pushes it to GHCR (ghcr.io/globallyceum25-dot/group-synergy-hub-635158f0)
+                 2. pushes it to GHCR (ghcr.io/lyceum-global-holdings/group-synergy-hub-635158f0)
                  3. (optional) SSHes to your server and rolls it out
 ```
 
@@ -47,7 +47,7 @@ echo "<YOUR_GITHUB_PAT>" | docker login ghcr.io -u <your-github-username> --pass
 
 # Grab the compose file and start it.
 mkdir -p /opt/synergy-hub && cd /opt/synergy-hub
-curl -fsSLO https://raw.githubusercontent.com/globallyceum25-dot/group-synergy-hub-635158f0/main/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/Lyceum-Global-Holdings/group-synergy-hub-635158f0/main/docker-compose.yml
 docker compose up -d
 ```
 

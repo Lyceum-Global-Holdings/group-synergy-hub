@@ -5,7 +5,7 @@
 # to main. To update:  docker compose pull && docker compose up -d
 services:
   app:
-    image: ghcr.io/globallyceum25-dot/group-synergy-hub-635158f0:latest
+    image: ghcr.io/lyceum-global-holdings/group-synergy-hub-635158f0:latest
     container_name: synergy-hub
     restart: unless-stopped
     ports:
