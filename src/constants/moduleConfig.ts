@@ -110,6 +110,9 @@ export const moduleConfig: Record<string, ModuleConfig> = {
     icon: Building2,
     subModules: [
       { key: 'customer-master', name: 'Customer Master', description: 'Customer profiles and details', url: '/tuh-modules/customer-master' },
+      { key: 'services', name: 'Services', description: 'Services the company provides, with list prices', url: '/sales/services' },
+      { key: 'quotations', name: 'Quotations', description: 'Quote services to customers, convert to invoices', url: '/sales/quotations' },
+      { key: 'sales-invoices', name: 'Invoices', description: 'Customer invoices with line items (shared with AR)', url: '/sales/invoices' },
       { key: 'customer-po', name: 'Customer PO', description: 'Customer purchase order management', url: '/tuh-modules/customer-po' },
       { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/tuh-modules/bill-of-materials' },
       { key: 'finished-goods', name: 'Finished Goods', description: 'Finished goods inventory management', url: '/tuh-modules/finished-goods' },

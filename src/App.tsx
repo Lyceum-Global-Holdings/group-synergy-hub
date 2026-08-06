@@ -103,6 +103,9 @@ const BillOfMaterials = lazy(() => import("./pages/procurement/BillOfMaterials")
 const CustomerMaster = lazy(() => import("./pages/tuh-modules/CustomerMaster"));
 const CustomerPO = lazy(() => import("./pages/tuh-modules/CustomerPO"));
 const CustomerPoView = lazy(() => import("./pages/tuh-modules/CustomerPoView"));
+const ServicesPage = lazy(() => import("./pages/sales/ServicesPage"));
+const QuotationsPage = lazy(() => import("./pages/sales/QuotationsPage"));
+const SalesInvoicesPage = lazy(() => import("./pages/sales/SalesInvoicesPage"));
 const CostumeCatalog = lazy(() => import("./pages/tuh-modules/CostumeCatalog"));
 const CostumeStock = lazy(() => import("./pages/tuh-modules/CostumeStock"));
 const CostumeRental = lazy(() => import("./pages/tuh-modules/CostumeRental"));
@@ -382,6 +385,9 @@ function App() {
                 <Route path="/tuh-modules/customer-master" element={<CustomerMaster />} />
                 <Route path="/tuh-modules/customer-po" element={<CustomerPO />} />
                 <Route path="/tuh-modules/customer-po/:cpoId" element={<CustomerPoView />} />
+                <Route path="/sales/services" element={<ServicesPage />} />
+                <Route path="/sales/quotations" element={<QuotationsPage />} />
+                <Route path="/sales/invoices" element={<SalesInvoicesPage />} />
                 <Route path="/tuh-modules/costume-catalog" element={<CostumeCatalog />} />
                 <Route path="/tuh-modules/costume-stock" element={<CostumeStock />} />
                 <Route path="/tuh-modules/costume-rental" element={<CostumeRental />} />
