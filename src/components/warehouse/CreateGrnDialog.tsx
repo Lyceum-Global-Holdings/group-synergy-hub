@@ -480,7 +480,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
     const values = form.getValues();
 
     // Filter items with quantity > 0
-    const validItems = items.filter((item) => item.quantity_received > 0);
+    let validItems = items.filter((item) => item.quantity_received > 0);
 
     if (validItems.length === 0) {
       alert('Please add at least one item with quantity received > 0');
@@ -514,6 +514,18 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
           skipped.map((s) => s.item_name || s.item_code || 'unnamed').join(', ')
       );
     }
+
+    // Normalise batch numbers before validating: uppercase + trim, so values
+    // typed in lower case or arriving from a draft/paste are accepted rather
+    // than rejected as "invalid format".
+    const normalisedBatches = items.map((it) => {
+      const norm = it.batch_number?.trim().toUpperCase() ?? '';
+      return norm !== (it.batch_number ?? '') ? { ...it, batch_number: norm } : it;
+    });
+    if (normalisedBatches.some((it, i) => it !== items[i])) {
+      setItems(normalisedBatches);
+    }
+    validItems = normalisedBatches.filter((item) => item.quantity_received > 0);
 
     // Validate batch-tracked items have batch numbers
     const missingBatch = validItems.filter(
@@ -991,7 +1003,9 @@ export function CreateGrnDialog({ open, onOpenChange, poId, editingDraft }: Crea
                           <div className="flex items-center gap-1 flex-1">
                             <Input
                               value={item.batch_number || ''}
-                              onChange={(e) => handleItemChange(index, 'batch_number', e.target.value)}
+                              // Batch numbers are uppercase per GS1 AI(10); normalise as
+                              // the user types so "tuh" isn't rejected as invalid.
+                              onChange={(e) => handleItemChange(index, 'batch_number', e.target.value.toUpperCase())}
                               placeholder="Batch #*"
                               className={cn("w-28 h-8 text-xs", item.is_batch_tracked && !item.batch_number?.trim() && "border-destructive")}
                             />
