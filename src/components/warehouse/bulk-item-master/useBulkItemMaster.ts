@@ -41,7 +41,7 @@ export interface UseBulkItemMasterReturn {
   resetAll: () => void;
   applyCategoryToAll: () => void;
   applyUnitToAll: () => void;
-  seedFromNames: (names: string[]) => void;
+  seedFromNames: (entries: (string | { name: string; uom?: string })[]) => void;
   autoClassifyAll: () => void;
   resetCode: (rowId: string) => void;
   submit: () => Promise<{ created: number; updated: number; skipped: number; failed: number }>;
@@ -353,10 +353,25 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     setRows(Array.from({ length: 5 }, emptyRow));
   }, []);
 
+  /**
+   * Seed rows from pasted lines. Each entry may carry an explicit UoM (second
+   * column of a "name⇥uom" paste); when present it wins over the auto-
+   * classifier, matched case-insensitively against unit abbreviation or name.
+   */
   const seedFromNames = useCallback(
-    (names: string[]) => {
-      const clean = names.map((n) => n.trim()).filter(Boolean);
+    (entries: (string | { name: string; uom?: string })[]) => {
+      const clean = entries
+        .map((e) => (typeof e === 'string' ? { name: e, uom: undefined } : e))
+        .map((e) => ({ name: e.name.trim(), uom: e.uom?.trim() }))
+        .filter((e) => e.name);
       if (clean.length === 0) return;
+
+      const unitByToken = new Map<string, string>();
+      units.forEach((u: any) => {
+        if (u.abbreviation) unitByToken.set(String(u.abbreviation).trim().toLowerCase(), u.id);
+        if (u.name) unitByToken.set(String(u.name).trim().toLowerCase(), u.id);
+      });
+
       setRows((prev) => {
         const placeholders = prev.filter(
           (r) => !r.name.trim() && !r.description.trim() && !r.brand.trim() && !r.code_manual,
@@ -365,20 +380,23 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
         const placeholderQueue = [...placeholders];
         const newRows: BulkItemMasterRow[] = [];
 
-        clean.forEach((name) => {
+        clean.forEach(({ name, uom }) => {
           const cls = classifyItem({
             name,
             categories: categories.map((c) => ({ id: c.id, name: c.name, code: c.code })),
             units: units.map((u) => ({ id: u.id, name: u.name, abbreviation: u.abbreviation })),
           });
+          const explicitUnit = uom ? unitByToken.get(uom.toLowerCase()) : undefined;
           const base = placeholderQueue.shift() ?? emptyRow();
           newRows.push({
             ...base,
             name,
             category_id: cls.category_id,
-            unit_id: cls.unit_id,
+            unit_id: explicitUnit ?? cls.unit_id,
             classify_confidence: cls.confidence,
             suggested_family: cls.category_family,
+            // Flag a pasted UoM we couldn't match so the user can fix it.
+            warnings: uom && !explicitUnit ? [`Unknown UoM "${uom}" — pick one`] : [],
           });
         });
 

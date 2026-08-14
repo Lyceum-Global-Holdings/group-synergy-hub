@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 import { useBulkItemMaster } from './useBulkItemMaster';
 import { useCompanies } from '@/hooks/useCompanies';
-import { PasteNamesDialog } from './PasteNamesDialog';
+import { PasteNamesDialog, parsePastedLine } from './PasteNamesDialog';
 import type { BulkItemMasterRow } from './types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -134,7 +134,8 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
     // Don't hijack paste when focused inside an input/textarea — let the
     // browser handle single-cell paste normally.
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-    seedFromNames(lines.map((l) => l.split('\t')[0]));
+    // Same parser as the paste dialog: name in column 1, optional UoM in column 2.
+    seedFromNames(lines.map(parsePastedLine).filter(Boolean) as { name: string; uom?: string }[]);
   };
 
   return (
@@ -348,7 +349,12 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
         </SheetContent>
       </Sheet>
 
-      <PasteNamesDialog open={pasteOpen} onOpenChange={setPasteOpen} onSeed={seedFromNames} />
+      <PasteNamesDialog
+        open={pasteOpen}
+        onOpenChange={setPasteOpen}
+        onSeed={seedFromNames}
+        units={units}
+      />
     </>
   );
 }
