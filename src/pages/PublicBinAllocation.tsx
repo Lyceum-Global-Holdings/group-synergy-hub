@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Mail,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScannedBinAdjustmentDialog } from '@/components/warehouse/ScannedBinAdjustmentDialog';
 
@@ -35,8 +36,17 @@ interface BinQR {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+// Source the project URL/anon key from the shared client rather than reading
+// import.meta.env directly: the generated client already resolves build-time
+// VITE_* vars with baked-in fallbacks, so a deploy without those build args
+// (e.g. the hosted build) still works. Reading the raw env here made this page
+// fail closed with "Temporarily unavailable" even though the service was fine.
+const SUPABASE_URL =
+  (supabase as unknown as { supabaseUrl?: string }).supabaseUrl ||
+  (import.meta.env.VITE_SUPABASE_URL as string);
+const SUPABASE_ANON_KEY =
+  (supabase as unknown as { supabaseKey?: string }).supabaseKey ||
+  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string);
 const SUPPORT_EMAIL = 'support@lyceumglobal.co';
 
 // HTTP-aligned error kinds (RFC 9110 §15.5/§15.6).
