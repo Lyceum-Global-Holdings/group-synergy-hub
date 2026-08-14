@@ -41,6 +41,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useBulkItemMaster } from './useBulkItemMaster';
+import { useCompanies } from '@/hooks/useCompanies';
 import { PasteNamesDialog } from './PasteNamesDialog';
 import type { BulkItemMasterRow } from './types';
 import { cn } from '@/lib/utils';
@@ -101,9 +102,16 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
     skippedCount,
     duplicatePolicy,
     setDuplicatePolicy,
+    codePrefix,
+    setCodePrefix,
     categories,
     units,
   } = useBulkItemMaster();
+
+  // Optional company scoping: selecting a company switches the code prefix
+  // from the generic INV to the company code (e.g. TUH-TXT-FAB-0001), with an
+  // independent sequence per prefix.
+  const { companies = [] } = useCompanies();
 
   const [pasteOpen, setPasteOpen] = useState(false);
 
@@ -161,6 +169,24 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
               Clear invalid ({invalidCount})
             </Button>
             <Button size="sm" variant="ghost" onClick={resetAll}>Reset</Button>
+            <div className="flex items-center gap-2 pl-2 border-l">
+              <span className="text-xs text-muted-foreground">Company (optional):</span>
+              <Select value={codePrefix} onValueChange={setCodePrefix}>
+                <SelectTrigger className="h-8 w-[170px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="INV">Generic (INV)</SelectItem>
+                  {companies
+                    .filter((c: any) => c.code && c.code.trim())
+                    .map((c: any) => (
+                      <SelectItem key={c.id} value={c.code.trim().toUpperCase()}>
+                        {c.code.trim().toUpperCase()} — {c.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-2 pl-2 border-l">
               <span className="text-xs text-muted-foreground">On duplicate code:</span>
               <Select value={duplicatePolicy} onValueChange={(v) => setDuplicatePolicy(v as any)}>

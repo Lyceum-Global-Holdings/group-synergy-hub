@@ -49,6 +49,8 @@ export interface UseBulkItemMasterReturn {
   skippedCount: number;
   duplicatePolicy: DuplicatePolicy;
   setDuplicatePolicy: (p: DuplicatePolicy) => void;
+  codePrefix: string;
+  setCodePrefix: (p: string) => void;
   categories: ReturnType<typeof useItemCategories>['categories'];
   units: ReturnType<typeof useItemUnits>['units'];
 }
@@ -63,6 +65,15 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
 
   const [duplicatePolicy, setDuplicatePolicy] = useState<DuplicatePolicy>('skip');
 
+  // Code prefix: 'INV' = generic items; a company code (e.g. 'TUH') makes the
+  // batch company-specific — codes become {COMPANY}-{CAT}-{SUBCAT}-{NNNN} with
+  // an independent sequence per prefix.
+  const [codePrefix, setCodePrefix] = useState<string>('INV');
+  const prefixPattern = useMemo(
+    () => codePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    [codePrefix],
+  );
+
   const [rows, setRows] = useState<BulkItemMasterRow[]>(() =>
     Array.from({ length: 5 }, emptyRow),
   );
@@ -76,23 +87,28 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
   }, [existingItems]);
 
   // Codes follow the standard XXX-XXX-XXX-NNNN format:
-  //   INV-{PARENT_CAT}-{LEAF_CAT}-{NNNN}
+  //   {PREFIX}-{PARENT_CAT}-{LEAF_CAT}-{NNNN}
+  // where PREFIX is 'INV' (generic) or a company code (company-specific).
+  // Sequences are tracked per prefix, so TUH-TXT-FAB-0001 numbers
+  // independently of INV-TXT-FAB-….
   // (If the leaf category has no parent, the leaf code is used for both
   //  the second and third segments so the shape is preserved.)
   const maxByCategoryCode = useMemo(() => {
     const map = new Map<string, number>();
+    const fourSeg = new RegExp(`^${prefixPattern}-([A-Z0-9]+)-([A-Z0-9]+)-(\\d+)$`, 'i');
+    const threeSeg = new RegExp(`^${prefixPattern}-([A-Z0-9]+)-(\\d+)$`, 'i');
     existingItems.forEach((it) => {
       const code = it.item_code || '';
       // New 4-segment format
-      let m = code.match(/^INV-([A-Z0-9]+)-([A-Z0-9]+)-(\d+)$/i);
+      let m = code.match(fourSeg);
       let key = '';
       let seq = NaN;
       if (m) {
         key = `${m[1].toUpperCase()}-${m[2].toUpperCase()}`;
         seq = Number(m[3]);
       } else {
-        // Legacy 3-segment format INV-CAT-NNN — treat as parent=leaf=CAT
-        m = code.match(/^INV-([A-Z0-9]+)-(\d+)$/i);
+        // Legacy 3-segment format {PREFIX}-CAT-NNN — treat as parent=leaf=CAT
+        m = code.match(threeSeg);
         if (m) {
           const cat = m[1].toUpperCase();
           key = `${cat}-${cat}`;
@@ -103,7 +119,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
       if ((map.get(key) ?? 0) < seq) map.set(key, seq);
     });
     return map;
-  }, [existingItems]);
+  }, [existingItems, prefixPattern]);
 
   const categoryById = useMemo(() => {
     const m = new Map<string, { id: string; name: string; code?: string | null; parent_id?: string | null }>();
@@ -141,12 +157,12 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
         let autoPreview = '';
         if (codes) {
           // Auto-generate per ISO/IEC 8000 + GS1 sequencing in the
-          // standard XXX-XXX-XXX-NNNN shape: INV-{parent}-{leaf}-{NNNN}.
+          // standard XXX-XXX-XXX-NNNN shape: {prefix}-{parent}-{leaf}-{NNNN}.
           // Skip any sequence already taken by the catalog or by an
           // earlier row in this batch.
           let seq = (counters.get(catKey) ?? (maxByCategoryCode.get(catKey) ?? 0)) + 1;
           for (let guard = 0; guard < 10000; guard++) {
-            const candidate = `INV-${codes.parent}-${codes.leaf}-${String(seq).padStart(4, '0')}`;
+            const candidate = `${codePrefix}-${codes.parent}-${codes.leaf}-${String(seq).padStart(4, '0')}`;
             const lower = candidate.toLowerCase();
             if (!existingCodeToId.has(lower) && !codesSeen.has(lower)) {
               autoPreview = candidate;
@@ -226,7 +242,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
 
       return out;
     },
-    [categoryById, existingCodeToId, maxByCategoryCode, duplicatePolicy, resolveCategoryCodes],
+    [categoryById, existingCodeToId, maxByCategoryCode, duplicatePolicy, resolveCategoryCodes, codePrefix],
   );
 
   const rowsRef = useRef(rows);
@@ -534,6 +550,8 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     skippedCount,
     duplicatePolicy,
     setDuplicatePolicy,
+    codePrefix,
+    setCodePrefix,
     categories,
     units,
   };
