@@ -39,6 +39,7 @@ import {
   Download,
   ChevronsUpDown,
   Check,
+  ArrowDown,
 } from 'lucide-react';
 import { useBulkItemMaster } from './useBulkItemMaster';
 import { useCompanies } from '@/hooks/useCompanies';
@@ -92,6 +93,8 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
     removeRow,
     clearInvalid,
     resetAll,
+    applyCategoryToAll,
+    applyUnitToAll,
     seedFromNames,
     autoClassifyAll,
     resetCode,
@@ -272,8 +275,42 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
                   <th className="px-2 py-2 text-left w-10">#</th>
                   <th className="px-2 py-2 text-left min-w-[240px]">Name *</th>
                   <th className="px-2 py-2 text-left min-w-[200px]">Description</th>
-                  <th className="px-2 py-2 text-left min-w-[180px]">Category *</th>
-                  <th className="px-2 py-2 text-left w-28">UoM *</th>
+                  <th className="px-2 py-2 text-left min-w-[180px]">
+                    <div className="flex items-center gap-1">
+                      Category *
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-6 px-1.5 text-[11px] font-normal"
+                            onClick={applyCategoryToAll}
+                            disabled={!rows[0]?.category_id}
+                          >
+                            <ArrowDown className="h-3 w-3 mr-0.5" /> Apply to all
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Copy row 1's category to every row</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </th>
+                  <th className="px-2 py-2 text-left w-32">
+                    <div className="flex items-center gap-1">
+                      UoM *
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-6 px-1.5 text-[11px] font-normal"
+                            onClick={applyUnitToAll}
+                            disabled={!rows[0]?.unit_id}
+                          >
+                            <ArrowDown className="h-3 w-3 mr-0.5" /> All
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Copy row 1's UoM to every row</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </th>
                   <th className="px-2 py-2 text-left min-w-[140px]">Brand</th>
                   <th className="px-2 py-2 text-left min-w-[200px]">Item code</th>
                   <th className="px-2 py-2 text-left min-w-[160px]">Status</th>

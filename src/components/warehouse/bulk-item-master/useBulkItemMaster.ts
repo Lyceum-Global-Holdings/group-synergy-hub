@@ -39,6 +39,8 @@ export interface UseBulkItemMasterReturn {
   removeRow: (rowId: string) => void;
   clearInvalid: () => void;
   resetAll: () => void;
+  applyCategoryToAll: () => void;
+  applyUnitToAll: () => void;
   seedFromNames: (names: string[]) => void;
   autoClassifyAll: () => void;
   resetCode: (rowId: string) => void;
@@ -313,6 +315,28 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     [applyPatch, categories, units, recompute],
   );
 
+  /**
+   * Fill down: copy the first row's category (or UoM) to every other row.
+   * Rows already imported/updated are left alone — their codes are committed.
+   */
+  const applyFirstRowField = useCallback(
+    (field: 'category_id' | 'unit_id') => {
+      setRows((prev) => {
+        const value = prev[0]?.[field];
+        if (!value) return prev;
+        return recompute(
+          prev.map((r, i) =>
+            i === 0 || ['imported', 'updated'].includes(r.status) ? r : { ...r, [field]: value },
+          ),
+        );
+      });
+    },
+    [recompute],
+  );
+
+  const applyCategoryToAll = useCallback(() => applyFirstRowField('category_id'), [applyFirstRowField]);
+  const applyUnitToAll = useCallback(() => applyFirstRowField('unit_id'), [applyFirstRowField]);
+
   const addRows = useCallback((n: number) => {
     setRows((prev) => recompute([...prev, ...Array.from({ length: n }, emptyRow)]));
   }, [recompute]);
@@ -540,6 +564,8 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     removeRow,
     clearInvalid,
     resetAll,
+    applyCategoryToAll,
+    applyUnitToAll,
     seedFromNames,
     autoClassifyAll,
     resetCode,
