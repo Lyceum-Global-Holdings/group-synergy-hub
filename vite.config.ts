@@ -6,7 +6,9 @@ import path from "path";
 export default defineConfig(async ({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    // Honour a caller-assigned port (PORT env) so the dev server can run
+    // alongside other apps; falls back to 8080 for a plain `npm run dev`.
+    port: Number(process.env.PORT) || 8080,
   },
   plugins: [
     react(),
