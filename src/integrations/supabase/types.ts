@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -5777,6 +5777,63 @@ export type Database = {
           },
         ]
       }
+      customer_invoice_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          invoice_id: string
+          item_name: string
+          line_total: number
+          quantity: number
+          service_id: string | null
+          sort_order: number
+          unit: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id: string
+          item_name: string
+          line_total?: number
+          quantity?: number
+          service_id?: string | null
+          sort_order?: number
+          unit?: string
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id?: string
+          item_name?: string
+          line_total?: number
+          quantity?: number
+          service_id?: string | null
+          sort_order?: number
+          unit?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_invoice_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_invoice_lines: {
         Row: {
           amount: number
@@ -5867,6 +5924,7 @@ export type Database = {
           payment_terms: string | null
           posted_by: string | null
           posted_date: string | null
+          quotation_id: string | null
           sales_order_id: string | null
           sap_document_number: string | null
           sap_last_sync_at: string | null
@@ -5893,6 +5951,7 @@ export type Database = {
           payment_terms?: string | null
           posted_by?: string | null
           posted_date?: string | null
+          quotation_id?: string | null
           sales_order_id?: string | null
           sap_document_number?: string | null
           sap_last_sync_at?: string | null
@@ -5919,6 +5978,7 @@ export type Database = {
           payment_terms?: string | null
           posted_by?: string | null
           posted_date?: string | null
+          quotation_id?: string | null
           sales_order_id?: string | null
           sap_document_number?: string | null
           sap_last_sync_at?: string | null
@@ -5961,6 +6021,13 @@ export type Database = {
             columns: ["gl_account_id"]
             isOneToOne: false
             referencedRelation: "v_active_accounts_with_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_invoices_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "sales_quotations"
             referencedColumns: ["id"]
           },
         ]
@@ -9512,6 +9579,8 @@ export type Database = {
           expiry_date: string | null
           grn_id: string
           id: string
+          inspected_at: string | null
+          inspected_by: string | null
           item_code: string | null
           item_name: string
           line_discount_amount: number
@@ -9519,8 +9588,14 @@ export type Database = {
           net_unit_price: number | null
           po_item_id: string | null
           quality_status: string | null
+          quantity_accepted: number
           quantity_ordered: number | null
           quantity_received: number
+          quantity_rejected: number
+          rejection_notes: string | null
+          rejection_reason:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
           remarks: string | null
           secondary_quantity_received: number | null
           secondary_uom: string | null
@@ -9541,6 +9616,8 @@ export type Database = {
           expiry_date?: string | null
           grn_id: string
           id?: string
+          inspected_at?: string | null
+          inspected_by?: string | null
           item_code?: string | null
           item_name: string
           line_discount_amount?: number
@@ -9548,8 +9625,14 @@ export type Database = {
           net_unit_price?: number | null
           po_item_id?: string | null
           quality_status?: string | null
+          quantity_accepted?: number
           quantity_ordered?: number | null
           quantity_received: number
+          quantity_rejected?: number
+          rejection_notes?: string | null
+          rejection_reason?:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
           remarks?: string | null
           secondary_quantity_received?: number | null
           secondary_uom?: string | null
@@ -9570,6 +9653,8 @@ export type Database = {
           expiry_date?: string | null
           grn_id?: string
           id?: string
+          inspected_at?: string | null
+          inspected_by?: string | null
           item_code?: string | null
           item_name?: string
           line_discount_amount?: number
@@ -9577,8 +9662,14 @@ export type Database = {
           net_unit_price?: number | null
           po_item_id?: string | null
           quality_status?: string | null
+          quantity_accepted?: number
           quantity_ordered?: number | null
           quantity_received?: number
+          quantity_rejected?: number
+          rejection_notes?: string | null
+          rejection_reason?:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
           remarks?: string | null
           secondary_quantity_received?: number | null
           secondary_uom?: string | null
@@ -11070,6 +11161,7 @@ export type Database = {
           bin_id: string | null
           condition: string | null
           created_at: string
+          grn_item_id: string | null
           id: string
           item_id: string
           mrn_id: string
@@ -11085,6 +11177,7 @@ export type Database = {
           bin_id?: string | null
           condition?: string | null
           created_at?: string
+          grn_item_id?: string | null
           id?: string
           item_id: string
           mrn_id: string
@@ -11100,6 +11193,7 @@ export type Database = {
           bin_id?: string | null
           condition?: string | null
           created_at?: string
+          grn_item_id?: string | null
           id?: string
           item_id?: string
           mrn_id?: string
@@ -11117,6 +11211,13 @@ export type Database = {
             columns: ["bin_id"]
             isOneToOne: false
             referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_return_items_grn_item_id_fkey"
+            columns: ["grn_item_id"]
+            isOneToOne: false
+            referencedRelation: "grn_items"
             referencedColumns: ["id"]
           },
           {
@@ -15759,6 +15860,176 @@ export type Database = {
           },
         ]
       }
+      sales_quotation_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          item_name: string
+          line_total: number
+          list_price: number | null
+          quantity: number
+          quotation_id: string
+          service_id: string | null
+          sort_order: number
+          unit: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_name: string
+          line_total?: number
+          list_price?: number | null
+          quantity?: number
+          quotation_id: string
+          service_id?: string | null
+          sort_order?: number
+          unit?: string
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_name?: string
+          line_total?: number
+          list_price?: number | null
+          quantity?: number
+          quotation_id?: string
+          service_id?: string | null
+          sort_order?: number
+          unit?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_quotation_items_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "sales_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_quotation_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_quotations: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          decided_at: string | null
+          discount_amount: number
+          discount_type: string | null
+          discount_value: number
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          payment_terms: string | null
+          quote_date: string
+          quote_number: string
+          sent_at: string | null
+          status: string
+          subtotal: number
+          tax_amount: number
+          tax_type: string | null
+          tax_value: number
+          terms: string | null
+          total_amount: number
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          decided_at?: string | null
+          discount_amount?: number
+          discount_type?: string | null
+          discount_value?: number
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          quote_date?: string
+          quote_number: string
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_type?: string | null
+          tax_value?: number
+          terms?: string | null
+          total_amount?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          decided_at?: string | null
+          discount_amount?: number
+          discount_type?: string | null
+          discount_value?: number
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          payment_terms?: string | null
+          quote_date?: string
+          quote_number?: string
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_type?: string | null
+          tax_value?: number
+          terms?: string | null
+          total_amount?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_quotations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_quotations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_quotations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_quotations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sap_configurations: {
         Row: {
           company_id: string
@@ -16018,6 +16289,107 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_price_history: {
+        Row: {
+          changed_by: string | null
+          company_id: string | null
+          created_at: string
+          id: string
+          new_price: number
+          old_price: number | null
+          service_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          new_price: number
+          old_price?: number | null
+          service_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          new_price?: number
+          old_price?: number | null
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_price_history_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          category: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          default_price: number
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          service_code: string
+          template_id: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_price?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          service_code: string
+          template_id?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_price?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          service_code?: string
+          template_id?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
         ]
@@ -22924,6 +23296,42 @@ export type Database = {
         }
         Returns: Json
       }
+      convert_quotation_to_invoice: {
+        Args: { p_quotation_id: string }
+        Returns: {
+          amount_received: number | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          customer_id: string | null
+          due_date: string
+          gl_account_id: string | null
+          gross_amount: number
+          id: string
+          invoice_date: string
+          invoice_number: string
+          net_amount: number
+          notes: string | null
+          payment_terms: string | null
+          posted_by: string | null
+          posted_date: string | null
+          quotation_id: string | null
+          sales_order_id: string | null
+          sap_document_number: string | null
+          sap_last_sync_at: string | null
+          sap_sync_status: string | null
+          status: string | null
+          tax_amount: number | null
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "customer_invoices"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_assets_from_request: {
         Args: { p_request_id: string }
         Returns: {
@@ -23029,6 +23437,37 @@ export type Database = {
         }
         Returns: string[]
       }
+      create_supplier_return_from_grn: {
+        Args: { p_grn_id: string }
+        Returns: {
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string | null
+          mrn_number: string
+          notes: string | null
+          reason: string
+          reference_id: string | null
+          reference_type: string | null
+          return_date: string
+          return_type: string
+          returned_by: string
+          srn_document_url: string | null
+          srn_number: string | null
+          status: string
+          total_value: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "material_return_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_tool_with_initial_bin: {
         Args: { p_bin_id: string; p_quantity: number; p_tool_data: Json }
         Returns: string
@@ -23044,6 +23483,30 @@ export type Database = {
         Returns: Json
       }
       current_supplier_ids: { Args: never; Returns: string[] }
+      customize_service_template: {
+        Args: { p_company_id: string; p_template_id: string }
+        Returns: {
+          category: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          default_price: number
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          service_code: string
+          template_id: string | null
+          unit: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "services"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       delete_partial_piece: { Args: { p_id: string }; Returns: undefined }
       ensure_opening_batch_for_bin_allocation: {
         Args: { _allocation_id: string }
@@ -23116,6 +23579,7 @@ export type Database = {
       generate_project_code: { Args: never; Returns: string }
       generate_putaway_number: { Args: never; Returns: string }
       generate_quality_inspection_number: { Args: never; Returns: string }
+      generate_quotation_number: { Args: never; Returns: string }
       generate_quote_number: { Args: never; Returns: string }
       generate_release_number: { Args: never; Returns: string }
       generate_rental_number: { Args: never; Returns: string }
@@ -23123,7 +23587,9 @@ export type Database = {
       generate_rfq_number: { Args: never; Returns: string }
       generate_safety_incident_number: { Args: never; Returns: string }
       generate_safety_inspection_number: { Args: never; Returns: string }
+      generate_sales_invoice_number: { Args: never; Returns: string }
       generate_sales_order_number: { Args: never; Returns: string }
+      generate_service_code: { Args: never; Returns: string }
       generate_srn_number: { Args: { _company_id: string }; Returns: string }
       generate_supplier_code: { Args: never; Returns: string }
       generate_transfer_number: { Args: never; Returns: string }
@@ -24199,9 +24665,17 @@ export type Database = {
           status: string
         }[]
       }
+      recompute_customer_invoice_totals: {
+        Args: { p_invoice_id: string }
+        Returns: undefined
+      }
       recompute_grn_totals: { Args: { p_grn_id: string }; Returns: undefined }
       recompute_item_primary_location: {
         Args: { p_item_id: string }
+        Returns: undefined
+      }
+      recompute_quotation_totals: {
+        Args: { p_quotation_id: string }
         Returns: undefined
       }
       recompute_stock_ledger_balances: { Args: never; Returns: Json }
@@ -25737,6 +26211,58 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "warehouse_bins"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_grn_item_disposition: {
+        Args: {
+          p_grn_item_id: string
+          p_notes?: string
+          p_qty_accepted: number
+          p_qty_rejected: number
+          p_reason?: Database["public"]["Enums"]["grn_rejection_reason"]
+        }
+        Returns: {
+          batch_number: string | null
+          catalog_item_id: string | null
+          conversion_note: string | null
+          created_at: string
+          description: string | null
+          discount_type: string | null
+          discount_value: number
+          expiry_date: string | null
+          grn_id: string
+          id: string
+          inspected_at: string | null
+          inspected_by: string | null
+          item_code: string | null
+          item_name: string
+          line_discount_amount: number
+          manufacturing_date: string | null
+          net_unit_price: number | null
+          po_item_id: string | null
+          quality_status: string | null
+          quantity_accepted: number
+          quantity_ordered: number | null
+          quantity_received: number
+          quantity_rejected: number
+          rejection_notes: string | null
+          rejection_reason:
+            | Database["public"]["Enums"]["grn_rejection_reason"]
+            | null
+          remarks: string | null
+          secondary_quantity_received: number | null
+          secondary_uom: string | null
+          total_cost: number | null
+          unit_of_measure: string
+          unit_price: number | null
+          updated_at: string
+          warehouse_item_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "grn_items"
           isOneToOne: true
           isSetofReturn: false
         }
