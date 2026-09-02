@@ -638,7 +638,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
               </Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => handleSubmit(false)} disabled={isCreating}>
-                  Save as unknown as Draft
+                  Save as Draft
                 </Button>
                 <Button onClick={() => handleSubmit(true)} disabled={isCreating}>
                   <CheckCircle className="mr-2 h-4 w-4" />
