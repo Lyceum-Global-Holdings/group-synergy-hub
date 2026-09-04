@@ -60,9 +60,10 @@ export function PasteNamesDialog({ open, onOpenChange, onSeed, units = [] }: Pro
   }, [units]);
 
   const entries = useMemo(
-    () => text.split(/\r?\n/).map(parsePastedLine).filter(Boolean) as PastedEntry[],
+    () => text.split(/\r?\n/).map((l) => parsePastedLine(l)).filter(Boolean) as PastedEntry[],
     [text],
   );
+
   const withUom = entries.filter((e) => e.uom);
   const unknownUom = withUom.filter((e) => !unitTokens.has(e.uom!.toLowerCase()));
 
