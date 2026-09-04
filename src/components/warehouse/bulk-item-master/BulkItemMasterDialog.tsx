@@ -419,12 +419,14 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
       <td className="px-2 py-1.5">
         <div className="flex items-center gap-1">
           <Input
+            data-bulk-cell="name"
             value={row.name}
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Item name"
             className="h-8 text-xs"
             disabled={['imported','updated'].includes(row.status)}
           />
+
           {row.classify_confidence !== 'none' && (
             <TooltipProvider>
               <Tooltip>
