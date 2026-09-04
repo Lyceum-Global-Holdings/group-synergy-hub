@@ -122,21 +122,34 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
     await submit();
   };
 
-  // Paste TSV directly into the grid (name⇥description⇥brand…)
+  // Paste TSV/multi-line text anywhere in the grid (including directly into a
+  // Name cell, which is what most users do).
   const handleGridPaste = (e: React.ClipboardEvent) => {
-    const text = e.clipboardData?.getData('text');
-    if (!text) return;
+    const text = e.clipboardData?.getData('text') ?? '';
+    if (!text.trim()) return;
+
     const lines = text.split(/\r?\n/).filter((l) => l.trim());
-    // Only auto-seed when the user pasted ≥2 lines OR a tab-separated row
-    if (lines.length < 2 && !text.includes('\t')) return;
+    const isBulk = lines.length > 1 || text.includes('\t');
+    // Single plain value → let the browser paste it into the focused cell.
+    if (!isBulk) return;
+
+    const target = e.target as HTMLElement | null;
+    const tag = target?.tagName;
+    const isField = tag === 'INPUT' || tag === 'TEXTAREA';
+    // Inside a non-name field (description/brand/item code) keep native paste;
+    // only the Name column seeds rows.
+    if (isField && target?.getAttribute('data-bulk-cell') !== 'name') return;
+
     e.preventDefault();
-    const target = e.target as HTMLElement;
-    // Don't hijack paste when focused inside an input/textarea — let the
-    // browser handle single-cell paste normally.
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-    // Same parser as the paste dialog: name in column 1, optional UoM in column 2.
-    seedFromNames(lines.map(parsePastedLine).filter(Boolean) as { name: string; uom?: string }[]);
+    e.stopPropagation();
+    const entries = lines
+      .map((l) => parsePastedLine(l, false))
+      .filter(Boolean) as { name: string; uom?: string }[];
+    if (entries.length === 0) return;
+    seedFromNames(entries);
+    toast.success(`Added ${entries.length} row${entries.length === 1 ? '' : 's'} from clipboard`);
   };
+
 
   return (
     <>
