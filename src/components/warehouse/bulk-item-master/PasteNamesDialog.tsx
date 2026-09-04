@@ -26,22 +26,26 @@ interface Props {
 }
 
 /**
- * Split a pasted line into name + optional UoM. Accepts tab (Excel), comma
- * or a trailing " | " separator so users can type by hand too.
+ * Split a pasted line into name + optional UoM. Accepts tab (Excel), a " | "
+ * separator, or a comma so users can type by hand too.
+ *
+ * `allowComma` must be false for grid paste: names frequently contain commas
+ * ("LED panel 8W, 12V") and splitting on them silently truncates the name.
  */
-export function parsePastedLine(line: string): PastedEntry | null {
+export function parsePastedLine(line: string, allowComma = true): PastedEntry | null {
   const raw = line.trim();
   if (!raw) return null;
   let parts: string[];
   if (raw.includes('\t')) parts = raw.split('\t');
   else if (raw.includes('|')) parts = raw.split('|');
-  else if (raw.includes(',')) parts = raw.split(',');
+  else if (allowComma && raw.includes(',')) parts = raw.split(',');
   else parts = [raw];
   const name = parts[0]?.trim() ?? '';
   const uom = parts[1]?.trim();
   if (!name) return null;
   return uom ? { name, uom } : { name };
 }
+
 
 export function PasteNamesDialog({ open, onOpenChange, onSeed, units = [] }: Props) {
   const [text, setText] = useState('');
