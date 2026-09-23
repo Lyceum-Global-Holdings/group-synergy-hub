@@ -10,7 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string, captchaToken?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
+  resetPassword: (email: string, captchaToken?: string) => Promise<{ error: any }>;
   updatePassword: (newPassword: string) => Promise<{ error: any }>;
 }
 
@@ -83,11 +83,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = async (email: string, captchaToken?: string) => {
     const redirectUrl = `${window.location.origin}/auth?reset=true`;
-    
+
+    // Pass the Turnstile token through, as signIn does: when captcha
+    // protection is on at the Supabase level, reset requests need one too.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
+      captchaToken,
     });
     return { error };
   };
