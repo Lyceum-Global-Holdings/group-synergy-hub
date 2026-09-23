@@ -8,8 +8,10 @@ name: Mirror to group-synergy-hub
 #        ▼
 #   Lyceum-Global-Holdings/group-synergy-hub           (read-only mirror)
 #
-# One-way by design: the mirror is force-updated, so anything committed directly
-# to group-synergy-hub will be overwritten on the next sync. Develop here.
+# Fast-forward only. Lovable commits straight to the mirror when it's used
+# there (Sep 2026: 10 such commits), and an earlier --force push would have
+# wiped them. If the mirror has commits this repo lacks, the push is rejected
+# and the job fails: merge the mirror in here first, then re-run.
 #
 # Auth: needs a MIRROR_TOKEN secret (fine-grained PAT with Contents read/write
 # on Lyceum-Global-Holdings/group-synergy-hub). Until it exists, the job
@@ -60,7 +62,14 @@ jobs:
           # owner's login as the username (x-access-token is only for GitHub
           # App tokens — it yields "Repository not found" here).
           LOGIN=$(curl -s -H "Authorization: Bearer ${{ secrets.MIRROR_TOKEN }}" https://api.github.com/user | jq -r '.login')
+          if [ -z "${LOGIN}" ] || [ "${LOGIN}" = "null" ]; then
+            echo "::error::MIRROR_TOKEN was rejected by GitHub (expired or revoked). Create a new classic PAT (repo + workflow scopes) and update the MIRROR_TOKEN secret."
+            exit 1
+          fi
           echo "pushing as: ${LOGIN}"
-          git push --force \
+          if ! git push \
             "https://${LOGIN}:${{ secrets.MIRROR_TOKEN }}@github.com/Lyceum-Global-Holdings/group-synergy-hub.git" \
-            "${GITHUB_REF}:${GITHUB_REF}"
+            "${GITHUB_REF}:${GITHUB_REF}"; then
+            echo "::error::Mirror has commits this repo doesn't (likely made in Lovable). Merge them here first: git fetch mirror && git merge mirror/main, push, and this job will fast-forward the mirror."
+            exit 1
+          fi
