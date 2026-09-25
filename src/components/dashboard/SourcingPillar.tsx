@@ -1,5 +1,5 @@
 import { Users } from "lucide-react";
-import { PillarCard, HeroMetric, SecondaryStat } from "./PillarCard";
+import { PillarCard, HeroMetric, SecondaryStat, StatGrid } from "./PillarCard";
 import { useSourcingPulse } from "@/hooks/useDashboardPulse";
 
 interface Props {
@@ -12,28 +12,22 @@ export function SourcingPillar({ companyId }: Props) {
   return (
     <PillarCard
       title="Sourcing"
+      subtitle="RFQs and suppliers"
       icon={Users}
-      accent="success"
       href="/sourcing/rfq-management"
       loading={isLoading}
     >
       <HeroMetric value={(data?.open_rfqs ?? 0).toLocaleString()} label="Open RFQs / RFPs" />
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-md border p-2.5">
-          <div className="text-xs text-muted-foreground">Closing in 7d</div>
-          <div className="text-lg font-semibold">{(data?.closing_7d ?? 0).toLocaleString()}</div>
-        </div>
-        <div className="rounded-md border p-2.5">
-          <div className="text-xs text-muted-foreground">Awarded today</div>
-          <div className="text-lg font-semibold text-success">{(data?.awarded_today ?? 0).toLocaleString()}</div>
-        </div>
-      </div>
-      <SecondaryStat label="Active suppliers" value={(data?.active_suppliers ?? 0).toLocaleString()} />
-      <SecondaryStat
-        label="New suppliers · 30d"
-        value={(data?.new_suppliers_30d ?? 0).toLocaleString()}
-        tone="success"
-      />
+      <StatGrid>
+        <SecondaryStat
+          label="Closing in 7 days"
+          value={(data?.closing_7d ?? 0).toLocaleString()}
+          tone={(data?.closing_7d ?? 0) > 0 ? "warning" : "default"}
+        />
+        <SecondaryStat label="Awarded today" value={(data?.awarded_today ?? 0).toLocaleString()} tone="success" />
+        <SecondaryStat label="Active suppliers" value={(data?.active_suppliers ?? 0).toLocaleString()} />
+        <SecondaryStat label="New suppliers · 30d" value={(data?.new_suppliers_30d ?? 0).toLocaleString()} />
+      </StatGrid>
     </PillarCard>
   );
 }

@@ -1,5 +1,5 @@
 import { ShoppingCart } from "lucide-react";
-import { PillarCard, HeroMetric, SecondaryStat } from "./PillarCard";
+import { PillarCard, HeroMetric, SecondaryStat, StatGrid } from "./PillarCard";
 import { Sparkline } from "./Sparkline";
 import { useProcurementPulse } from "@/hooks/useDashboardPulse";
 
@@ -13,31 +13,37 @@ const fmtMoney = (n: number) =>
 export function ProcurementPillar({ companyId }: Props) {
   const { data, isLoading } = useProcurementPulse(companyId);
 
-  const delta = data && data.spend_last_month > 0
-    ? {
-        value: `${(((data.spend_mtd - data.spend_last_month) / data.spend_last_month) * 100).toFixed(1)}% vs last mo`,
-        positive: data.spend_mtd <= data.spend_last_month, // lower spend = good
-      }
+  const pct = data && data.spend_last_month > 0
+    ? ((data.spend_mtd - data.spend_last_month) / data.spend_last_month) * 100
     : null;
+  const delta = pct === null
+    ? null
+    : {
+        value: `${pct > 0 ? "+" : ""}${pct.toFixed(1)}% vs last month`,
+        positive: pct <= 0, // lower spend = good
+      };
 
   return (
     <PillarCard
       title="Procurement"
+      subtitle="Month-to-date spend"
       icon={ShoppingCart}
-      accent="info"
-      href="/procurement/purchase-orders"
+      variant="night"
+      href="/procurement/purchase-order"
       loading={isLoading}
     >
-      <HeroMetric value={fmtMoney(data?.spend_mtd ?? 0)} label="Month-to-date spend" delta={delta} />
-      <Sparkline data={data?.sparkline_7d} color="hsl(var(--info))" />
-      <SecondaryStat label="Open POs" value={(data?.open_count ?? 0).toLocaleString()} />
-      <SecondaryStat
-        label="Pending approval"
-        value={(data?.pending_approval ?? 0).toLocaleString()}
-        tone={(data?.pending_approval ?? 0) > 0 ? "warning" : "default"}
-      />
-      <SecondaryStat label="Approved today" value={(data?.approved_today ?? 0).toLocaleString()} tone="success" />
-      <SecondaryStat label="GRNs awaiting" value={(data?.pending_grn ?? 0).toLocaleString()} />
+      <HeroMetric value={fmtMoney(data?.spend_mtd ?? 0)} label="Spent this month" delta={delta} />
+      <Sparkline data={data?.sparkline_7d} color="hsl(199 89% 65%)" />
+      <StatGrid>
+        <SecondaryStat label="Open POs" value={(data?.open_count ?? 0).toLocaleString()} />
+        <SecondaryStat
+          label="Pending approval"
+          value={(data?.pending_approval ?? 0).toLocaleString()}
+          tone={(data?.pending_approval ?? 0) > 0 ? "warning" : "default"}
+        />
+        <SecondaryStat label="Approved today" value={(data?.approved_today ?? 0).toLocaleString()} tone="success" />
+        <SecondaryStat label="GRNs awaiting" value={(data?.pending_grn ?? 0).toLocaleString()} />
+      </StatGrid>
     </PillarCard>
   );
 }

@@ -1,5 +1,5 @@
-import { DollarSign } from "lucide-react";
-import { PillarCard, HeroMetric, SecondaryStat } from "./PillarCard";
+import { Wallet } from "lucide-react";
+import { PillarCard, HeroMetric, SecondaryStat, StatGrid } from "./PillarCard";
 import { useFinancePulse } from "@/hooks/useDashboardPulse";
 
 interface Props {
@@ -15,34 +15,30 @@ export function FinancePillar({ companyId }: Props) {
   return (
     <PillarCard
       title="Finance"
-      icon={DollarSign}
-      accent="warning"
+      subtitle="Payables"
+      icon={Wallet}
       href="/finance/accounts-payable"
       loading={isLoading}
     >
-      <HeroMetric
-        value={fmtMoney(data?.outstanding_payables ?? 0)}
-        label="Outstanding payables"
-      />
-      <SecondaryStat
-        label="Overdue invoices"
-        value={(data?.overdue_invoices ?? 0).toLocaleString()}
-        tone={(data?.overdue_invoices ?? 0) > 0 ? "destructive" : "default"}
-      />
-      <SecondaryStat
-        label="Overdue amount"
-        value={fmtMoney(data?.overdue_amount ?? 0)}
-        tone={(data?.overdue_amount ?? 0) > 0 ? "destructive" : "default"}
-      />
-      <SecondaryStat
-        label="Payments pending"
-        value={(data?.pending_payments ?? 0).toLocaleString()}
-        tone={(data?.pending_payments ?? 0) > 0 ? "warning" : "default"}
-      />
-      <SecondaryStat
-        label="Pending payment value"
-        value={fmtMoney(data?.pending_payment_amount ?? 0)}
-      />
+      <HeroMetric value={fmtMoney(data?.outstanding_payables ?? 0)} label="Outstanding payables" />
+      <StatGrid>
+        <SecondaryStat
+          label="Overdue invoices"
+          value={(data?.overdue_invoices ?? 0).toLocaleString()}
+          tone={(data?.overdue_invoices ?? 0) > 0 ? "destructive" : "default"}
+        />
+        <SecondaryStat
+          label="Overdue amount"
+          value={fmtMoney(data?.overdue_amount ?? 0)}
+          tone={(data?.overdue_amount ?? 0) > 0 ? "destructive" : "default"}
+        />
+        <SecondaryStat
+          label="Payments pending"
+          value={(data?.pending_payments ?? 0).toLocaleString()}
+          tone={(data?.pending_payments ?? 0) > 0 ? "warning" : "default"}
+        />
+        <SecondaryStat label="Pending value" value={fmtMoney(data?.pending_payment_amount ?? 0)} />
+      </StatGrid>
     </PillarCard>
   );
 }

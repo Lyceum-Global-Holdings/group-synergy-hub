@@ -6,22 +6,25 @@ interface LivePulseIndicatorProps {
 
 export function LivePulseIndicator({ live }: LivePulseIndicatorProps) {
   return (
-    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border bg-card text-xs font-medium">
-      <span className="relative inline-flex h-2 w-2">
+    <div
+      className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-medium"
+      aria-live="polite"
+    >
+      <span className="relative inline-flex h-2.5 w-2.5">
         <span
           className={cn(
             "absolute inline-flex h-full w-full rounded-full opacity-75",
-            live ? "bg-success animate-ping" : "bg-muted-foreground/30",
+            live ? "animate-ping bg-success" : "bg-muted-foreground/30",
           )}
         />
         <span
           className={cn(
-            "relative inline-flex rounded-full h-2 w-2",
-            live ? "bg-success" : "bg-muted-foreground/50",
+            "relative inline-flex h-2.5 w-2.5 rounded-full",
+            live ? "bg-success" : "bg-success/70",
           )}
         />
       </span>
-      {live ? "Live update" : "Live"}
+      {live ? "Updating…" : "Live"}
     </div>
   );
 }

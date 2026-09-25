@@ -3,6 +3,8 @@ import type { SankeyFlow } from "@/hooks/useDashboardPulse";
 
 interface Props {
   data?: SankeyFlow;
+  /** Shown instead of the default when there is nothing to draw. */
+  emptyText?: string;
 }
 
 const COL = {
@@ -33,11 +35,15 @@ interface RLink {
  *   GRN + Returns ─► Location ─► Product ─► Issues   (30d qty)
  * Custom SVG, fixed ~230px height, top locations/products from the server.
  */
-export function MaterialFlowSankey({ data }: Props) {
+export function MaterialFlowSankey({ data, emptyText }: Props) {
   const model = useMemo(() => buildModel(data), [data]);
 
   if (!model) {
-    return <p className="text-xs text-muted-foreground p-6 text-center">No material movements in the last 30 days.</p>;
+    return (
+      <p className="p-6 text-center text-sm text-muted-foreground">
+        {emptyText ?? "No material movements in the last 30 days."}
+      </p>
+    );
   }
 
   const { W, H, nodeW, links, cols, labels } = model;

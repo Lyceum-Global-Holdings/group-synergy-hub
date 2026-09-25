@@ -1,107 +1,124 @@
 import { ReactNode } from "react";
-import { Card } from "@/components/ui/card";
-import { ArrowRight, LucideIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CircleLink, GrainOverlay, NIGHT_GRADIENT, Skeleton } from "./DashCard";
 
 interface PillarCardProps {
   title: string;
+  subtitle?: string;
   icon: LucideIcon;
-  accent?: "primary" | "success" | "warning" | "info" | "destructive";
+  /** "night" = dark navy feature card (white text), for the one metric to spotlight. */
+  variant?: "default" | "night";
   href?: string;
   cta?: string;
   loading?: boolean;
   children: ReactNode;
 }
 
-const accentText = {
-  primary: "text-primary",
-  success: "text-success",
-  warning: "text-warning",
-  info: "text-info",
-  destructive: "text-destructive",
-};
-
-const accentRail = {
-  primary: "bg-primary",
-  success: "bg-success",
-  warning: "bg-warning",
-  info: "bg-info",
-  destructive: "bg-destructive",
-};
-
 export function PillarCard({
   title,
+  subtitle,
   icon: Icon,
-  accent = "primary",
+  variant = "default",
   href,
   cta = "View module",
   loading,
   children,
 }: PillarCardProps) {
+  const night = variant === "night";
   return (
-    <Card className="flex flex-col h-full overflow-hidden p-0 transition-shadow hover:shadow-[var(--shadow-md)]">
-      {/* Panel header with accent rail */}
-      <div className="relative flex items-center justify-between px-5 py-3 border-b border-border bg-[hsl(var(--surface-2))]">
-        <span className={cn("absolute left-0 top-0 bottom-0 w-0.5", accentRail[accent])} />
-        <div className="flex items-center gap-2">
-          <Icon className={cn("h-4 w-4", accentText[accent])} />
-          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/80">
-            {title}
-          </span>
-        </div>
-        {href && (
-          <Link
-            to={href}
+    <section
+      className={cn(
+        "relative flex h-full flex-col overflow-hidden rounded-3xl p-5",
+        night
+          ? // `dark` scopes the dark theme tokens to this card, so the shared
+            // HeroMetric / SecondaryStat pieces render light-on-navy.
+            cn("dark", NIGHT_GRADIENT, "text-foreground shadow-xl shadow-primary/20")
+          : "border border-border/60 bg-card shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-md)]",
+      )}
+    >
+      {night && (
+        <>
+          <GrainOverlay />
+          {/* concentric rings, echoing the swirl on the reference tracker card */}
+          <svg aria-hidden className="pointer-events-none absolute -bottom-24 -right-20 h-72 w-72 text-sky-300/15" viewBox="0 0 200 200" fill="none">
+            {[30, 45, 60, 75, 90].map((r) => (
+              <circle key={r} cx="100" cy="100" r={r} stroke="currentColor" strokeWidth="1.2" />
+            ))}
+          </svg>
+        </>
+      )}
+
+      <div className="relative mb-5 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
             className={cn(
-              "text-[10px] font-bold uppercase tracking-[0.1em] inline-flex items-center gap-1 transition-colors hover:underline",
-              accentText[accent],
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl",
+              night ? "bg-white/10 text-sky-300" : "bg-primary/10 text-primary",
             )}
           >
-            {cta} <ArrowRight className="h-3 w-3" />
-          </Link>
-        )}
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold tracking-tight">{title}</h3>
+            {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+          </div>
+        </div>
+        {href && <CircleLink to={href} label={`${cta}: ${title}`} tone={night ? "onDark" : "default"} />}
       </div>
-      <div className="flex-1 p-6">
+
+      <div className="relative flex flex-1 flex-col">
         {loading ? (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-8 w-36 bg-muted rounded" />
-            <div className="h-3 w-48 bg-muted rounded" />
-            <div className="h-16 bg-muted/60 rounded" />
+          <div className="space-y-3">
+            <Skeleton className="h-9 w-36" />
+            <Skeleton className="h-3 w-44" />
+            <Skeleton className="h-12 w-full" />
+            <div className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+            </div>
           </div>
         ) : (
           children
         )}
       </div>
-    </Card>
+    </section>
   );
 }
 
 interface HeroMetricProps {
   value: ReactNode;
   label: string;
+  /** `value` carries its own sign; `positive` means good (green), not "up". */
   delta?: { value: string; positive?: boolean } | null;
 }
 
 export function HeroMetric({ value, label, delta }: HeroMetricProps) {
   return (
-    <div className="mb-5">
-      <div className="flex items-baseline gap-2">
-        <div className="font-mono text-3xl font-extrabold tracking-tight text-foreground tabular-nums">
-          {value}
-        </div>
+    <div className="mb-4">
+      <div className="text-3xl font-semibold leading-none tracking-tight tabular-nums text-foreground">{value}</div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="text-xs text-muted-foreground">{label}</p>
         {delta && (
           <span
             className={cn(
-              "text-[11px] font-semibold",
-              delta.positive ? "text-success" : "text-destructive",
+              "rounded-full px-2 py-0.5 text-[11px] font-medium",
+              delta.positive ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
             )}
           >
-            {delta.positive ? "↑" : "↓"} {delta.value}
+            {delta.value}
           </span>
         )}
       </div>
-      <p className="text-xs font-medium text-muted-foreground mt-1">{label}</p>
+    </div>
+  );
+}
+
+/** Wraps SecondaryStat tiles in a two-column grid. */
+export function StatGrid({ children, cols = 2 }: { children: ReactNode; cols?: 2 | 3 }) {
+  return (
+    <div className={cn("mt-auto grid gap-2 pt-4", cols === 3 ? "grid-cols-3" : "grid-cols-2")}>
+      {children}
     </div>
   );
 }
@@ -120,11 +137,11 @@ export function SecondaryStat({ label, value, tone = "default" }: SecondaryStatP
     success: "text-success",
   };
   return (
-    <div className="flex items-center justify-between py-2 border-t border-border-subtle first:border-t-0">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className={cn("font-mono text-xs font-bold tabular-nums", toneMap[tone])}>
-        {value}
-      </span>
+    <div className="rounded-2xl bg-muted/60 px-3 py-2.5">
+      <div className={cn("text-base font-semibold leading-tight tabular-nums", toneMap[tone])}>{value}</div>
+      <div className="mt-0.5 truncate text-[11px] text-muted-foreground" title={label}>
+        {label}
+      </div>
     </div>
   );
 }
