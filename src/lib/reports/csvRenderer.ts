@@ -42,6 +42,12 @@ export function renderCsv(envelope: ReportEnvelope, fileName: string): void {
     );
   }
 
+  if (envelope.notes?.length) {
+    lines.push("");
+    lines.push("# Methodology:");
+    envelope.notes.forEach((n) => lines.push(`# - ${n}`));
+  }
+
   const csv = "\uFEFF" + lines.join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);

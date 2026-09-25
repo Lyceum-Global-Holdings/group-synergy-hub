@@ -12,9 +12,13 @@ export async function renderPdf(envelope: ReportEnvelope, fileName: string): Pro
   ]);
   const autoTable = (autoTableMod as { default: any }).default ?? (autoTableMod as any);
 
-  // A4 landscape for wide tables, portrait for narrow ones
-  const orientation = envelope.columns.length > 6 ? "landscape" : "portrait";
-  const doc = new jsPDF({ orientation, unit: "pt", format: "a4" });
+  // A4 landscape for wide tables, portrait for narrow ones; very wide
+  // analytical reports (e.g. the 1/3/6/12-month price trend) move to A3.
+  const colCount = envelope.columns.length;
+  const orientation = colCount > 6 ? "landscape" : "portrait";
+  const format = colCount > 16 ? "a3" : "a4";
+  const bodyFontSize = colCount > 20 ? 6.5 : colCount > 12 ? 7 : 8;
+  const doc = new jsPDF({ orientation, unit: "pt", format });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 32;
 
@@ -75,7 +79,7 @@ export async function renderPdf(envelope: ReportEnvelope, fileName: string): Pro
     body,
     foot,
     margin: { left: margin, right: margin },
-    styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
+    styles: { fontSize: bodyFontSize, cellPadding: colCount > 12 ? 3 : 4, overflow: "linebreak" },
     headStyles: { fillColor: [31, 41, 55], textColor: 255, fontStyle: "bold" },
     footStyles: { fillColor: [243, 244, 246], textColor: 0, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [247, 247, 247] },
@@ -101,6 +105,27 @@ export async function renderPdf(envelope: ReportEnvelope, fileName: string): Pro
       );
     },
   });
+
+  // ---- Methodology notes (ISO 9001 §7.5) ----
+  if (envelope.notes?.length) {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const maxWidth = pageWidth - margin * 2;
+    let y = ((doc as any).lastAutoTable?.finalY ?? 120) + 20;
+    const entries = ["Methodology", ...envelope.notes.map((n) => `•  ${n}`)];
+    doc.setFontSize(8);
+    entries.forEach((text, i) => {
+      const wrapped = doc.splitTextToSize(text, maxWidth) as string[];
+      // Keep clear of the signature/footer band drawn on each page.
+      if (y + wrapped.length * 10 > pageHeight - 48) {
+        doc.addPage();
+        y = 40;
+      }
+      doc.setFont("helvetica", i === 0 ? "bold" : "normal");
+      doc.setTextColor(i === 0 ? 40 : 90);
+      doc.text(wrapped, margin, y);
+      y += wrapped.length * 10 + 2;
+    });
+  }
 
   doc.save(fileName);
 }

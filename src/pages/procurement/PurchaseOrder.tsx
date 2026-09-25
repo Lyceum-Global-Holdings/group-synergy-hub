@@ -97,7 +97,7 @@ export default function PurchaseOrderPage() {
         </div>
         <div className="flex items-center gap-2">
           <GenerateReportButton
-            templates={["PR-PO-REG-001", "PR-PO-OPN-001", "PR-SPND-001"]}
+            templates={["PR-PO-REG-001", "PR-PO-OPN-001", "PR-SPND-001", "PR-PRC-TRD-001", "PR-PRC-HIS-001", "PR-PRC-SUP-001"]}
           />
           <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />

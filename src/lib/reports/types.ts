@@ -52,6 +52,11 @@ export interface ReportEnvelope {
   /** Optional totals row keyed by column key */
   totals?: Record<string, unknown>;
   /**
+   * Methodology / definitions printed below the table on every output
+   * (ISO 9001 §7.5 documented information). One sentence per entry.
+   */
+  notes?: string[];
+  /**
    * Optional per-column substring(s) to highlight in the on-screen preview.
    * Keyed by column key; value is one or more terms (case-insensitive).
    * Preview-only — XLSX/PDF/CSV exports remain plain text.

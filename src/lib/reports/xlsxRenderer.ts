@@ -132,6 +132,22 @@ export async function renderXlsx(envelope: ReportEnvelope, fileName: string): Pr
     });
   }
 
+  // ---------- Methodology notes (ISO 9001 §7.5) ----------
+  if (envelope.notes?.length) {
+    let rowIdx = headerRowIdx + 1 + envelope.rows.length + (envelope.totals ? 1 : 0) + 1;
+    ws.mergeCells(`A${rowIdx}:${lastColLetter}${rowIdx}`);
+    ws.getCell(`A${rowIdx}`).value = "Methodology";
+    ws.getCell(`A${rowIdx}`).font = { bold: true, size: 10 };
+    envelope.notes.forEach((note) => {
+      rowIdx += 1;
+      ws.mergeCells(`A${rowIdx}:${lastColLetter}${rowIdx}`);
+      const cell = ws.getCell(`A${rowIdx}`);
+      cell.value = `• ${note}`;
+      cell.font = { size: 9, color: { argb: "FF555555" } };
+      cell.alignment = { wrapText: true, vertical: "top" };
+    });
+  }
+
   // Auto-width
   ws.columns.forEach((col, i) => {
     const explicit = envelope.columns[i]?.width;

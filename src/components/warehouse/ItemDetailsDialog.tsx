@@ -308,6 +308,7 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
           <PurchasePriceHistory
             catalogItemId={(item as any).catalog_item_id ?? null}
             warehouseItemId={item.id}
+            companyId={(item as any).company_id ?? null}
           />
 
 

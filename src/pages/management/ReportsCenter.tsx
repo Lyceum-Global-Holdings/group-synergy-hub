@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { REPORT_REGISTRY, ReportDefinition, getReportsByModule, groupReports } from "@/lib/reports/registry";
 import { RotateCcw } from "lucide-react";
 import { ReportParameterPanel } from "@/components/management/reports/ReportParameterPanel";
@@ -131,6 +132,7 @@ export default function ReportsCenter() {
     }
     setBusyFormat(format);
     try {
+      const itemLabels = await lookupItemLabels(openReport, params);
       const envelope = await buildReportEnvelope(
         openReport,
         {
@@ -138,7 +140,7 @@ export default function ReportsCenter() {
           companyName: selectedCompany.name,
           currency: baseCurrency || "USD",
           generatedBy: user?.email || user?.id || "system",
-          filters: buildFilterDescriptors(openReport, params, nameLookups),
+          filters: buildFilterDescriptors(openReport, params, { ...nameLookups, item: itemLabels }),
         },
         params,
       );
@@ -328,7 +330,26 @@ type NameLookups = {
   location: Map<string, string>;
   category: Map<string, string>;
   supplier: Map<string, string>;
+  /** catalog item id → "CODE — Name", resolved per run */
+  item?: Map<string, string>;
 };
+
+/** Resolve selected catalog items to "CODE — Name" for the report header. */
+async function lookupItemLabels(
+  def: ReportDefinition,
+  params: Record<string, unknown>,
+): Promise<Map<string, string>> {
+  const ids = def.parameters
+    .filter((p) => p.type === "item")
+    .map((p) => params[p.key])
+    .filter((v): v is string => typeof v === "string" && v.length > 0);
+  if (ids.length === 0) return new Map();
+  const { data } = await supabase
+    .from("warehouse_item_catalog")
+    .select("id, item_code, name")
+    .in("id", ids);
+  return new Map((data ?? []).map((r) => [r.id, `${r.item_code} — ${r.name}`]));
+}
 
 function buildFilterDescriptors(
   def: ReportDefinition,
@@ -356,6 +377,9 @@ function buildFilterDescriptors(
       } else if (p.type === "select") {
         const opt = p.options.find((o) => o.value === v);
         display = opt?.label ?? String(v);
+      } else if (p.type === "item") {
+        const id = String(v);
+        display = lookups?.item?.get(id) ?? `${id.slice(0, 8)}…`;
       } else if (p.type === "location" || p.type === "category" || p.type === "supplier") {
         const id = String(v);
         const name = lookups?.[p.type]?.get(id);

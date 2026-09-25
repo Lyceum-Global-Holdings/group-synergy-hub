@@ -18,6 +18,8 @@ export interface ReportDefinition {
   columns: ReportColumn[];
   /** Hook id used by the page to look up the matching data hook */
   hookId: string;
+  /** Definitions and standards notes, rendered under the table on every output. */
+  methodology?: string[];
 }
 
 export type ReportParameter =
@@ -35,6 +37,10 @@ export type ReportParameter =
       required?: boolean;
       /** Default span in days back from today, e.g. 30 */
       defaultDays?: number;
+      /** Default to the trailing N calendar months (takes precedence over defaultDays). */
+      defaultMonths?: number;
+      /** Quick-pick chips that set the range to the last N calendar months. */
+      presets?: { label: string; months: number }[];
     }
   | {
       key: string;
@@ -104,6 +110,40 @@ export type ReportParameter =
       /** Column key to highlight in the preview when a match is found. */
       highlightColumn: string;
     };
+
+// ---------- Purchase price intelligence (shared parameters / notes) ----------
+
+const PRICE_BASIS_PARAM: ReportParameter = {
+  key: "basis",
+  label: "Price basis",
+  type: "select",
+  options: [
+    { value: "received", label: "Received — GRN net cost" },
+    { value: "ordered", label: "Ordered — approved PO price" },
+  ],
+  defaultValue: "received",
+};
+
+const PRICE_PERIOD_PARAM: ReportParameter = {
+  key: "period",
+  label: "Period",
+  type: "dateRange",
+  defaultMonths: 12,
+  presets: [
+    { label: "1M", months: 1 },
+    { label: "3M", months: 3 },
+    { label: "6M", months: 6 },
+    { label: "12M", months: 12 },
+  ],
+};
+
+const PRICE_BASIS_NOTES = [
+  "Received basis: approved GRN lines, net of line and document discounts, accepted quantity only, dated by GRN date (IAS 2 §10–11 cost of purchase).",
+  "Ordered basis: approved, sent, acknowledged and received PO lines, PO header discount pro-rated by value, dated by PO approval date. POs carry no location, so the location filter does not apply.",
+  "Prices exclude recoverable taxes and freight/transport (reported separately in the Freight Cost reports).",
+  "Foreign-currency lines are translated to the company base currency at the spot rate on the transaction date (IAS 21 §21–22) from Finance exchange rates. Lines without a rate are left out of base-currency figures and counted under “No FX”.",
+  "Products are grouped by item and unit of measure, so prices in different units are never mixed. Zero-price lines (e.g. free samples) count toward quantity but not price statistics.",
+];
 
 export const REPORT_REGISTRY: ReportDefinition[] = [
   // ============ WAREHOUSE — INVENTORY ============
@@ -1048,6 +1088,135 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "total_qty", label: "Total Qty", type: "number", width: 14, align: "right" },
       { key: "total_spend", label: "Total Spend", type: "currency", width: 16, align: "right" },
       { key: "currency", label: "Cur", type: "string", width: 8 },
+    ],
+  },
+
+  // ---------- Price Intelligence ----------
+  {
+    code: "PR-PRC-TRD-001",
+    title: "Purchase Price Trend (1 / 3 / 6 / 12 months)",
+    description:
+      "Per product: quantity and weighted-average purchase price for the last 1, 3, 6 and 12 months, last price, min/max, price change and volatility.",
+    moduleKey: "procurement", group: "Price Intelligence", standard: "IAS 2 / IAS 21",
+    hookId: "procurement.priceTrend",
+    parameters: [
+      PRICE_BASIS_PARAM,
+      { key: "asOf", label: "As of (blank = today)", type: "date" },
+      { key: "catalogItemId", label: "Item", type: "item", placeholder: "All items" },
+      { key: "categoryId", label: "Category", type: "category" },
+      { key: "supplierId", label: "Supplier", type: "supplier" },
+      { key: "locationId", label: "Location (received basis)", type: "location" },
+    ],
+    methodology: [
+      "Windows are ISO 8601 trailing periods ending on the as-of date (included): 1M = P1M, 3M = P3M, 6M = P6M, 12M = P12M.",
+      "WAP = weighted-average purchase price = Σ(net unit price × quantity) ÷ Σ quantity (IAS 2 §25).",
+      "Last vs 12M = (last price − 12M WAP) ÷ 12M WAP. 3M vs 12M = (3M WAP − 12M WAP) ÷ 12M WAP. Positive values mean prices are rising.",
+      "Volatility = coefficient of variation (standard deviation ÷ mean) of line prices over 12 months. Sorted by 12-month spend (Pareto).",
+      ...PRICE_BASIS_NOTES,
+    ],
+    columns: [
+      { key: "item_code", label: "Item Code", type: "string", width: 16 },
+      { key: "item_name", label: "Item", type: "string", width: 28 },
+      { key: "uom", label: "UoM", type: "string", width: 7 },
+      { key: "qty_1m", label: "Qty 1M", type: "number", width: 10, align: "right" },
+      { key: "wap_1m", label: "WAP 1M", type: "currency", width: 13, align: "right" },
+      { key: "qty_3m", label: "Qty 3M", type: "number", width: 10, align: "right" },
+      { key: "wap_3m", label: "WAP 3M", type: "currency", width: 13, align: "right" },
+      { key: "qty_6m", label: "Qty 6M", type: "number", width: 10, align: "right" },
+      { key: "wap_6m", label: "WAP 6M", type: "currency", width: 13, align: "right" },
+      { key: "qty_12m", label: "Qty 12M", type: "number", width: 10, align: "right" },
+      { key: "wap_12m", label: "WAP 12M", type: "currency", width: 13, align: "right" },
+      { key: "spend_12m", label: "Spend 12M", type: "currency", width: 15, align: "right" },
+      { key: "min_12m", label: "Min 12M", type: "currency", width: 13, align: "right" },
+      { key: "max_12m", label: "Max 12M", type: "currency", width: 13, align: "right" },
+      { key: "last_price", label: "Last Price", type: "currency", width: 13, align: "right" },
+      { key: "last_date", label: "Last Date", type: "date", width: 12 },
+      { key: "last_supplier", label: "Last Supplier", type: "string", width: 22 },
+      { key: "chg_last_vs_12m", label: "Last vs 12M", type: "percent", width: 11, align: "right" },
+      { key: "chg_3m_vs_12m", label: "3M vs 12M", type: "percent", width: 11, align: "right" },
+      { key: "volatility_12m", label: "Volatility", type: "percent", width: 10, align: "right" },
+      { key: "suppliers_12m", label: "Suppliers", type: "integer", width: 9, align: "right" },
+      { key: "lines_12m", label: "Lines", type: "integer", width: 8, align: "right" },
+      { key: "fx_missing", label: "No FX", type: "integer", width: 7, align: "right" },
+    ],
+  },
+  {
+    code: "PR-PRC-HIS-001",
+    title: "Purchase History Ledger",
+    description:
+      "Every purchase of each product in a period — supplier, quantity, gross and net unit price, discount and change vs the previous purchase.",
+    moduleKey: "procurement", group: "Price Intelligence", standard: "IAS 2 / ISO 8601",
+    hookId: "procurement.purchaseHistory",
+    parameters: [
+      PRICE_BASIS_PARAM,
+      PRICE_PERIOD_PARAM,
+      { key: "catalogItemId", label: "Item", type: "item", placeholder: "All items" },
+      { key: "categoryId", label: "Category", type: "category" },
+      { key: "supplierId", label: "Supplier", type: "supplier" },
+      { key: "locationId", label: "Location (received basis)", type: "location" },
+    ],
+    methodology: [
+      "Gross and net prices are in the transaction currency (Cur); base-currency columns use the IAS 21 spot rate shown under FX Rate.",
+      "Disc % = (gross − net) ÷ gross, including the pro-rated document discount.",
+      "Δ vs Prev = change in base-currency net price vs the previous priced purchase of the same product and unit.",
+      "Item Link = Free text marks PO lines not linked to the item catalogue; they are grouped by their typed code or name.",
+      ...PRICE_BASIS_NOTES,
+    ],
+    columns: [
+      { key: "txn_date", label: "Date", type: "date", width: 12 },
+      { key: "doc_number", label: "Document", type: "string", width: 16 },
+      { key: "po_number", label: "PO #", type: "string", width: 16 },
+      { key: "supplier_name", label: "Supplier", type: "string", width: 24 },
+      { key: "item_code", label: "Item Code", type: "string", width: 16 },
+      { key: "item_name", label: "Item", type: "string", width: 28 },
+      { key: "uom", label: "UoM", type: "string", width: 7 },
+      { key: "quantity", label: "Qty", type: "number", width: 10, align: "right" },
+      { key: "txn_currency", label: "Cur", type: "string", width: 6 },
+      { key: "gross_unit_price", label: "Gross Price", type: "number", width: 12, align: "right" },
+      { key: "discount_pct", label: "Disc %", type: "percent", width: 8, align: "right" },
+      { key: "net_unit_price", label: "Net Price", type: "number", width: 12, align: "right" },
+      { key: "fx_rate", label: "FX Rate", type: "number", width: 9, align: "right" },
+      { key: "net_unit_price_base", label: "Net Price (Base)", type: "currency", width: 14, align: "right" },
+      { key: "line_value_base", label: "Line Value (Base)", type: "currency", width: 15, align: "right" },
+      { key: "chg_vs_prev", label: "Δ vs Prev", type: "percent", width: 10, align: "right" },
+      { key: "item_link", label: "Item Link", type: "string", width: 10 },
+    ],
+  },
+  {
+    code: "PR-PRC-SUP-001",
+    title: "Supplier Price Comparison",
+    description:
+      "Product × supplier benchmark: weighted-average and last price, quantity share, and how far each supplier is above the best price.",
+    moduleKey: "procurement", group: "Price Intelligence", standard: "CIPS price benchmark",
+    hookId: "procurement.supplierPriceComparison",
+    parameters: [
+      PRICE_BASIS_PARAM,
+      PRICE_PERIOD_PARAM,
+      { key: "catalogItemId", label: "Item", type: "item", placeholder: "All items" },
+      { key: "categoryId", label: "Category", type: "category" },
+      { key: "locationId", label: "Location (received basis)", type: "location" },
+    ],
+    methodology: [
+      "Suppliers are ranked per product and unit by WAP (1 = lowest). vs Best = (supplier WAP − lowest WAP) ÷ lowest WAP.",
+      "Qty Share = supplier quantity ÷ total quantity of that product purchased in the period.",
+      ...PRICE_BASIS_NOTES,
+    ],
+    columns: [
+      { key: "item_code", label: "Item Code", type: "string", width: 16 },
+      { key: "item_name", label: "Item", type: "string", width: 28 },
+      { key: "uom", label: "UoM", type: "string", width: 7 },
+      { key: "price_rank", label: "Rank", type: "integer", width: 6, align: "right" },
+      { key: "supplier_name", label: "Supplier", type: "string", width: 26 },
+      { key: "lines", label: "Lines", type: "integer", width: 7, align: "right" },
+      { key: "quantity", label: "Qty", type: "number", width: 10, align: "right" },
+      { key: "qty_share", label: "Qty Share", type: "percent", width: 10, align: "right" },
+      { key: "wap", label: "WAP", type: "currency", width: 13, align: "right" },
+      { key: "vs_best_pct", label: "vs Best", type: "percent", width: 9, align: "right" },
+      { key: "last_price", label: "Last Price", type: "currency", width: 13, align: "right" },
+      { key: "last_date", label: "Last Date", type: "date", width: 12 },
+      { key: "min_price", label: "Min Price", type: "currency", width: 13, align: "right" },
+      { key: "spend", label: "Spend", type: "currency", width: 15, align: "right" },
+      { key: "fx_missing", label: "No FX", type: "integer", width: 7, align: "right" },
     ],
   },
 

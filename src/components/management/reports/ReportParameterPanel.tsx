@@ -35,6 +35,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useSuppliers } from "@/hooks/useSuppliers";
+import { trailingMonths } from "@/lib/reports/period";
 
 interface Props {
   definition: ReportDefinition;
@@ -80,7 +82,9 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
       if (next[p.key] !== undefined && next[p.key] !== null && next[p.key] !== "") return;
       if (p.type === "dateRange") {
         const days = p.defaultDays ?? 30;
-        next[p.key] = { from: isoToday(days), to: isoToday(0) };
+        next[p.key] = p.defaultMonths
+          ? trailingMonths(p.defaultMonths)
+          : { from: isoToday(days), to: isoToday(0) };
         changed = true;
       } else if (p.type === "textOperator") {
         next[p.key] = { op: "contains", term: "" };
@@ -210,7 +214,7 @@ function ParameterInput({
       );
     case "dateRange": {
       const v = (value as { from?: string; to?: string }) ?? {};
-      return (
+      const inputs = (
         <div className="grid grid-cols-2 gap-2">
           <Input
             type="date"
@@ -222,6 +226,31 @@ function ParameterInput({
             value={v.to ?? ""}
             onChange={(e) => onChange({ ...v, to: e.target.value })}
           />
+        </div>
+      );
+      if (!param.presets?.length) return inputs;
+      return (
+        <div className="grid gap-2">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${param.label} quick ranges`}>
+            {param.presets.map((p) => {
+              const range = trailingMonths(p.months);
+              const active = v.from === range.from && v.to === range.to;
+              return (
+                <Button
+                  key={p.label}
+                  type="button"
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  className="h-7 rounded-full px-3 text-xs"
+                  aria-pressed={active}
+                  onClick={() => onChange(range)}
+                >
+                  Last {p.label}
+                </Button>
+              );
+            })}
+          </div>
+          {inputs}
         </div>
       );
     }
@@ -320,9 +349,12 @@ function ParameterInput({
         </Select>
       );
     case "supplier":
-      // Supplier picker is handled by a future enhancement; for now render disabled
       return (
-        <Input id={param.key} disabled placeholder="Supplier filter (coming soon)" />
+        <SupplierParamInput
+          paramKey={param.key}
+          value={(value as string) ?? null}
+          onChange={onChange}
+        />
       );
     case "item":
       return (
@@ -513,6 +545,20 @@ function ItemParamInput({
             {!isFetching && results.length === 0 && (
               <CommandEmpty>No items found.</CommandEmpty>
             )}
+            {value && (
+              <CommandGroup>
+                <CommandItem
+                  value="__clear__"
+                  onSelect={() => {
+                    onChange(null);
+                    setOpen(false);
+                  }}
+                  className="text-muted-foreground"
+                >
+                  Clear selection (all items)
+                </CommandItem>
+              </CommandGroup>
+            )}
             <CommandGroup>
               {results.map((it) => {
                 const meta = [it.brand, it.category_name, it.unit_name]
@@ -544,6 +590,90 @@ function ItemParamInput({
                   </CommandItem>
                 );
               })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SupplierParamInput({
+  paramKey,
+  value,
+  onChange,
+}: {
+  paramKey: string;
+  value: string | null;
+  onChange: (v: unknown) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  // Company-scoped approved suppliers (all suppliers for a super admin in
+  // all-companies view) — the same list the rest of procurement uses.
+  const { data: suppliers = [], isLoading } = useSuppliers();
+  const selected = suppliers.find((s) => s.id === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={paramKey}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between font-normal", !value && "text-muted-foreground")}
+        >
+          <span className="truncate">
+            {selected ? `${selected.name}${selected.supplier_code ? ` · ${selected.supplier_code}` : ""}` : "All suppliers"}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(28rem,90vw)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search supplier name or code…" />
+          <CommandList>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-4 text-xs text-muted-foreground">
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                Loading suppliers…
+              </div>
+            ) : (
+              <CommandEmpty>No suppliers found.</CommandEmpty>
+            )}
+            {value && (
+              <CommandGroup>
+                <CommandItem
+                  value="__clear__ all suppliers"
+                  onSelect={() => {
+                    onChange(null);
+                    setOpen(false);
+                  }}
+                  className="text-muted-foreground"
+                >
+                  Clear selection (all suppliers)
+                </CommandItem>
+              </CommandGroup>
+            )}
+            <CommandGroup>
+              {suppliers.map((s) => (
+                <CommandItem
+                  key={s.id}
+                  value={`${s.name} ${s.supplier_code ?? ""} ${s.id}`}
+                  onSelect={() => {
+                    onChange(s.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === s.id ? "opacity-100" : "opacity-0")} />
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">{s.name}</span>
+                    {s.supplier_code && (
+                      <span className="text-xs text-muted-foreground">{s.supplier_code}</span>
+                    )}
+                  </div>
+                </CommandItem>
+              ))}
             </CommandGroup>
           </CommandList>
         </Command>

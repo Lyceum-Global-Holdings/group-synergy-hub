@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ReportDefinition } from "@/lib/reports/registry";
 import { ReportEnvelope, NotesFilterOp } from "@/lib/reports/types";
+import { parseIsoDate, toIsoDate, trailingMonths } from "@/lib/reports/period";
 
 export interface BuildEnvelopeContext {
   companyName: string;
@@ -18,7 +19,9 @@ function envelopeBase(
   period?: { start?: string; end?: string },
   highlightTerms?: Record<string, string[]>,
   highlightWholeCell?: boolean,
+  extraNotes?: string[],
 ): ReportEnvelope {
+  const notes = [...(def.methodology ?? []), ...(extraNotes ?? [])];
   return {
     reportCode: def.code,
     title: def.title,
@@ -36,6 +39,7 @@ function envelopeBase(
     totals,
     highlightTerms,
     highlightWholeCell,
+    notes: notes.length ? notes : undefined,
   };
 }
 
@@ -709,6 +713,47 @@ function periodArgs(p?: { from?: string; to?: string }) {
   };
 }
 
+/* ---------------- Purchase price intelligence ---------------- */
+
+interface PriceReportParams {
+  basis?: string;
+  period?: { from?: string; to?: string };
+  asOf?: string;
+  catalogItemId?: string | null;
+  categoryId?: string | null;
+  supplierId?: string | null;
+  locationId?: string | null;
+}
+
+export type PriceBasis = "received" | "ordered";
+
+export function priceBasisOf(p: { basis?: string }): PriceBasis {
+  return p.basis === "ordered" ? "ordered" : "received";
+}
+
+/** Common RPC args; POs have no location, so it is dropped for the ordered basis. */
+function priceArgs(ctx: BuildEnvelopeContext, p: PriceReportParams, basis: PriceBasis) {
+  return {
+    p_company_id: ctx.companyId,
+    p_basis: basis,
+    p_catalog_item_id: p.catalogItemId || null,
+    p_category_id: p.categoryId || null,
+    p_location_id: basis === "received" ? p.locationId || null : null,
+  };
+}
+
+function priceExtraNotes(p: PriceReportParams, basis: PriceBasis): string[] {
+  return basis === "ordered" && p.locationId
+    ? ["The location filter was ignored: purchase orders carry no location (ordered basis)."]
+    : [];
+}
+
+async function callPriceRpc(rpc: string, args: Record<string, unknown>) {
+  const { data, error } = await (supabase.rpc as any)(rpc, args);
+  if (error) throw error;
+  return (data ?? []) as Record<string, unknown>[];
+}
+
 /* ---------------- Dispatcher ---------------- */
 
 export async function buildReportEnvelope(
@@ -843,6 +888,60 @@ export async function buildReportEnvelope(
         p_date_from: pa.from,
         p_date_to: pa.to,
       }, pa.period);
+    }
+    case "procurement.priceTrend": {
+      const p = params as PriceReportParams;
+      const basis = priceBasisOf(p);
+      const asOf = p.asOf || toIsoDate(new Date());
+      const rows = await callPriceRpc("report_purchase_price_trend", {
+        ...priceArgs(ctx, p, basis),
+        p_as_of: asOf,
+        p_supplier_id: p.supplierId || null,
+      });
+      return envelopeBase(
+        def, ctx, rows,
+        { spend_12m: sumCol(rows, "spend_12m") },
+        { start: trailingMonths(12, parseIsoDate(asOf)).from, end: asOf },
+        undefined, undefined,
+        priceExtraNotes(p, basis),
+      );
+    }
+    case "procurement.purchaseHistory": {
+      const p = params as PriceReportParams;
+      const basis = priceBasisOf(p);
+      const pa = periodArgs(p.period);
+      const rows = (
+        await callPriceRpc("report_purchase_history", {
+          ...priceArgs(ctx, p, basis),
+          p_date_from: pa.from,
+          p_date_to: pa.to,
+          p_supplier_id: p.supplierId || null,
+        })
+      ).map((r) => ({ ...r, item_link: r.unlinked ? "Free text" : "Catalog" }));
+      return envelopeBase(
+        def, ctx, rows,
+        { line_value_base: sumCol(rows, "line_value_base") },
+        pa.period,
+        undefined, undefined,
+        priceExtraNotes(p, basis),
+      );
+    }
+    case "procurement.supplierPriceComparison": {
+      const p = params as PriceReportParams;
+      const basis = priceBasisOf(p);
+      const pa = periodArgs(p.period);
+      const rows = await callPriceRpc("report_supplier_price_comparison", {
+        ...priceArgs(ctx, p, basis),
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      });
+      return envelopeBase(
+        def, ctx, rows,
+        { spend: sumCol(rows, "spend") },
+        pa.period,
+        undefined, undefined,
+        priceExtraNotes(p, basis),
+      );
     }
     case "procurement.spendAnalysis": {
       const p = params as { period?: { from?: string; to?: string } };

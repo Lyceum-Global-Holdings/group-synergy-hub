@@ -1,13 +1,15 @@
 import { useId } from "react";
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts";
 
 interface SparklineProps {
   data: Array<{ d: string; v: number }> | undefined;
   color?: string;
   height?: number;
+  /** Scale the y-axis to the data range instead of starting at zero (e.g. prices). */
+  fitToData?: boolean;
 }
 
-export function Sparkline({ data, color = "hsl(var(--primary))", height = 48 }: SparklineProps) {
+export function Sparkline({ data, color = "hsl(var(--primary))", height = 48, fitToData }: SparklineProps) {
   // One gradient per instance: ids built from the colour string were invalid
   // (spaces, parens) and collided when two cards shared a colour.
   const gradientId = `spark-${useId().replace(/:/g, "")}`;
@@ -24,6 +26,7 @@ export function Sparkline({ data, color = "hsl(var(--primary))", height = 48 }: 
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
+          {fitToData && <YAxis hide domain={["dataMin", "dataMax"]} />}
           <Area
             type="monotone"
             dataKey="v"
