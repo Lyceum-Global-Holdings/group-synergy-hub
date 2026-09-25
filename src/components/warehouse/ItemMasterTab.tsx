@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, Loader2, Columns3, Upload, CheckSquare, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Search, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, Loader2, Columns3, Upload, ArrowUp, ArrowDown, ArrowUpDown, MoreHorizontal, SlidersHorizontal, Boxes, Coins, AlertTriangle, Activity, UserRound, PackageCheck, PencilLine, UserCog } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,6 +88,8 @@ import { writeExcelFromJSON } from '@/utils/excelUtils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useManagedColumns } from '@/hooks/useManagedColumns';
+import { useWarehousePulse } from '@/hooks/useDashboardPulse';
+import { cn } from '@/lib/utils';
 
 const INV_COLUMN_DEFS = [
   { key: 'photo', label: 'Photo', fixed: false },
@@ -235,7 +237,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     isMarkingInactive 
   } = useWarehouseItems({ disableFetch: true });
 
-  const { companies, selectedCompany } = useCompany();
+  const { companies, selectedCompany, formatCurrency, baseCurrency } = useCompany();
+  // Company/location-wide totals for the summary tiles (not just the loaded page).
+  const { data: pulse, isLoading: pulseLoading } = useWarehousePulse(selectedCompany?.id ?? null, globalLocationId);
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
   const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations({ disableFetch: true });
@@ -264,7 +268,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const rowVirtualizer = useVirtualizer({
     count: shouldVirtualize ? filteredItems.length : 0,
     getScrollElement: () => scrollParentRef.current,
-    estimateSize: () => 56,
+    estimateSize: () => 60,
     overscan: 8,
   });
 
@@ -438,123 +442,158 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     }
   };
 
+  // ---- presentation helpers ----
+  const fmtQty = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const compactNumber = (n: number) =>
+    new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+  const STATUS_STYLE: Record<string, { dot: string; pill: string }> = {
+    active: { dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15' },
+    inactive: { dot: 'bg-slate-400', pill: 'bg-slate-100 text-slate-600 ring-slate-500/15' },
+    discontinued: { dot: 'bg-red-500', pill: 'bg-red-50 text-red-700 ring-red-600/15' },
+  };
+  const STOCK_MODES: { value: typeof stockMode; label: string }[] = [
+    { value: 'all', label: 'All stock' },
+    { value: 'in_stock', label: 'In stock' },
+    { value: 'zero', label: 'Zero' },
+    { value: 'low', label: 'Low' },
+  ];
+  const pillTrigger = (active: boolean) =>
+    cn(
+      'h-9 w-auto min-w-[140px] gap-2 rounded-full border-border/70 bg-background px-3.5 text-sm shadow-none',
+      active && 'border-primary/40 bg-primary/5 font-medium text-primary',
+    );
+  const iconBtn =
+    'inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  const thClass = 'h-11 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-muted-foreground';
+  const optionalCols = (['category', 'unit', 'bin', 'stock_owner', 'current_stock', 'reserved', 'available', 'unit_cost', 'status'] as const).filter(
+    (k) => col(k),
+  ).length;
+  const colSpan = 3 + optionalCols; // select + item + actions
+
+  const kpis = [
+    { key: 'skus', label: 'Active SKUs', hint: 'Items with a stock record', icon: Boxes, value: pulse?.sku_count, display: (v: number) => v.toLocaleString('en-US') },
+    { key: 'value', label: 'Stock value', hint: 'On hand × unit cost', icon: Coins, value: pulse?.on_hand_value, display: compactNumber, prefix: baseCurrency || undefined, title: (v: number) => formatCurrency(v) },
+    { key: 'low', label: 'Low stock', hint: stockMode === 'low' ? 'Filtering the list — click to clear' : 'At or below reorder level — click to filter', icon: AlertTriangle, value: pulse?.low_stock_count, display: (v: number) => v.toLocaleString('en-US'), alert: (pulse?.low_stock_count ?? 0) > 0, onClick: () => setStockMode(stockMode === 'low' ? 'all' : 'low'), active: stockMode === 'low' },
+    { key: 'moves', label: 'Moves · 24h', hint: 'Stock transactions in the last day', icon: Activity, value: pulse?.moves_24h, display: (v: number) => v.toLocaleString('en-US') },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-48"
-              />
-            </div>
-            
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Summary tiles — company / location-wide, from the dashboard pulse */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kpis.map((k) => {
+          const Tag = k.onClick ? 'button' : 'div';
+          return (
+            <Tag
+              key={k.key}
+              {...(k.onClick ? { type: 'button' as const, onClick: k.onClick, 'aria-pressed': !!k.active } : {})}
+              title={k.hint}
+              className={cn(
+                'flex min-w-0 items-center gap-2.5 rounded-2xl border border-border/60 bg-card p-3 text-left shadow-[var(--shadow-xs)] transition-all sm:gap-3 sm:p-4',
+                k.onClick && 'hover:border-primary/40 hover:shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                k.active && 'border-primary/50 ring-2 ring-primary/15',
+              )}
+            >
+              <span
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10',
+                  k.alert ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary',
+                )}
+              >
+                <k.icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-xs text-muted-foreground">{k.label}</span>
+                {pulseLoading ? (
+                  <span className="mt-1 block h-6 w-16 animate-pulse rounded-md bg-muted" />
+                ) : (
+                  <span
+                    className={cn('block truncate text-lg font-semibold tabular-nums tracking-tight sm:text-xl', k.alert && 'text-destructive')}
+                    title={k.value != null && k.title ? k.title(Number(k.value)) : undefined}
+                  >
+                    {k.value != null && 'prefix' in k && k.prefix && (
+                      <span className="mr-1 text-xs font-medium text-muted-foreground">{k.prefix}</span>
+                    )}
+                    {k.value != null ? k.display(Number(k.value)) : '—'}
+                  </span>
+                )}
+              </span>
+            </Tag>
+          );
+        })}
+      </div>
 
-            <Select value={binFilter} onValueChange={setBinFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Bin" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Bins</SelectItem>
-                {uniqueBins.map(bin => (
-                  <SelectItem key={bin.code} value={bin.code}>
-                    {bin.code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="discontinued">Discontinued</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={stockMode} onValueChange={(v) => setStockMode(v as typeof stockMode)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Stock" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stock</SelectItem>
-                <SelectItem value="in_stock">In Stock (&gt; 0)</SelectItem>
-                <SelectItem value="zero">Zero Stock</SelectItem>
-                <SelectItem value="low">Low Stock (≤ Reorder)</SelectItem>
-              </SelectContent>
-            </Select>
-
-
+      {/* Toolbar */}
+      <div className="space-y-3 rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-xs)]">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[220px] max-w-md flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Stock Owner"
-              value={ownerLabelFilter}
-              onChange={(e) => setOwnerLabelFilter(e.target.value)}
-              className="w-[160px]"
+              placeholder="Search by name, code or SKU…"
+              aria-label="Search items"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-10 rounded-full border-transparent bg-muted/60 pl-10 pr-9 focus-visible:bg-background"
             />
-
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             )}
-
-            <span className="text-xs text-muted-foreground ml-2">
-              Loaded {totalLoaded} items
-              {isFetchingNextPage && ' • Loading more...'}
-            </span>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div role="radiogroup" aria-label="Stock level" className="inline-flex rounded-full bg-muted p-1">
+            {STOCK_MODES.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                role="radio"
+                aria-checked={stockMode === m.value}
+                onClick={() => setStockMode(m.value)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-all',
+                  stockMode === m.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* Column management — super admins only */}
             {canManageColumnsSystemWide && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Columns3 className="mr-2 h-4 w-4" />
-                  Columns
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 p-2 space-y-1">
-                {INV_COLUMN_DEFS.filter(c => !c.fixed).map(colDef => (
-                  <label key={colDef.key} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded">
-                    <Checkbox
-                      checked={visibleColumns[colDef.key]}
-                      onCheckedChange={() => toggleColumn(colDef.key)}
-                    />
-                    {colDef.label}
-                  </label>
-                ))}
-                <DropdownMenuSeparator />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-xs"
-                  onClick={(e) => { e.preventDefault(); resetToSystemDefault(); }}
-                >
-                  Reset to system default
-                </Button>
-                {canManageColumnsSystemWide && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 rounded-full border-border/70 px-3.5">
+                    <Columns3 className="mr-2 h-4 w-4" />
+                    Columns
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 space-y-1 rounded-xl p-2">
+                  {INV_COLUMN_DEFS.filter(c => !c.fixed).map(colDef => (
+                    <label key={colDef.key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent">
+                      <Checkbox
+                        checked={visibleColumns[colDef.key]}
+                        onCheckedChange={() => toggleColumn(colDef.key)}
+                      />
+                      {colDef.label}
+                    </label>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-xs"
+                    onClick={(e) => { e.preventDefault(); resetToSystemDefault(); }}
+                  >
+                    Reset to system default
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -573,25 +612,24 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                     <Settings className="mr-2 h-3.5 w-3.5" />
                     {isApplyingColumns ? 'Applying…' : 'Apply to everyone (system-wide)'}
                   </Button>
-                )}
-                {hasSystemColumnDefault && (
-                  <p className="px-2 pt-1 text-[10px] text-muted-foreground">
-                    A system-wide default is set by an admin.
-                  </p>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {hasSystemColumnDefault && (
+                    <p className="px-2 pt-1 text-[10px] text-muted-foreground">
+                      A system-wide default is set by an admin.
+                    </p>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {canDelete && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Admin Tools
-                    <ChevronDown className="ml-2 h-4 w-4" />
+                  <Button variant="outline" size="sm" className="h-9 rounded-full border-border/70 px-3.5">
+                    <Wrench className="mr-2 h-4 w-4" />
+                    Admin tools
+                    <ChevronDown className="ml-1.5 h-4 w-4 opacity-60" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-56 rounded-xl">
                   <DropdownMenuItem
                     onClick={() => {
                       if (!globalLocationId) {
@@ -619,12 +657,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                     <Wrench className="mr-2 h-4 w-4" />
                     {isMigrating ? 'Fixing...' : 'Fix Allocations'}
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setIsFixOpeningStockDialogOpen(true)}
-                  >
+                  <DropdownMenuItem onClick={() => setIsFixOpeningStockDialogOpen(true)}>
                     <FileWarning className="mr-2 h-4 w-4" />
                     Fix Opening Stock
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleDownloadItemMaster}>
                     <Download className="mr-2 h-4 w-4" />
                     Download Item Master
@@ -636,88 +673,168 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            <Button variant="outline" onClick={() => setIsBulkStockUploadOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" /> Upload Stock
+            <Button variant="outline" size="sm" className="h-9 rounded-full border-border/70 px-3.5" onClick={() => setIsBulkStockUploadOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" /> Upload stock
             </Button>
           </div>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className={pillTrigger(categoryFilter !== 'all')} aria-label="Category">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map(category => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={binFilter} onValueChange={setBinFilter}>
+            <SelectTrigger className={pillTrigger(binFilter !== 'all')} aria-label="Bin">
+              <SelectValue placeholder="Bin" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All bins</SelectItem>
+              {uniqueBins.map(bin => (
+                <SelectItem key={bin.code} value={bin.code}>
+                  {bin.code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className={pillTrigger(statusFilter !== 'all')} aria-label="Status">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="discontinued">Discontinued</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="relative">
+            <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Stock owner"
+              aria-label="Stock owner"
+              value={ownerLabelFilter}
+              onChange={(e) => setOwnerLabelFilter(e.target.value)}
+              className={cn(
+                'h-9 w-[170px] rounded-full border-border/70 pl-9 text-sm',
+                ownerLabelFilter && 'border-primary/40 bg-primary/5 text-primary',
+              )}
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-9 rounded-full px-3 text-muted-foreground" onClick={clearFilters}>
+              <X className="mr-1 h-4 w-4" />
+              Clear filters
+            </Button>
+          )}
+
+          <span className="ml-auto text-xs text-muted-foreground" aria-live="polite">
+            {totalLoaded.toLocaleString('en-US')} item{totalLoaded === 1 ? '' : 's'} loaded
+            {hasNextPage && !isFetchingNextPage ? ' · scroll for more' : ''}
+            {isFetchingNextPage && ' · loading more…'}
+          </span>
+        </div>
       </div>
 
-      <div className="border rounded-lg">
+      {/* Items */}
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[var(--shadow-xs)]">
         <div
           ref={scrollParentRef}
           className="overflow-auto"
-          style={{ maxHeight: 'calc(100vh - 320px)' }}
+          style={{ maxHeight: 'max(420px, calc(100svh - 380px))' }}
           role="grid"
           aria-rowcount={filteredItems.length}
           aria-label="Item master inventory"
         >
-        <Table className="min-w-full [&_td]:py-1.5 [&_th]:py-2">
-          <TableHeader className="sticky top-0 z-10 bg-background">
-
-            <TableRow>
-              <TableHead className="w-[40px]">
+        <Table className="min-w-full">
+          <TableHeader className="sticky top-0 z-10 bg-[hsl(var(--surface-2))] shadow-[inset_0_-1px_0_hsl(var(--border))]">
+            <TableRow className="border-0 hover:bg-transparent">
+              <TableHead className="w-12 pl-4">
                 <Checkbox
+                  aria-label="Select all loaded items"
                   checked={filteredItems.length > 0 && selectedItemIds.size === filteredItems.length}
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              {col('photo') && <TableHead className="w-[50px]">Photo</TableHead>}
-              {col('item_code') && (
-                <TableHead>
+              <TableHead className={thClass}>
+                <span className="inline-flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => handleSort('item_code')}
-                    className="inline-flex items-center font-medium hover:text-foreground"
-                    aria-sort={sortBy === 'item_code' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    onClick={() => handleSort('name')}
+                    className="inline-flex items-center uppercase hover:text-foreground"
+                    aria-sort={sortBy === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
-                    Item Code<SortIcon k="item_code" />
+                    Item<SortIcon k="name" />
                   </button>
-                </TableHead>
-              )}
-              <TableHead>
-                <button
-                  type="button"
-                  onClick={() => handleSort('name')}
-                  className="inline-flex items-center font-medium hover:text-foreground"
-                  aria-sort={sortBy === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                >
-                  Name<SortIcon k="name" />
-                </button>
+                  {col('item_code') && (
+                    <button
+                      type="button"
+                      onClick={() => handleSort('item_code')}
+                      className="inline-flex items-center uppercase hover:text-foreground"
+                      aria-sort={sortBy === 'item_code' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    >
+                      Code<SortIcon k="item_code" />
+                    </button>
+                  )}
+                </span>
               </TableHead>
-              {col('category') && <TableHead>Category</TableHead>}
-              {col('unit') && <TableHead>Unit</TableHead>}
-              {col('bin') && <TableHead>Bin</TableHead>}
-              {col('stock_owner') && <TableHead>Stock Owner</TableHead>}
+              {col('category') && <TableHead className={thClass}>Category</TableHead>}
+              {col('unit') && <TableHead className={thClass}>Unit</TableHead>}
+              {col('bin') && <TableHead className={thClass}>Bins</TableHead>}
+              {col('stock_owner') && <TableHead className={thClass}>Stock owner</TableHead>}
               {col('current_stock') && (
-                <TableHead className="text-right">
+                <TableHead className={cn(thClass, 'text-right')}>
                   <button
                     type="button"
                     onClick={() => handleSort('current_stock')}
-                    className="inline-flex items-center font-medium hover:text-foreground"
+                    className="inline-flex items-center uppercase hover:text-foreground"
                     aria-sort={sortBy === 'current_stock' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
-                    Current Stock<SortIcon k="current_stock" />
+                    On hand<SortIcon k="current_stock" />
                   </button>
                 </TableHead>
               )}
-              {col('reserved') && <TableHead className="text-right">Reserved</TableHead>}
-              {col('available') && <TableHead className="text-right">Available</TableHead>}
-              {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
-              {col('status') && <TableHead>Status</TableHead>}
-              <TableHead className="w-[100px]">Actions</TableHead>
+              {col('reserved') && <TableHead className={cn(thClass, 'text-right')}>Reserved</TableHead>}
+              {col('available') && <TableHead className={cn(thClass, 'text-right')}>Available</TableHead>}
+              {col('unit_cost') && <TableHead className={cn(thClass, 'text-right')}>Unit cost</TableHead>}
+              {col('status') && <TableHead className={thClass}>Status</TableHead>}
+              {/* Actions stay pinned to the right edge while the table scrolls sideways */}
+              <TableHead className={cn(thClass, 'sticky right-0 z-20 w-28 bg-[hsl(var(--surface-2))] pr-4 text-right shadow-[inset_1px_0_0_hsl(var(--border))]')}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-              <TableCell colSpan={visibleCount + 1} className="text-center py-8">
-                  Loading items...
-                </TableCell>
-              </TableRow>
+              Array.from({ length: 8 }).map((_, i) => (
+                <TableRow key={`sk-${i}`} className="h-[60px] border-border/50 hover:bg-transparent">
+                  <TableCell className="pl-4"><div className="h-4 w-4 animate-pulse rounded bg-muted" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 animate-pulse rounded-xl bg-muted" />
+                      <div className="space-y-1.5">
+                        <div className="h-3.5 w-48 animate-pulse rounded bg-muted" />
+                        <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell colSpan={colSpan - 2}><div className="h-3.5 w-full max-w-md animate-pulse rounded bg-muted" /></TableCell>
+                </TableRow>
+              ))
             ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-destructive">
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={colSpan} className="py-12 text-center text-destructive">
                   Inventory could not load{lazyError instanceof Error && lazyError.message ? `: ${lazyError.message}` : '.'}{' '}
                   <Button variant="link" size="sm" className="px-1" onClick={() => refetchInventory()}>
                     Retry
@@ -725,112 +842,147 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-muted-foreground">
-                  {globalLocationId && selectedCompany?.name
-                    ? `No inventory for ${selectedCompany.name} at ${
-                        locationNameById.get(globalLocationId) ?? 'this location'
-                      }.`
-                    : 'No items found. Create your first item to get started.'}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={colSpan} className="py-14">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                      <Package className="h-6 w-6" />
+                    </span>
+                    <div className="text-sm text-muted-foreground">
+                      {hasActiveFilters || debouncedSearch
+                        ? 'No items match your search and filters.'
+                        : globalLocationId && selectedCompany?.name
+                          ? `No inventory for ${selectedCompany.name} at ${locationNameById.get(globalLocationId) ?? 'this location'}.`
+                          : 'No items found. Add items from the catalog to get started.'}
+                    </div>
+                    {(hasActiveFilters || searchTerm) && (
+                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => { clearFilters(); setSearchTerm(''); }}>
+                        Clear search and filters
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : ((() => {
-              const renderRow = (item: typeof filteredItems[number], idx: number) => (
-                <TableRow key={item.id} aria-rowindex={idx + 1} data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}>
-
-                  <TableCell>
+              const renderRow = (item: typeof filteredItems[number], idx: number) => {
+                const reserved = Number(item.reserved_quantity ?? 0);
+                const available = Number(item.available_quantity ?? ((item.current_stock || 0) - reserved));
+                const reorder = Number(item.reorder_level || 0);
+                const status = STATUS_STYLE[item.status] ?? STATUS_STYLE.inactive;
+                const locStock = itemLocationStock[item.id];
+                const locTotal = locStock?.reduce((sum, loc) => sum + loc.stock, 0) ?? 0;
+                // Viewing one location shows a subset of the item total — not a desync.
+                const outOfSync = !!locStock?.length && !globalLocationId && locTotal !== (item.current_stock || 0);
+                // Stock recorded on the item but not allocated to any bin.
+                const unallocated = (item.current_stock || 0) > 0 && !(item.bins && item.bins.length > 0);
+                const onHand = locStock?.length ? locTotal : Number(item.current_stock || 0);
+                return (
+                <TableRow
+                  key={item.id}
+                  aria-rowindex={idx + 1}
+                  data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}
+                  className="group h-[60px] border-border/50 hover:bg-[hsl(220_20%_98.3%)] data-[state=selected]:bg-[hsl(213_70%_97%)]"
+                >
+                  <TableCell className="pl-4">
                     <Checkbox
+                      aria-label={`Select ${item.name}`}
                       checked={selectedItemIds.has(item.id)}
                       onCheckedChange={() => toggleSelectItem(item.id)}
                     />
                   </TableCell>
-                  {col('photo') && (
-                    <TableCell>
-                      <div 
-                        className={`w-8 h-8 rounded border overflow-hidden bg-muted flex items-center justify-center ${item.image_url ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
-                        onClick={() => {
-                          if (item.image_url) {
-                            setPreviewImage({ url: item.image_url, name: item.name });
-                          }
-                        }}
-                      >
-                        {item.image_url ? (
-                          <img 
-                            src={item.image_url} 
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              (e.currentTarget.parentElement?.querySelector('.placeholder-icon') as HTMLElement)?.classList.remove('hidden');
-                            }}
-                          />
-                        ) : null}
-                        <ImageIcon className={`h-4 w-4 text-muted-foreground placeholder-icon ${item.image_url ? 'hidden' : ''}`} />
-                      </div>
-                    </TableCell>
-                  )}
-                  {col('item_code') && <TableCell className="font-medium">{item.item_code}</TableCell>}
-                  <TableCell>
-                    <div className="space-y-0.5">
-                      <div className="font-medium">{item.name}</div>
-                      {item.description && (
-                        <div className="text-xs text-muted-foreground line-clamp-1">
-                          {item.description}
-                        </div>
+                  <TableCell className="py-2">
+                    <div className="flex min-w-[240px] max-w-[440px] items-center gap-3">
+                      {col('photo') && (
+                        <button
+                          type="button"
+                          disabled={!item.image_url}
+                          aria-label={item.image_url ? `Preview photo of ${item.name}` : `No photo for ${item.name}`}
+                          onClick={() => item.image_url && setPreviewImage({ url: item.image_url, name: item.name })}
+                          className={cn(
+                            'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/60',
+                            item.image_url && 'cursor-zoom-in transition-shadow hover:ring-2 hover:ring-primary/40',
+                          )}
+                        >
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                (e.currentTarget.parentElement?.querySelector('.placeholder-icon') as HTMLElement)?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <ImageIcon className={cn('placeholder-icon h-4 w-4 text-muted-foreground/70', item.image_url && 'hidden')} />
+                        </button>
                       )}
+                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => setViewingItem(item)}
+                          className="block max-w-full truncate text-left font-medium text-foreground hover:text-primary hover:underline"
+                          title={item.description ? `${item.name} — ${item.description}` : item.name}
+                        >
+                          {item.name}
+                        </button>
+                        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                          {col('item_code') && <span className="shrink-0 font-mono">{item.item_code}</span>}
+                          {item.description && (
+                            <span className="truncate">{col('item_code') ? '· ' : ''}{item.description}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </TableCell>
                   {col('category') && (
                     <TableCell>
-                      {item.category_id
-                        ? categoryById.get(item.category_id)?.name || '-'
-                        : '-'
-                      }
+                      {item.category_id && categoryById.get(item.category_id)?.name ? (
+                        <span className="inline-flex max-w-[180px] truncate rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground/80">
+                          {categoryById.get(item.category_id)?.name}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                   )}
                   {col('unit') && (
-                    <TableCell>
-                      {item.unit_id
-                        ? unitById.get(item.unit_id)?.abbreviation || '-'
-                        : '-'
-                      }
+                    <TableCell className="text-sm text-muted-foreground">
+                      {item.unit_id ? unitById.get(item.unit_id)?.abbreviation || '—' : '—'}
                     </TableCell>
                   )}
                   {col('bin') && (
                     <TableCell>
                       {item.bins && item.bins.length > 0 ? (
                         <TooltipProvider>
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap items-center gap-1">
                             {item.bins.slice(0, 2).map(bin => {
-                              const reserved = Number(bin.reserved_quantity ?? 0);
+                              const binReserved = Number(bin.reserved_quantity ?? 0);
                               const allocated = Number(bin.allocated_quantity ?? bin.quantity);
                               return (
                                 <Tooltip key={bin.id}>
                                   <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="text-xs cursor-help">
-                                      <Package className="h-3 w-3 mr-1" />
-                                      {bin.bin_code}
-                                      <span className="ml-1 text-muted-foreground">({bin.quantity})</span>
-                                      {reserved > 0 && (
-                                        <span className="ml-1 text-amber-600">· {reserved} resv</span>
-                                      )}
-                                    </Badge>
+                                    <span className="inline-flex cursor-help items-center gap-1 whitespace-nowrap rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs">
+                                      <Package className="h-3 w-3 text-muted-foreground" />
+                                      <span className="font-medium">{bin.bin_code}</span>
+                                      <span className="tabular-nums text-muted-foreground">{fmtQty(Number(bin.quantity))}</span>
+                                      {binReserved > 0 && <span className="text-amber-600">· {fmtQty(binReserved)} resv</span>}
+                                    </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>{bin.name} — Allocated: {allocated}, Reserved: {reserved}, Available: {bin.quantity}</p>
+                                    <p>{bin.name} — Allocated: {allocated}, Reserved: {binReserved}, Available: {bin.quantity}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               );
                             })}
                             {item.bins.length > 2 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{item.bins.length - 2} more
-                              </span>
+                              <span className="text-xs text-muted-foreground">+{item.bins.length - 2}</span>
                             )}
                           </div>
                         </TooltipProvider>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                   )}
@@ -839,13 +991,15 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       {item.stock_owners && item.stock_owners.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {item.stock_owners.map((n, i) => (
-                            <Badge
+                            <span
                               key={`${n}-${i}`}
-                              variant={n === 'Unassigned' ? 'outline' : 'secondary'}
-                              className="text-xs"
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-xs',
+                                n === 'Unassigned' ? 'border border-dashed border-border text-muted-foreground' : 'bg-primary/10 text-primary',
+                              )}
                             >
                               {n}
-                            </Badge>
+                            </span>
                           ))}
                         </div>
                       ) : (
@@ -855,170 +1009,114 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   )}
                   {col('current_stock') && (
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="space-y-1 text-right min-w-[140px]">
-                          {itemLocationStock[item.id]?.length > 0 ? (
-                            <>
-                              {itemLocationStock[item.id].slice(0, 3).map((loc) => (
-                                <div key={loc.locationId} className="flex items-center justify-end gap-1.5 text-xs">
-                                  <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
-                                  <span className="text-muted-foreground truncate max-w-[80px]">{loc.locationName}:</span>
-                                  <span className={`font-medium ${
-                                    loc.stock <= (item.reorder_level || 0) ? 'text-destructive' : 'text-green-600'
-                                  }`}>
-                                    {loc.stock}
-                                  </span>
-                                </div>
-                              ))}
-                              {itemLocationStock[item.id].length > 3 && (
-                                <div className="text-xs text-muted-foreground">
-                                  +{itemLocationStock[item.id].length - 3} more locations
-                                </div>
-                              )}
-                              {(() => {
-                                const calculatedTotal = itemLocationStock[item.id]?.reduce((sum, loc) => sum + loc.stock, 0) || 0;
-                                // When the user is viewing a specific location, the totals here
-                                // are intentionally a subset (this location only) of the item
-                                // master total — do NOT flag that as a desync.
-                                const isOutOfSync = !globalLocationId && calculatedTotal !== (item.current_stock || 0);
-                                return (
-                                  <div className="text-xs border-t border-border pt-1 mt-1 text-muted-foreground flex items-center justify-end gap-2">
-                                    {isOutOfSync && (
-                                      <span className="text-yellow-600" title={`DB shows ${item.current_stock || 0}, allocations total ${calculatedTotal}. Run Reconcile Stock to fix.`}>
-                                        ⚠️
-                                      </span>
-                                    )}
-                                    <span>Total: <span className="font-semibold text-foreground">{calculatedTotal}</span></span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setStockDetailsItem(item)}
-                                      className="p-0.5 h-5 w-5"
-                                      title="View Stock Details"
-                                    >
-                                      <BarChart3 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                );
-                              })()}
-                            </>
-                          ) : (
-                            <div className="flex items-center justify-end gap-2">
-                              {(item.current_stock || 0) > 0 && (
-                                <span className="text-yellow-600" title={`Stock exists (${item.current_stock}) but no bin allocations. Run Reconcile Stock to fix.`}>
-                                  ⚠️
-                                </span>
-                              )}
-                              <span className={`font-medium ${
-                                (item.current_stock || 0) <= (item.reorder_level || 0) ? 'text-destructive' : 
-                                (item.current_stock || 0) <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
-                                'text-green-600'
-                              }`}>
-                                {item.current_stock || 0}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setStockDetailsItem(item)}
-                                className="p-0.5 h-5 w-5"
-                                title="View Stock Details"
-                              >
-                                <BarChart3 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {(outOfSync || unallocated) && (
+                          <span
+                            className="text-amber-500"
+                            title={
+                              outOfSync
+                                ? `DB shows ${item.current_stock || 0}, allocations total ${locTotal}. Run Reconcile Stock to fix.`
+                                : `Stock exists (${item.current_stock}) but no bin allocations. Run Reconcile Stock to fix.`
+                            }
+                          >
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setStockDetailsItem(item)}
+                          title="View stock details"
+                          className={cn(
+                            'rounded-md px-1 font-semibold tabular-nums hover:bg-muted',
+                            onHand <= reorder ? 'text-destructive' : onHand <= Number(item.min_stock_level || 0) ? 'text-amber-600' : 'text-foreground',
                           )}
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setStockAdjustmentItem(item)}
-                            className="p-1 h-6 w-6"
-                            title="Adjust Stock"
-                          >
-                            <Settings className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setStockMovementItem(item)}
-                            className="p-1 h-6 w-6"
-                            title="View History"
-                          >
-                            <History className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        >
+                          {fmtQty(onHand)}
+                        </button>
                       </div>
+                      {locStock?.length ? (
+                        <div className="flex items-center justify-end gap-1 text-[11px] text-muted-foreground">
+                          <MapPin className="h-3 w-3" />
+                          <span className="max-w-[120px] truncate">{locStock[0].locationName}</span>
+                        </div>
+                      ) : null}
                     </TableCell>
                   )}
                   {col('reserved') && (
-                    <TableCell className="text-right">
-                      {(() => {
-                        const reserved = Number(item.reserved_quantity ?? 0);
-                        return (
-                          <span className={reserved > 0 ? 'font-medium text-amber-600' : 'text-muted-foreground'}>
-                            {reserved.toFixed(2)}
-                          </span>
-                        );
-                      })()}
+                    <TableCell className={cn('text-right tabular-nums', reserved > 0 ? 'font-medium text-amber-600' : 'text-muted-foreground')}>
+                      {fmtQty(reserved)}
                     </TableCell>
                   )}
                   {col('available') && (
                     <TableCell className="text-right">
-                      {(() => {
-                        const available = Number(
-                          item.available_quantity ??
-                          ((item.current_stock || 0) - Number(item.reserved_quantity ?? 0))
-                        );
-                        return (
-                          <span className={`font-medium ${available <= 0 ? 'text-destructive' : 'text-green-600'}`}>
-                            {available.toFixed(2)}
-                          </span>
-                        );
-                      })()}
+                      <span className="inline-flex items-center justify-end gap-2">
+                        {available <= 0 ? (
+                          <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-600">Out</span>
+                        ) : reorder > 0 && available <= reorder ? (
+                          <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700">Low</span>
+                        ) : null}
+                        <span className={cn('font-semibold tabular-nums', available <= 0 ? 'text-red-600' : 'text-foreground')}>
+                          {fmtQty(available)}
+                        </span>
+                      </span>
                     </TableCell>
                   )}
-                  {col('unit_cost') && <TableCell>{item.unit_cost ? `LKR ${item.unit_cost}` : '-'}</TableCell>}
+                  {col('unit_cost') && (
+                    <TableCell className="whitespace-nowrap text-right tabular-nums text-sm">
+                      {item.unit_cost ? formatCurrency(Number(item.unit_cost)) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  )}
                   {col('status') && (
                     <TableCell>
-                      <Badge className={getStatusColor(item.status)}>
+                      <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize ring-1 ring-inset', status.pill)}>
+                        <span className={cn('h-1.5 w-1.5 rounded-full', status.dot)} />
                         {item.status}
-                      </Badge>
+                      </span>
                     </TableCell>
                   )}
-                  <TableCell>
-                    <div className="flex items-center space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setViewingItem(item)}
-                        title="View Details"
-                      >
+                  <TableCell className="sticky right-0 bg-card pr-3 shadow-[inset_1px_0_0_hsl(var(--border)/0.6)] group-hover:bg-[hsl(220_20%_98.3%)] group-data-[state=selected]:bg-[hsl(213_70%_97%)]">
+                    <div className="flex items-center justify-end gap-0.5">
+                      <button type="button" className={iconBtn} onClick={() => setViewingItem(item)} title="View details" aria-label={`View ${item.name}`}>
                         <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setTransferItem(item)}
-                        title="Transfer Between Warehouses"
-                      >
+                      </button>
+                      <button type="button" className={iconBtn} onClick={() => setTransferItem(item)} title="Transfer between warehouses" aria-label={`Transfer ${item.name}`}>
                         <ArrowLeftRight className="h-4 w-4" />
-                      </Button>
-                      {canDelete && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeletingItem(item)}
-                          disabled={isDeleting || isMarkingInactive}
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className={iconBtn} aria-label={`More actions for ${item.name}`}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                          <DropdownMenuItem onClick={() => setStockAdjustmentItem(item)}>
+                            <SlidersHorizontal className="mr-2 h-4 w-4" /> Adjust stock
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setStockMovementItem(item)}>
+                            <History className="mr-2 h-4 w-4" /> Movement history
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setStockDetailsItem(item)}>
+                            <BarChart3 className="mr-2 h-4 w-4" /> Stock by location
+                          </DropdownMenuItem>
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setDeletingItem(item)}
+                                disabled={isDeleting || isMarkingInactive}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Remove from inventory
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>
-              );
+                );
+              };
               if (!shouldVirtualize) {
                 return filteredItems.map((item, idx) => renderRow(item, idx));
               }
@@ -1029,13 +1127,13 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 <>
                   {paddingTop > 0 && (
                     <tr aria-hidden style={{ height: paddingTop }}>
-                      <td colSpan={visibleCount + 1} />
+                      <td colSpan={colSpan} />
                     </tr>
                   )}
                   {virtualItems.map((vi) => renderRow(filteredItems[vi.index], vi.index))}
                   {paddingBottom > 0 && (
                     <tr aria-hidden style={{ height: paddingBottom }}>
-                      <td colSpan={visibleCount + 1} />
+                      <td colSpan={colSpan} />
                     </tr>
                   )}
                 </>
@@ -1045,20 +1143,19 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         </Table>
         </div>
 
-
-        {/* Infinite scroll sentinel */}
+        {/* Infinite scroll sentinel (same placement as before the redesign) */}
         <div ref={sentinelRef} className="h-1" />
 
         {isFetchingNextPage && (
-          <div className="flex items-center justify-center py-4 gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 border-t border-border/50 py-3 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading more items...
+            Loading more items…
           </div>
         )}
 
         {!hasNextPage && totalLoaded > 0 && !isLoading && (
-          <div className="text-center py-3 text-xs text-muted-foreground">
-            All {totalLoaded} items loaded
+          <div className="border-t border-border/50 py-2.5 text-center text-xs text-muted-foreground">
+            All {totalLoaded.toLocaleString('en-US')} items loaded
           </div>
         )}
       </div>
@@ -1225,16 +1322,32 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
 
       {/* Floating selection action bar */}
       {selectedItemIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-background border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
-          <CheckSquare className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">{selectedItemIds.size} item(s) selected</span>
-          <Button size="sm" onClick={() => setIsBulkIssueOpen(true)}>Bulk Issue</Button>
-          <Button size="sm" variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>Bulk Update</Button>
-          <Button size="sm" variant="outline" onClick={() => setIsBulkChangeOwnerOpen(true)}>Change Stock Owner</Button>
+        <div
+          role="toolbar"
+          aria-label="Bulk actions for selected items"
+          className="fixed bottom-6 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-1.5 rounded-2xl bg-slate-900 px-2.5 py-2 text-white shadow-2xl shadow-slate-900/30"
+        >
+          <span className="mr-1 inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-1.5 text-sm font-medium">
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-white px-1 text-xs font-bold tabular-nums text-slate-900">
+              {selectedItemIds.size}
+            </span>
+            selected
+          </span>
+          <Button size="sm" className="h-8 rounded-xl bg-white text-slate-900 hover:bg-white/90" onClick={() => setIsBulkIssueOpen(true)}>
+            <PackageCheck className="mr-1.5 h-4 w-4" /> Bulk issue
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 rounded-xl text-white hover:bg-white/10 hover:text-white" onClick={() => setIsBulkUpdateOpen(true)}>
+            <PencilLine className="mr-1.5 h-4 w-4" /> Update
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 rounded-xl text-white hover:bg-white/10 hover:text-white" onClick={() => setIsBulkChangeOwnerOpen(true)}>
+            <UserCog className="mr-1.5 h-4 w-4" /> Change owner
+          </Button>
           {canDelete && (
-            <Button size="sm" variant="destructive" onClick={() => setIsBulkDeleteOpen(true)}>Bulk Delete</Button>
+            <Button size="sm" variant="ghost" className="h-8 rounded-xl text-red-300 hover:bg-red-500/20 hover:text-red-200" onClick={() => setIsBulkDeleteOpen(true)}>
+              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+            </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
+          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-xl text-white/70 hover:bg-white/10 hover:text-white" onClick={clearSelection} aria-label="Clear selection">
             <X className="h-4 w-4" />
           </Button>
         </div>

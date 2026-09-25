@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 import { Button } from '@/components/ui/button';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
+import { HERO_GRADIENT } from '@/components/dashboard/DashCard';
+import { cn } from '@/lib/utils';
 
 const ItemMasterTab = lazy(() =>
   import('@/components/warehouse/ItemMasterTab').then((m) => ({ default: m.ItemMasterTab })),
@@ -27,22 +29,26 @@ export default function Inventory() {
   const [bulkIssueOpen, setBulkIssueOpen] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-semibold tracking-tight">Inventory</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             On-hand stock by item, location and bin. Tools appear here as items with type "Tool".
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => setBulkIssueOpen(true)}>
-            <PackageCheck className="h-4 w-4 mr-2" />
-            Bulk Issue
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="h-10 rounded-full border-border/70 bg-card px-5" onClick={() => setBulkIssueOpen(true)}>
+            <PackageCheck className="mr-2 h-4 w-4" />
+            Bulk issue
           </Button>
-          <Button onClick={() => setBulkOpen(true)}>
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Bulk add from catalog
+          <Button
+            className={cn(HERO_GRADIENT, "h-10 rounded-full px-5 text-white shadow-lg shadow-primary/25 hover:brightness-110")}
+            onClick={() => setBulkOpen(true)}
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Bulk add from catalog</span>
+            <span className="sm:hidden">Add from catalog</span>
           </Button>
         </div>
       </div>
