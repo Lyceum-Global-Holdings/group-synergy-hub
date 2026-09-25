@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { CompanySidebar } from "@/components/layout/CompanySidebar";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { QuickCreateMenu } from "@/components/layout/QuickCreateMenu";
+import { CompanySelector } from "@/components/layout/CompanySwitcher";
 import { LocationSelector } from "@/components/common/LocationSelector";
 import { UserProfile } from "@/components/common/UserProfile";
 import { LiveClock } from "@/components/common/LiveClock";
@@ -66,8 +67,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             <div className="ml-auto flex items-center gap-2 shrink-0">
               {/* Desktop */}
-              <div className="hidden lg:flex items-center gap-3">
-                <LiveClock />
+              <div className="hidden lg:flex items-center gap-2">
+                <div className="hidden xl:flex items-center gap-2">
+                  <LiveClock />
+                  <div className="mx-1 h-5 w-px bg-border" aria-hidden />
+                </div>
+                <CompanySelector />
                 <LocationSelector />
               </div>
 
@@ -78,13 +83,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     variant="outline"
                     size="icon"
                     className="lg:hidden h-10 w-10 rounded-full border-border/70 bg-card"
-                    aria-label="Location and time"
+                    aria-label="Company, location and time"
                   >
                     <SlidersHorizontal className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-[280px] rounded-2xl p-3 space-y-3">
                   <LiveClock />
+                  <CompanySelector triggerClassName="w-full" />
                   <LocationSelector triggerClassName="w-full" />
                 </PopoverContent>
               </Popover>
