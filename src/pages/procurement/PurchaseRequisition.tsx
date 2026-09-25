@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { PurchaseRequisition, PrStatus } from '@/types/procurement';
 import { format } from 'date-fns';
 import { GenerateReportButton } from '@/components/management/reports/GenerateReportButton';
+import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
 
 const statusColors: Record<PrStatus, string> = {
   draft: 'bg-gray-500',
@@ -41,6 +42,8 @@ const priorityColors = {
 export default function PurchaseRequisition() {
   const [selectedPr, setSelectedPr] = useState<PurchaseRequisition | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  // Header quick-create menu links here with ?new=…
+  useOpenFromQuery("new", { "1": () => setIsCreateDialogOpen(true) });
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');

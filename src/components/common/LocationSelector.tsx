@@ -11,8 +11,9 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useEffectiveLocationsForCompany, type EffectiveLocation } from "@/hooks/useWarehouseLocations";
 import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import { useEffect, useMemo } from "react";
+import { cn } from "@/lib/utils";
 
-export function LocationSelector() {
+export function LocationSelector({ triggerClassName }: { triggerClassName?: string } = {}) {
   const { globalLocationId, setGlobalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
   const { data: permissions, isLoading: permissionsLoading } = useCurrentUserLocationPermissions();
@@ -133,17 +134,24 @@ export function LocationSelector() {
   else if (locations.length === 0) placeholder = "No locations for this company";
 
   return (
-    <div className="flex items-center gap-2 shrink-0">
-      <MapPin className="h-4 w-4 text-muted-foreground" />
-      <Select
+    <Select
         value={selectValue}
         onValueChange={(value) =>
           setGlobalLocationId(showAllOption ? (value === "all" ? null : value) : value)
         }
         disabled={isLoading || !selectedCompany?.id}
       >
-        <SelectTrigger className="w-[200px] shrink-0">
-          <SelectValue placeholder={placeholder} />
+        <SelectTrigger
+          aria-label="Location filter"
+          className={cn(
+            "h-10 w-[210px] shrink-0 gap-2 rounded-full border-border/70 bg-card pl-3.5 shadow-[var(--shadow-xs)] hover:border-primary/40 [&>span]:truncate",
+            triggerClassName,
+          )}
+        >
+          <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-left">
+            <SelectValue placeholder={placeholder} />
+          </span>
         </SelectTrigger>
         <SelectContent className="min-w-[260px]">
           {locationsError && (
@@ -172,7 +180,6 @@ export function LocationSelector() {
           ))}
         </SelectContent>
       </Select>
-    </div>
   );
 }
 

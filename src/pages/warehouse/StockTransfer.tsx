@@ -29,6 +29,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import type { StockTransferRequest } from "@/types/stockTransfer";
 import { format } from "date-fns";
+import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
 
 export default function StockTransfer() {
   const navigate = useNavigate();
@@ -37,6 +38,8 @@ export default function StockTransfer() {
   const { globalLocationId } = useLocationFilter();
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  // Header quick-create menu links here with ?new=…
+  useOpenFromQuery("new", { "1": () => setCreateDialogOpen(true) });
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<StockTransferRequest | null>(null);
   const [activeTab, setActiveTab] = useState("all");

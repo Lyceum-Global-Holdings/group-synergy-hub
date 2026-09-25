@@ -26,6 +26,7 @@ import { BulkRepairMaterialReturnsDialog } from "@/components/warehouse/BulkRepa
 import { CreateMaterialRequestDialog } from "@/components/warehouse/CreateMaterialRequestDialog";
 import { MaterialRequestDetailsDialog } from "@/components/warehouse/MaterialRequestDetailsDialog";
 import { format } from "date-fns";
+import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
 
 const getStatusColor = (status: string): "default" | "destructive" | "secondary" => {
   switch (status) {
@@ -50,6 +51,8 @@ export default function MaterialIssueReturn() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  // Header quick-create menu links here with ?new=…
+  useOpenFromQuery("new", { request: () => setRequestDialogOpen(true) });
   const [requestDetailsOpen, setRequestDetailsOpen] = useState(false);
   const [returnDetailsOpen, setReturnDetailsOpen] = useState(false);
   const [repairDialogOpen, setRepairDialogOpen] = useState(false);

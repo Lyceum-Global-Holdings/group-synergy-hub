@@ -21,6 +21,7 @@ import { GrnStatus } from '@/types/grn';
 import { CreateGrnDialog } from '@/components/warehouse/CreateGrnDialog';
 import { GrnDetailsDialog } from '@/components/warehouse/GrnDetailsDialog';
 import { format } from 'date-fns';
+import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
@@ -51,6 +52,8 @@ function GoodsReceiptNote() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  // Header quick-create menu links here with ?new=…
+  useOpenFromQuery("new", { "1": () => setShowCreateDialog(true) });
   const [selectedGrn, setSelectedGrn] = useState<string | null>(null);
   const [editingGrnDraft, setEditingGrnDraft] = useState<any | null>(null);
 

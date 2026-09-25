@@ -13,6 +13,7 @@ import { PoDetailsDialog } from "@/components/procurement/PoDetailsDialog";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
 import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
+import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
 
 const statusColors: Record<PoStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
@@ -45,6 +46,8 @@ export default function PurchaseOrderPage() {
   const [statusFilter, setStatusFilter] = useState<PoStatus | "all">("all");
   const [selectedPo, setSelectedPo] = useState<PurchaseOrder | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  // Header quick-create menu links here with ?new=…
+  useOpenFromQuery("new", { "1": () => setShowCreateDialog(true) });
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
   const { data: purchaseOrders = [], isLoading } = usePurchaseOrders();

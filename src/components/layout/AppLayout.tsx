@@ -1,11 +1,10 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { CompanySidebar } from "@/components/layout/CompanySidebar";
-import { CompanySelector } from "@/components/common/CompanySelector";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { QuickCreateMenu } from "@/components/layout/QuickCreateMenu";
 import { LocationSelector } from "@/components/common/LocationSelector";
 import { UserProfile } from "@/components/common/UserProfile";
 import { LiveClock } from "@/components/common/LiveClock";
-import { InstallAppButton } from "@/components/common/InstallAppButton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -22,10 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const superAdminQuery = useSuperAdmin();
   const profileQuery = useCurrentUserProfile();
 
-  const isViewingAllCompanies = companyContext.isViewingAllCompanies;
-  const companies = companyContext.companies;
   const isCompaniesLoading = companyContext.isLoading;
-  const isSuperAdmin = superAdminQuery.data ?? false;
   const isSuperAdminLoading = superAdminQuery.isLoading && !superAdminQuery.isError;
   const isProfileLoading = profileQuery.isLoading && !profileQuery.isError;
   
@@ -55,65 +51,52 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <RealtimeBusProvider>
     <SidebarProvider>
-      <div className="h-svh flex w-full bg-background overflow-hidden">
+      {/* Shell: sidebar + header sit on the soft grey frame; each page renders
+          inside the rounded panel below (the single canonical scroll region). */}
+      <div className="h-svh flex w-full bg-shell overflow-hidden">
         <CompanySidebar />
-        
-        <div className="flex-1 flex flex-col min-w-0 h-svh">
-          {/* Header — clean enterprise shell bar (viewport-locked) */}
-          <header className="h-14 flex items-center justify-between gap-2 bg-card px-3 sm:px-5 shadow-[var(--shadow-sm)] border-b border-border/40 shrink-0 sticky top-0 z-20">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-              <SidebarTrigger className="text-muted-foreground hover:text-foreground shrink-0" />
-              <div className="h-5 w-px bg-border/60 hidden sm:block" />
-              <h1 className="text-sm font-semibold text-foreground truncate tracking-tight">
-                <span className="hidden sm:inline">Enterprise Management System</span>
-                <span className="sm:hidden">Lyceum ERP</span>
-              </h1>
-            </div>
 
-            {/* Desktop controls */}
-            <div className="hidden lg:flex items-center gap-2 shrink-0">
-              <LiveClock />
-              <div className="h-5 w-px bg-border/60" />
-              <CompanySelector />
-              <LocationSelector />
-              {isSuperAdmin && !isViewingAllCompanies && companies.length > 1 && (
-                <Badge variant="outline" className="text-xs">
-                  Viewing as company
-                </Badge>
-              )}
-              <InstallAppButton />
-              <UserProfile />
-            </div>
+        <div className="flex-1 flex flex-col min-w-0 h-svh md:peer-data-[state=collapsed]:pl-3">
+          <header className="h-16 flex items-center gap-2 sm:gap-3 px-3 md:pl-0 md:pr-3 shrink-0">
+            <SidebarTrigger
+              className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-card hover:text-foreground"
+              aria-label="Toggle navigation"
+            />
+            <GlobalSearch />
 
-            {/* Mobile/tablet controls — popover groups secondary actions */}
-            <div className="flex lg:hidden items-center gap-1 shrink-0">
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              {/* Desktop */}
+              <div className="hidden lg:flex items-center gap-3">
+                <LiveClock />
+                <LocationSelector />
+              </div>
+
+              {/* Tablet / phone — secondary controls in a popover */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Open header options">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="lg:hidden h-10 w-10 rounded-full border-border/70 bg-card"
+                    aria-label="Location and time"
+                  >
                     <SlidersHorizontal className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-[280px] p-3 space-y-3">
+                <PopoverContent align="end" className="w-[280px] rounded-2xl p-3 space-y-3">
                   <LiveClock />
-                  <div className="h-px bg-border/60" />
-                  <CompanySelector />
-                  <LocationSelector />
-                  {isSuperAdmin && !isViewingAllCompanies && companies.length > 1 && (
-                    <Badge variant="outline" className="text-xs">
-                      Viewing as company
-                    </Badge>
-                  )}
-                  <InstallAppButton />
+                  <LocationSelector triggerClassName="w-full" />
                 </PopoverContent>
               </Popover>
+
               <UserProfile />
+              <QuickCreateMenu />
             </div>
           </header>
 
-          {/* Main Content — the single canonical scroll region */}
           <main
             id="app-scroll-container"
-            className="flex-1 p-5 overflow-auto min-h-0 overscroll-contain"
+            className="flex-1 min-h-0 overflow-auto overscroll-contain bg-background p-4 sm:p-5 md:mb-3 md:mr-3 md:rounded-[24px] md:border md:border-border/60 md:shadow-[0_1px_3px_hsl(220_25%_10%/0.05)]"
           >
             {children}
           </main>
