@@ -71,4 +71,29 @@ describe("renderPdf", () => {
     const pagesWithRowsOnly = await capture(envelopeFor("PR-PRC-HIS-001", 40, []));
     expect(doc.getNumberOfPages()).toBeGreaterThan(pagesWithRowsOnly.getNumberOfPages());
   });
+
+  it("adds a visual summary (KPI tiles + chart images) before the table", async () => {
+    // 1×1 PNG
+    const png =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+    const env = envelopeFor("PR-SPND-001", 5, []);
+    const plain = await capture(env);
+    const withCharts = await (async () => {
+      await renderPdf(env, "test.pdf", {
+        kpis: [{ label: "Total spend", value: "LKR 1,234.00" }, { label: "Suppliers", value: "4" }],
+        charts: [
+          { title: "Monthly spend by supplier", png, width: 640, height: 300 },
+          { title: "Top suppliers by spend", png, width: 640, height: 328 },
+        ],
+      });
+      return saved.at(-1) as jsPDF;
+    })();
+    const text = withCharts.output();
+    expect(text).toContain("Total spend");
+    expect(text).toContain("Monthly spend by supplier");
+    expect(text).toContain("Detail");
+    expect(text).toMatch(/\/Subtype \/Image/);
+    expect(withCharts.getNumberOfPages()).toBeGreaterThanOrEqual(plain.getNumberOfPages());
+    expect(text).toContain(`Page 1 of ${withCharts.getNumberOfPages()}`);
+  });
 });

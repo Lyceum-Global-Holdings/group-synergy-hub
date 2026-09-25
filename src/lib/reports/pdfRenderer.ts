@@ -1,11 +1,16 @@
 import { ReportEnvelope } from "./types";
 import { formatValue } from "./format";
+import type { RenderedVisuals } from "./visuals/types";
 
 /**
  * Render report as PDF using jspdf + autoTable (already in the project).
  * Lazy-imported to keep the main bundle small.
  */
-export async function renderPdf(envelope: ReportEnvelope, fileName: string): Promise<void> {
+export async function renderPdf(
+  envelope: ReportEnvelope,
+  fileName: string,
+  visuals?: RenderedVisuals | null,
+): Promise<void> {
   const [{ default: jsPDF }, autoTableMod] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
@@ -20,7 +25,10 @@ export async function renderPdf(envelope: ReportEnvelope, fileName: string): Pro
   const bodyFontSize = colCount > 20 ? 6.5 : colCount > 12 ? 7 : 8;
   const doc = new jsPDF({ orientation, unit: "pt", format });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 32;
+  const contentWidth = pageWidth - margin * 2;
+  const footerBand = 48; // signature + confidentiality lines at the bottom of every page
 
   // ---- Header block ----
   doc.setFont("helvetica", "bold");
@@ -57,6 +65,67 @@ export async function renderPdf(envelope: ReportEnvelope, fileName: string): Pro
   doc.setDrawColor(200);
   doc.line(margin, 108, pageWidth - margin, 108);
 
+  // ---- Visual summary: KPI tiles + charts ----
+  let y = 120;
+  if (visuals && (visuals.kpis.length || visuals.charts.length)) {
+    if (visuals.kpis.length) {
+      const gap = 10;
+      const n = visuals.kpis.length;
+      const tileW = (contentWidth - gap * (n - 1)) / n;
+      visuals.kpis.forEach((k, i) => {
+        const x = margin + i * (tileW + gap);
+        doc.setFillColor(241, 245, 249);
+        doc.roundedRect(x, y, tileW, 46, 6, 6, "F");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(100);
+        doc.text(doc.splitTextToSize(k.label, tileW - 16)[0] as string, x + 8, y + 15);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(15, 23, 42);
+        doc.text(doc.splitTextToSize(k.value, tileW - 16)[0] as string, x + 8, y + 34);
+      });
+      y += 60;
+    }
+
+    // Two charts per row on landscape pages, one on portrait.
+    const cols = orientation === "landscape" ? 2 : 1;
+    const gap = 16;
+    const cellW = (contentWidth - gap * (cols - 1)) / cols;
+    let rowH = 0;
+    visuals.charts.forEach((c, i) => {
+      const col = i % cols;
+      const h = (cellW * c.height) / c.width;
+      if (col === 0) {
+        y += rowH;
+        rowH = 0;
+        if (y + 16 + h > pageHeight - footerBand) {
+          doc.addPage();
+          y = 40;
+        }
+      }
+      const x = margin + col * (cellW + gap);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text(doc.splitTextToSize(c.title, cellW)[0] as string, x, y + 10);
+      doc.addImage(c.png, "PNG", x, y + 16, cellW, h, undefined, "FAST");
+      rowH = Math.max(rowH, 16 + h + 18);
+    });
+    y += rowH;
+
+    // Data table follows the visuals; start it on a fresh page if little room is left.
+    if (y > pageHeight - footerBand - 120) {
+      doc.addPage();
+      y = 40;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text("Detail", margin, y + 4);
+    y += 14;
+  }
+
   // ---- Body ----
   const head = [envelope.columns.map((c) => c.label)];
   const body = envelope.rows.map((row) =>
@@ -74,49 +143,27 @@ export async function renderPdf(envelope: ReportEnvelope, fileName: string): Pro
       : undefined;
 
   autoTable(doc, {
-    startY: 120,
+    startY: y,
     head,
     body,
     foot,
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, bottom: footerBand + 6 },
     styles: { fontSize: bodyFontSize, cellPadding: colCount > 12 ? 3 : 4, overflow: "linebreak" },
     headStyles: { fillColor: [31, 41, 55], textColor: 255, fontStyle: "bold" },
     footStyles: { fillColor: [243, 244, 246], textColor: 0, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [247, 247, 247] },
-    didDrawPage: (data: { pageNumber: number }) => {
-      const pageHeight = doc.internal.pageSize.getHeight();
-      doc.setFontSize(8);
-      doc.setTextColor(120);
-      doc.text(
-        `Lyceum ERP  ·  Confidential — Internal Use  ·  Source: Lyceum ERP`,
-        margin,
-        pageHeight - 18,
-      );
-      doc.text(
-        `Page ${data.pageNumber} of ${doc.getNumberOfPages()}`,
-        pageWidth - margin,
-        pageHeight - 18,
-        { align: "right" },
-      );
-      doc.text(
-        `Signature: __________________________   Date: __________`,
-        margin,
-        pageHeight - 32,
-      );
-    },
   });
 
   // ---- Methodology notes (ISO 9001 §7.5) ----
   if (envelope.notes?.length) {
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const maxWidth = pageWidth - margin * 2;
+    const maxWidth = contentWidth;
     let y = ((doc as any).lastAutoTable?.finalY ?? 120) + 20;
     const entries = ["Methodology", ...envelope.notes.map((n) => `•  ${n}`)];
     doc.setFontSize(8);
     entries.forEach((text, i) => {
       const wrapped = doc.splitTextToSize(text, maxWidth) as string[];
       // Keep clear of the signature/footer band drawn on each page.
-      if (y + wrapped.length * 10 > pageHeight - 48) {
+      if (y + wrapped.length * 10 > pageHeight - footerBand) {
         doc.addPage();
         y = 40;
       }
@@ -125,6 +172,18 @@ export async function renderPdf(envelope: ReportEnvelope, fileName: string): Pro
       doc.text(wrapped, margin, y);
       y += wrapped.length * 10 + 2;
     });
+  }
+
+  // ---- Footer on every page (drawn last so "Page X of Y" is correct) ----
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text(`Signature: __________________________   Date: __________`, margin, pageHeight - 32);
+    doc.text(`Lyceum ERP  ·  Confidential — Internal Use  ·  Source: Lyceum ERP`, margin, pageHeight - 18);
+    doc.text(`Page ${p} of ${pages}`, pageWidth - margin, pageHeight - 18, { align: "right" });
   }
 
   doc.save(fileName);

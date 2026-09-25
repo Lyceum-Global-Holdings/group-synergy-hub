@@ -19,9 +19,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { REPORT_REGISTRY, ReportDefinition, getReportsByModule, groupReports } from "@/lib/reports/registry";
-import { RotateCcw } from "lucide-react";
+import { BarChart3, RotateCcw, Table2 } from "lucide-react";
 import { ReportParameterPanel } from "@/components/management/reports/ReportParameterPanel";
 import { ReportPreviewTable } from "@/components/management/reports/ReportPreviewTable";
+import { ReportVisuals } from "@/components/management/reports/ReportVisuals";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { buildReportEnvelope } from "@/hooks/reports/useReportData";
 import { exportReport } from "@/lib/reports/exporter";
 import { ReportEnvelope, ReportFormat } from "@/lib/reports/types";
@@ -105,6 +108,9 @@ export default function ReportsCenter() {
   );
   const [previewEnvelope, setPreviewEnvelope] = useState<ReportEnvelope | null>(null);
   const [busyFormat, setBusyFormat] = useState<ReportFormat | null>(null);
+  // Visual reports: charts in the preview and (optionally) in PDF / Excel exports.
+  const [includeCharts, setIncludeCharts] = useState(true);
+  const [previewView, setPreviewView] = useState<"charts" | "table">("charts");
 
   const filteredReports = useMemo(() => {
     const list = getReportsByModule(activeModule);
@@ -152,6 +158,7 @@ export default function ReportsCenter() {
           format,
           companyId: selectedCompany.id,
           params,
+          includeCharts,
         });
         toast.success(`${openReport.title} exported as ${format.toUpperCase()}`);
       }
@@ -316,7 +323,31 @@ export default function ReportsCenter() {
                   </Button>
                 </div>
 
-                {previewEnvelope && <ReportPreviewTable envelope={previewEnvelope} />}
+                <div className="flex items-center gap-2">
+                  <Switch id="include-charts" checked={includeCharts} onCheckedChange={setIncludeCharts} />
+                  <Label htmlFor="include-charts" className="cursor-pointer text-sm font-normal">
+                    Include charts in PDF and Excel exports
+                  </Label>
+                </div>
+
+                {previewEnvelope && (
+                  <Tabs value={previewView} onValueChange={(v) => setPreviewView(v as "charts" | "table")}>
+                    <TabsList>
+                      <TabsTrigger value="charts" className="gap-1.5">
+                        <BarChart3 className="h-4 w-4" /> Charts
+                      </TabsTrigger>
+                      <TabsTrigger value="table" className="gap-1.5">
+                        <Table2 className="h-4 w-4" /> Table
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="charts" className="mt-3">
+                      <ReportVisuals envelope={previewEnvelope} />
+                    </TabsContent>
+                    <TabsContent value="table" className="mt-3">
+                      <ReportPreviewTable envelope={previewEnvelope} />
+                    </TabsContent>
+                  </Tabs>
+                )}
               </div>
             </>
           )}

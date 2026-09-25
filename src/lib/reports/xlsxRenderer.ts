@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { ReportEnvelope } from "./types";
 import { excelNumFmt } from "./format";
+import type { RenderedVisuals } from "./visuals/types";
 
 /**
  * Render a report envelope as a downloadable XLSX file.
@@ -15,7 +16,11 @@ import { excelNumFmt } from "./format";
  *   Row 8+: data
  *   Last:  totals (bold, top border)
  */
-export async function renderXlsx(envelope: ReportEnvelope, fileName: string): Promise<void> {
+export async function renderXlsx(
+  envelope: ReportEnvelope,
+  fileName: string,
+  visuals?: RenderedVisuals | null,
+): Promise<void> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Lyceum ERP — Reports Center";
   wb.created = new Date();
@@ -163,6 +168,11 @@ export async function renderXlsx(envelope: ReportEnvelope, fileName: string): Pr
     col.width = max + 2;
   });
 
+  // ---------- Charts sheet (visual report) ----------
+  if (visuals && (visuals.kpis.length || visuals.charts.length)) {
+    addChartsSheet(wb, envelope, visuals);
+  }
+
   const buffer = await wb.xlsx.writeBuffer();
   download(buffer as ArrayBuffer, fileName, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
@@ -200,4 +210,56 @@ function download(buffer: ArrayBuffer, fileName: string, mime: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * "Charts" worksheet: KPI summary plus the report charts as images (ExcelJS
+ * can't author native Excel charts). The workbook opens on this sheet; the
+ * data stays on the first sheet for filtering and pivoting.
+ */
+function addChartsSheet(wb: ExcelJS.Workbook, envelope: ReportEnvelope, visuals: RenderedVisuals) {
+  const ws = wb.addWorksheet("Charts", { views: [{ showGridLines: false }] });
+  ws.getColumn(1).width = 30;
+  ws.getColumn(2).width = 26;
+
+  ws.getCell("A1").value = `${envelope.companyName} — ${envelope.title}`;
+  ws.getCell("A1").font = { bold: true, size: 14 };
+  ws.getCell("A2").value =
+    envelope.periodStart || envelope.periodEnd
+      ? `Period: ${envelope.periodStart ?? "—"} → ${envelope.periodEnd ?? "—"} (ISO 8601) · Currency: ${envelope.currency} (ISO 4217)`
+      : `Currency: ${envelope.currency} (ISO 4217)`;
+  ws.getCell("A2").font = { size: 10, color: { argb: "FF666666" } };
+
+  let row = 4;
+  visuals.kpis.forEach((k) => {
+    ws.getCell(`A${row}`).value = k.label;
+    ws.getCell(`A${row}`).font = { color: { argb: "FF555555" } };
+    ws.getCell(`B${row}`).value = k.value;
+    ws.getCell(`B${row}`).font = { bold: true };
+    ws.getCell(`B${row}`).alignment = { horizontal: "right" };
+    row += 1;
+  });
+  row += 1;
+
+  // Two charts per row. Default cells are ~64 px wide × 20 px tall.
+  const width = 560;
+  visuals.charts.forEach((c, i) => {
+    const height = Math.round((width * c.height) / c.width);
+    const col = i % 2 === 0 ? 0 : 9;
+    if (i % 2 === 0 && i > 0) row += 1;
+    const titleCell = ws.getCell(row, col + 1);
+    titleCell.value = c.title;
+    titleCell.font = { bold: true, size: 11 };
+    const id = wb.addImage({ base64: c.png, extension: "png" });
+    ws.addImage(id, { tl: { col, row }, ext: { width, height } });
+    if (i % 2 === 1 || i === visuals.charts.length - 1) {
+      const tallest = Math.max(
+        height,
+        i % 2 === 1 ? Math.round((width * visuals.charts[i - 1].height) / visuals.charts[i - 1].width) : 0,
+      );
+      row += 2 + Math.ceil(tallest / 20);
+    }
+  });
+
+  wb.views = [{ x: 0, y: 0, width: 12000, height: 8000, firstSheet: 0, activeTab: wb.worksheets.length - 1, visibility: "visible" }];
 }

@@ -44,20 +44,34 @@ export interface ExportOptions {
   format: ReportFormat;
   companyId: string | null;
   params: Record<string, unknown>;
+  /** Add KPI tiles and charts to PDF / Excel output (CSV stays data-only). */
+  includeCharts?: boolean;
+}
+
+/** Charts are optional garnish: if rendering fails the export still goes out. */
+async function visualsFor(envelope: ReportEnvelope, include?: boolean) {
+  if (!include) return null;
+  try {
+    const { renderVisualsForExport } = await import("@/components/management/reports/charts/exportVisuals");
+    return await renderVisualsForExport(envelope);
+  } catch (e) {
+    console.warn("[Reports] chart rendering failed; exporting without charts", e);
+    return null;
+  }
 }
 
 export async function exportReport(
   envelope: ReportEnvelope,
   opts: ExportOptions,
 ): Promise<void> {
-  const { format, companyId, params } = opts;
+  const { format, companyId, params, includeCharts } = opts;
 
   switch (format) {
     case "xlsx":
-      await renderXlsx(envelope, fileName(envelope, "xlsx"));
+      await renderXlsx(envelope, fileName(envelope, "xlsx"), await visualsFor(envelope, includeCharts));
       break;
     case "pdf":
-      await renderPdf(envelope, fileName(envelope, "pdf"));
+      await renderPdf(envelope, fileName(envelope, "pdf"), await visualsFor(envelope, includeCharts));
       break;
     case "csv":
       renderCsv(envelope, fileName(envelope, "csv"));
@@ -67,5 +81,5 @@ export async function exportReport(
       break;
   }
 
-  void logAudit(envelope, format, companyId, params);
+  void logAudit(envelope, format, companyId, { ...params, includeCharts: !!includeCharts });
 }

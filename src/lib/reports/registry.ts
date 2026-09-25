@@ -1,4 +1,5 @@
 import { ReportColumn } from "./types";
+import type { VisualSpec } from "./visuals/types";
 
 /**
  * Static catalogue of available reports.
@@ -20,6 +21,8 @@ export interface ReportDefinition {
   hookId: string;
   /** Definitions and standards notes, rendered under the table on every output. */
   methodology?: string[];
+  /** Curated KPI tiles and charts; reports without this get derived visuals. */
+  visuals?: VisualSpec;
 }
 
 export type ReportParameter =
@@ -214,6 +217,17 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     group: "Inventory",
     standard: "IAS 2 §28 (NRV)",
     hookId: "warehouse.inventoryAging",
+    visuals: {
+      kpis: [
+        { label: "Stock value", agg: "sum", key: "stock_value" },
+        { label: "Items", agg: "rows" },
+        { label: "Avg days since movement", agg: "avg", key: "days_since_movement" },
+      ],
+      charts: [
+        { id: "buckets", kind: "donut", title: "Stock value by age bucket", x: "aging_bucket", measures: [{ key: "stock_value" }], limit: 8 },
+        { id: "top", kind: "hbar", title: "Top items by stock value", x: "item_name", measures: [{ key: "stock_value" }], limit: 10 },
+      ],
+    },
     parameters: [{ key: "categoryId", label: "Category", type: "category" }],
     columns: [
       { key: "item_code", label: "Item Code", type: "string", width: 18 },
@@ -707,6 +721,17 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     group: "Assets",
     standard: "ISO 55000",
     hookId: "warehouse.toolCost",
+    visuals: {
+      kpis: [
+        { label: "Total cost", agg: "sum", key: "total_cost" },
+        { label: "Calibration", agg: "sum", key: "calibration_cost" },
+        { label: "Maintenance", agg: "sum", key: "maintenance_cost" },
+        { label: "Tools", agg: "rows" },
+      ],
+      charts: [
+        { id: "cost", kind: "stacked", title: "Calibration and maintenance cost by tool", subtitle: "Top 10 tools by total cost", x: "tool_name", measures: [{ key: "calibration_cost", label: "Calibration" }, { key: "maintenance_cost", label: "Maintenance" }], limit: 10 },
+      ],
+    },
     parameters: [
       { key: "period", label: "Date Range", type: "dateRange", defaultDays: 365 },
     ],
@@ -861,6 +886,17 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     description: "All active accounts with opening, period movement, and closing balances as of a date.",
     moduleKey: "finance", group: "Ledger", standard: "IFRS presentation",
     hookId: "finance.trialBalance",
+    visuals: {
+      kpis: [
+        { label: "Period debits", agg: "sum", key: "period_debit" },
+        { label: "Period credits", agg: "sum", key: "period_credit" },
+        { label: "Accounts", agg: "rows" },
+      ],
+      charts: [
+        { id: "dc", kind: "column", title: "Debits vs credits by account type", x: "account_type", measures: [{ key: "period_debit", label: "Debits" }, { key: "period_credit", label: "Credits" }] },
+        { id: "balances", kind: "hbar", title: "Largest closing balances", x: "account_name", measures: [{ key: "closing_balance" }], limit: 10, sort: "abs-desc" },
+      ],
+    },
     parameters: [{ key: "asOfDate", label: "As of date", type: "date" }],
     columns: [
       { key: "account_code", label: "Account", type: "string", width: 14 },
@@ -902,6 +938,18 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     description: "Open supplier invoices bucketed 0-30 / 31-60 / 61-90 / 90+ days overdue.",
     moduleKey: "finance", group: "Aging", standard: "IFRS 9",
     hookId: "finance.apAging",
+    visuals: {
+      kpis: [
+        { label: "Outstanding", agg: "sum", key: "outstanding" },
+        { label: "Invoices", agg: "rows" },
+        { label: "Suppliers", agg: "distinct", key: "supplier_name" },
+        { label: "Over 90 days", agg: "sum", key: "bucket_90_plus" },
+      ],
+      charts: [
+        { id: "aging", kind: "measureColumns", title: "Outstanding by age", x: "", measures: [{ key: "bucket_0_30", label: "0–30 days" }, { key: "bucket_31_60", label: "31–60 days" }, { key: "bucket_61_90", label: "61–90 days" }, { key: "bucket_90_plus", label: "90+ days" }] },
+        { id: "top", kind: "hbar", title: "Top suppliers by amount outstanding", x: "supplier_name", measures: [{ key: "outstanding" }], limit: 10 },
+      ],
+    },
     parameters: [{ key: "asOfDate", label: "As of date", type: "date" }],
     columns: [
       { key: "invoice_number", label: "Invoice #", type: "string", width: 16 },
@@ -926,6 +974,18 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     description: "Open customer invoices bucketed 0-30 / 31-60 / 61-90 / 90+ days overdue.",
     moduleKey: "finance", group: "Aging", standard: "IFRS 9 / IFRS 15",
     hookId: "finance.arAging",
+    visuals: {
+      kpis: [
+        { label: "Outstanding", agg: "sum", key: "outstanding" },
+        { label: "Invoices", agg: "rows" },
+        { label: "Customers", agg: "distinct", key: "customer_name" },
+        { label: "Over 90 days", agg: "sum", key: "bucket_90_plus" },
+      ],
+      charts: [
+        { id: "aging", kind: "measureColumns", title: "Outstanding by age", x: "", measures: [{ key: "bucket_0_30", label: "0–30 days" }, { key: "bucket_31_60", label: "31–60 days" }, { key: "bucket_61_90", label: "61–90 days" }, { key: "bucket_90_plus", label: "90+ days" }] },
+        { id: "top", kind: "hbar", title: "Top customers by amount outstanding", x: "customer_name", measures: [{ key: "outstanding" }], limit: 10 },
+      ],
+    },
     parameters: [{ key: "asOfDate", label: "As of date", type: "date" }],
     columns: [
       { key: "invoice_number", label: "Invoice #", type: "string", width: 16 },
@@ -1080,6 +1140,18 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     description: "Procurement spend rolled up by supplier and calendar month.",
     moduleKey: "procurement", group: "Spend", standard: "CIPS spend cube",
     hookId: "procurement.spendAnalysis",
+    visuals: {
+      kpis: [
+        { label: "Total spend", agg: "sum", key: "total_spend" },
+        { label: "Purchase orders", agg: "sum", key: "po_count" },
+        { label: "Suppliers", agg: "distinct", key: "supplier_name" },
+        { label: "Months", agg: "distinct", key: "period_month" },
+      ],
+      charts: [
+        { id: "monthly", kind: "stacked", title: "Monthly spend by supplier", subtitle: "Top 5 suppliers; the rest grouped as Other", x: "period_month", xTime: "month", series: "supplier_name", measures: [{ key: "total_spend" }], seriesLimit: 5 },
+        { id: "top", kind: "hbar", title: "Top suppliers by spend", x: "supplier_name", measures: [{ key: "total_spend" }], limit: 10 },
+      ],
+    },
     parameters: [{ key: "period", label: "Period", type: "dateRange", defaultDays: 365 }],
     columns: [
       { key: "period_month", label: "Month", type: "string", width: 12 },
@@ -1099,6 +1171,19 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       "Per product: quantity and weighted-average purchase price for the last 1, 3, 6 and 12 months, last price, min/max, price change and volatility.",
     moduleKey: "procurement", group: "Price Intelligence", standard: "IAS 2 / IAS 21",
     hookId: "procurement.priceTrend",
+    visuals: {
+      kpis: [
+        { label: "Spend (12 months)", agg: "sum", key: "spend_12m" },
+        { label: "Products", agg: "rows" },
+        { label: "Purchase lines (12 months)", agg: "sum", key: "lines_12m" },
+        { label: "Avg last price vs 12M", agg: "avg", key: "chg_last_vs_12m" },
+      ],
+      charts: [
+        { id: "movers", kind: "hbar", title: "Price change: last price vs 12-month average", subtitle: "Largest movers, up or down", x: "item_name", measures: [{ key: "chg_last_vs_12m", agg: "avg" }], limit: 10, sort: "abs-desc" },
+        { id: "trend", kind: "hbar", title: "Price trend: 3-month vs 12-month average", subtitle: "Positive = prices rising", x: "item_name", measures: [{ key: "chg_3m_vs_12m", agg: "avg" }], limit: 10, sort: "abs-desc" },
+        { id: "spend", kind: "hbar", title: "Top products by 12-month spend", x: "item_name", measures: [{ key: "spend_12m" }], limit: 10 },
+      ],
+    },
     parameters: [
       PRICE_BASIS_PARAM,
       { key: "asOf", label: "As of (blank = today)", type: "date" },
@@ -1147,6 +1232,19 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       "Every purchase of each product in a period — supplier, quantity, gross and net unit price, discount and change vs the previous purchase.",
     moduleKey: "procurement", group: "Price Intelligence", standard: "IAS 2 / ISO 8601",
     hookId: "procurement.purchaseHistory",
+    visuals: {
+      kpis: [
+        { label: "Purchase value", agg: "sum", key: "line_value_base" },
+        { label: "Purchase lines", agg: "rows" },
+        { label: "Products", agg: "distinct", key: "item_name" },
+        { label: "Suppliers", agg: "distinct", key: "supplier_name" },
+      ],
+      charts: [
+        { id: "monthly", kind: "column", title: "Purchase value by month", x: "txn_date", xTime: "month", measures: [{ key: "line_value_base" }] },
+        { id: "suppliers", kind: "hbar", title: "Top suppliers by purchase value", x: "supplier_name", measures: [{ key: "line_value_base" }], limit: 10 },
+        { id: "products", kind: "hbar", title: "Top products by purchase value", x: "item_name", measures: [{ key: "line_value_base" }], limit: 10 },
+      ],
+    },
     parameters: [
       PRICE_BASIS_PARAM,
       PRICE_PERIOD_PARAM,
@@ -1189,6 +1287,19 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       "Product × supplier benchmark: weighted-average and last price, quantity share, and how far each supplier is above the best price.",
     moduleKey: "procurement", group: "Price Intelligence", standard: "CIPS price benchmark",
     hookId: "procurement.supplierPriceComparison",
+    visuals: {
+      kpis: [
+        { label: "Spend", agg: "sum", key: "spend" },
+        { label: "Suppliers", agg: "distinct", key: "supplier_name" },
+        { label: "Products", agg: "distinct", key: "item_name" },
+        { label: "Avg gap to best price", agg: "avg", key: "vs_best_pct" },
+      ],
+      charts: [
+        { id: "spend", kind: "hbar", title: "Spend by supplier", x: "supplier_name", measures: [{ key: "spend" }], limit: 10 },
+        { id: "gap", kind: "hbar", title: "Average gap to the best price", subtitle: "0% = cheapest supplier for the products it sells", x: "supplier_name", measures: [{ key: "vs_best_pct", agg: "avg" }], limit: 10 },
+        { id: "share", kind: "donut", title: "Spend share by supplier", x: "supplier_name", measures: [{ key: "spend" }] },
+      ],
+    },
     parameters: [
       PRICE_BASIS_PARAM,
       PRICE_PERIOD_PARAM,
@@ -1397,6 +1508,18 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     description: "Per-order yield, wastage, and completion percentages aggregated across all stages.",
     moduleKey: "production", group: "Output", standard: "ISO 22400-2",
     hookId: "production.efficiency",
+    visuals: {
+      kpis: [
+        { label: "Orders", agg: "rows" },
+        { label: "Total input", agg: "sum", key: "total_input" },
+        { label: "Total output", agg: "sum", key: "total_output" },
+        { label: "Total wastage", agg: "sum", key: "total_wastage" },
+      ],
+      charts: [
+        { id: "flow", kind: "column", title: "Input, output and wastage by order", subtitle: "Largest 10 orders by input", x: "order_number", measures: [{ key: "total_input", label: "Input" }, { key: "total_output", label: "Output" }, { key: "total_wastage", label: "Wastage" }], limit: 10 },
+        { id: "status", kind: "donut", title: "Orders by status", x: "status", measures: [{ key: "order_number", agg: "count" }] },
+      ],
+    },
     parameters: [{ key: "period", label: "Order Start Range", type: "dateRange", defaultDays: 90 }],
     columns: [
       { key: "order_number", label: "Order #", type: "string", width: 16 },
@@ -1470,6 +1593,18 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     description: "Per budget line: planned vs committed vs actual with variance amount and %.",
     moduleKey: "construction", group: "Budget", standard: "PMI EVM",
     hookId: "construction.budgetVariance",
+    visuals: {
+      kpis: [
+        { label: "Planned", agg: "sum", key: "planned_amount" },
+        { label: "Committed", agg: "sum", key: "committed_amount" },
+        { label: "Actual", agg: "sum", key: "actual_amount" },
+        { label: "Variance", agg: "sum", key: "variance_amount" },
+      ],
+      charts: [
+        { id: "pca", kind: "column", title: "Planned vs committed vs actual by category", x: "category", measures: [{ key: "planned_amount", label: "Planned" }, { key: "committed_amount", label: "Committed" }, { key: "actual_amount", label: "Actual" }], limit: 8 },
+        { id: "variance", kind: "hbar", title: "Largest variances", x: "description", measures: [{ key: "variance_amount" }], limit: 10, sort: "abs-desc" },
+      ],
+    },
     parameters: [{ key: "projectId", label: "Project ID (optional)", type: "text", placeholder: "uuid" }],
     columns: [
       { key: "project_code", label: "Project", type: "string", width: 14 },
