@@ -47,10 +47,26 @@ function renderHighlighted(text: string, terms: string[], wholeCell = false) {
   );
 }
 
+const PREVIEW_ROWS = 1000;
+
+/** Amber notice shown when a report hit the row cap and has more data. */
+export function RowLimitBanner({ envelope }: { envelope: ReportEnvelope }) {
+  if (!envelope.rowLimit) return null;
+  return (
+    <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-foreground">
+      Showing the first {envelope.rowLimit.toLocaleString("en-US")} rows — this report has more. Narrow the filters
+      (period, location, item…) to see the rest.
+    </div>
+  );
+}
+
 export function ReportPreviewTable({ envelope }: Props) {
   // Wide analytical reports scroll sideways instead of squeezing codes and
   // amounts onto several lines.
   const wide = envelope.columns.length > 10;
+  // Rendering 10,000 rows × many columns in the DOM is slow; the preview shows
+  // the first PREVIEW_ROWS. Totals, charts and exports use every row.
+  const shownRows = envelope.rows.length > PREVIEW_ROWS ? envelope.rows.slice(0, PREVIEW_ROWS) : envelope.rows;
   return (
     <div className="rounded-lg border bg-card">
       <div className="border-b p-4 space-y-1">
@@ -105,7 +121,7 @@ export function ReportPreviewTable({ envelope }: Props) {
                 </TableCell>
               </TableRow>
             )}
-            {envelope.rows.map((row, i) => (
+            {shownRows.map((row, i) => (
               <TableRow key={i}>
                 {envelope.columns.map((c) => {
                   const align =
@@ -184,7 +200,11 @@ export function ReportPreviewTable({ envelope }: Props) {
 
       <div className="border-t px-4 py-2 text-xs text-muted-foreground flex justify-between">
         <span>Lyceum ERP · Confidential — Internal Use</span>
-        <span>{envelope.rows.length} rows</span>
+        <span>
+          {shownRows.length < envelope.rows.length
+            ? `Showing ${shownRows.length.toLocaleString("en-US")} of ${envelope.rows.length.toLocaleString("en-US")} rows — exports include all`
+            : `${envelope.rows.length.toLocaleString("en-US")} rows`}
+        </span>
       </div>
     </div>
   );

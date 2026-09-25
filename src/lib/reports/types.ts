@@ -56,6 +56,8 @@ export interface ReportEnvelope {
    * (ISO 9001 §7.5 documented information). One sentence per entry.
    */
   notes?: string[];
+  /** Set when the rows were cut off at this limit (the result has more). */
+  rowLimit?: number;
   /**
    * Optional per-column substring(s) to highlight in the on-screen preview.
    * Keyed by column key; value is one or more terms (case-insensitive).

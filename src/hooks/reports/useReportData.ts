@@ -1,7 +1,7 @@
-import { supabase } from "@/integrations/supabase/client";
 import { ReportDefinition } from "@/lib/reports/registry";
 import { ReportEnvelope, NotesFilterOp } from "@/lib/reports/types";
 import { parseIsoDate, toIsoDate, trailingMonths } from "@/lib/reports/period";
+import { beginReportRun, rpcAll, REPORT_ROW_CAP } from "./rpcAll";
 
 export interface BuildEnvelopeContext {
   companyName: string;
@@ -159,7 +159,7 @@ export async function fetchStockOnHand(
   const p_include_bin_ids = mode === "include" && ids.length > 0 ? ids : null;
   const p_exclude_bin_ids = mode === "exclude" && ids.length > 0 ? ids : null;
 
-  const { data, error } = await supabase.rpc("report_stock_on_hand", {
+  const { data, error } = await rpcAll("report_stock_on_hand", {
     p_company_id: ctx.companyId,
     p_location_id: params.locationId || null,
     p_category_id: params.categoryId || null,
@@ -198,7 +198,7 @@ export async function fetchItemStockAvailability(
   if (!params.catalogItemId && !phrase) {
     return envelopeBase(def, ctx, []);
   }
-  const { data, error } = await supabase.rpc("report_item_stock_availability", {
+  const { data, error } = await rpcAll("report_item_stock_availability", {
     p_catalog_item_id: params.catalogItemId || null,
     p_search_phrase: phrase || null,
     p_location_id: params.locationId || null,
@@ -224,7 +224,7 @@ export async function fetchInventoryValuation(
   params: { asOfDate?: string | null; categoryId?: string | null },
 ): Promise<ReportEnvelope> {
   const asOf = params.asOfDate ? new Date(params.asOfDate).toISOString() : new Date().toISOString();
-  const { data, error } = await supabase.rpc("report_inventory_valuation", {
+  const { data, error } = await rpcAll("report_inventory_valuation", {
     p_company_id: ctx.companyId,
     p_as_of_date: asOf,
     p_category_id: params.categoryId || null,
@@ -244,7 +244,7 @@ export async function fetchInventoryAging(
   ctx: BuildEnvelopeContext,
   params: { categoryId?: string | null },
 ): Promise<ReportEnvelope> {
-  const { data, error } = await supabase.rpc("report_inventory_aging", {
+  const { data, error } = await rpcAll("report_inventory_aging", {
     p_company_id: ctx.companyId,
     p_category_id: params.categoryId || null,
   });
@@ -261,7 +261,7 @@ export async function fetchAbcClassification(
   ctx: BuildEnvelopeContext,
   params: { categoryId?: string | null },
 ): Promise<ReportEnvelope> {
-  const { data, error } = await supabase.rpc("report_abc_classification", {
+  const { data, error } = await rpcAll("report_abc_classification", {
     p_company_id: ctx.companyId,
     p_months: 12,
     p_category_id: params.categoryId || null,
@@ -288,7 +288,7 @@ export async function fetchStockMovement(
   const from = params.period?.from ? new Date(params.period.from).toISOString() : null;
   const to = params.period?.to ? new Date(params.period.to).toISOString() : null;
   const parsed = parseNotesFilter(params.notesFilter);
-  const { data, error } = await supabase.rpc("report_stock_movement_ledger", {
+  const { data, error } = await rpcAll("report_stock_movement_ledger", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -326,7 +326,7 @@ export async function fetchPartialPiecesOnHand(
     includeZero?: boolean;
   },
 ): Promise<ReportEnvelope> {
-  const { data, error } = await (supabase.rpc as any)("report_partial_pieces_on_hand", {
+  const { data, error } = await rpcAll("report_partial_pieces_on_hand", {
     p_company_id: ctx.companyId,
     p_location_id: params.locationId || null,
     p_bin_id: params.binId || null,
@@ -358,7 +358,7 @@ export async function fetchPartialPiecesMovement(
   const from = params.period?.from ? new Date(params.period.from).toISOString() : null;
   const to = params.period?.to ? new Date(params.period.to).toISOString() : null;
   const parsed = parseNotesFilter(params.notesFilter);
-  const { data, error } = await (supabase.rpc as any)("report_partial_pieces_movement", {
+  const { data, error } = await rpcAll("report_partial_pieces_movement", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -398,7 +398,7 @@ export async function fetchCycleCountVariance(
   const from = params.period?.from || null;
   const to = params.period?.to || null;
   const parsed = parseNotesFilter(params.notesFilter);
-  const { data, error } = await supabase.rpc("report_cycle_count_variance", {
+  const { data, error } = await rpcAll("report_cycle_count_variance", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -428,7 +428,7 @@ export async function fetchBinUtilisation(
   ctx: BuildEnvelopeContext,
   params: { locationId?: string | null },
 ): Promise<ReportEnvelope> {
-  const { data, error } = await supabase.rpc("report_bin_utilisation", {
+  const { data, error } = await rpcAll("report_bin_utilisation", {
     p_company_id: ctx.companyId,
     p_location_id: params.locationId || null,
   });
@@ -450,7 +450,7 @@ export async function fetchGrnRegister(
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
-  const { data, error } = await supabase.rpc("report_grn_register", {
+  const { data, error } = await rpcAll("report_grn_register", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -472,7 +472,7 @@ export async function fetchFreightSummary(
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
-  const { data, error } = await supabase.rpc("report_freight_cost_summary" as any, {
+  const { data, error } = await rpcAll("report_freight_cost_summary", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -493,7 +493,7 @@ export async function fetchFreightRegister(
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
-  const { data, error } = await supabase.rpc("report_freight_register" as any, {
+  const { data, error } = await rpcAll("report_freight_register", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -515,7 +515,7 @@ export async function fetchAssetRegister(
   params: { locationId?: string | null; status?: string },
 ): Promise<ReportEnvelope> {
   const status = params.status && params.status !== "all" ? params.status : null;
-  const { data, error } = await supabase.rpc("report_asset_register", {
+  const { data, error } = await rpcAll("report_asset_register", {
     p_company_id: ctx.companyId,
     p_location_id: params.locationId || null,
     p_status: status,
@@ -537,7 +537,7 @@ export async function fetchToolLedger(
   const from = params.period?.from || null;
   const to = params.period?.to || null;
   const status = params.status && params.status !== "all" ? params.status : null;
-  const { data, error } = await supabase.rpc("report_tool_ledger", {
+  const { data, error } = await rpcAll("report_tool_ledger", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -560,7 +560,7 @@ export async function fetchToolCalibrationDue(
   const from = params.period?.from || null;
   const to = params.period?.to || null;
   const status = params.status && params.status !== "all" ? params.status : null;
-  const { data, error } = await supabase.rpc("report_tool_calibration_due" as any, {
+  const { data, error } = await rpcAll("report_tool_calibration_due", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -579,7 +579,7 @@ export async function fetchToolCalibrationHistory(
   const from = params.period?.from || null;
   const to = params.period?.to || null;
   const result = params.result && params.result !== "all" ? params.result : null;
-  const { data, error } = await supabase.rpc("report_tool_calibration_history" as any, {
+  const { data, error } = await rpcAll("report_tool_calibration_history", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -597,7 +597,7 @@ export async function fetchToolCost(
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
-  const { data, error } = await supabase.rpc("report_tool_cost" as any, {
+  const { data, error } = await rpcAll("report_tool_cost", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -619,7 +619,7 @@ export async function fetchToolMaintenanceDue(
   const from = params.period?.from || null;
   const to = params.period?.to || null;
   const status = params.status && params.status !== "all" ? params.status : null;
-  const { data, error } = await supabase.rpc("report_tool_maintenance_due" as any, {
+  const { data, error } = await rpcAll("report_tool_maintenance_due", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -638,7 +638,7 @@ export async function fetchToolMaintenanceHistory(
   const from = params.period?.from || null;
   const to = params.period?.to || null;
   const type = params.type && params.type !== "all" ? params.type : null;
-  const { data, error } = await supabase.rpc("report_tool_maintenance_history" as any, {
+  const { data, error } = await rpcAll("report_tool_maintenance_history", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
@@ -667,7 +667,7 @@ export async function fetchBatchTraceability(
     throw new Error("Provide either a Batch Number or an Item Code to trace.");
   }
   const parsed = parseNotesFilter(params.notesFilter);
-  const { data, error } = await supabase.rpc("report_batch_traceability", {
+  const { data, error } = await rpcAll("report_batch_traceability", {
     p_company_id: ctx.companyId,
     p_batch_number: batch,
     p_item_code: code,
@@ -698,8 +698,7 @@ async function fetchRpc(
   args: Record<string, unknown>,
   period?: { start?: string; end?: string },
 ): Promise<ReportEnvelope> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)(rpcName, args);
+  const { data, error } = await rpcAll(rpcName, args);
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
   return envelopeBase(def, ctx, rows, undefined, period);
@@ -749,14 +748,14 @@ function priceExtraNotes(p: PriceReportParams, basis: PriceBasis): string[] {
 }
 
 async function callPriceRpc(rpc: string, args: Record<string, unknown>) {
-  const { data, error } = await (supabase.rpc as any)(rpc, args);
+  const { data, error } = await rpcAll(rpc, args);
   if (error) throw error;
   return (data ?? []) as Record<string, unknown>[];
 }
 
 /* ---------------- Dispatcher ---------------- */
 
-export async function buildReportEnvelope(
+async function buildReportEnvelopeInner(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
   params: Record<string, unknown>,
@@ -1073,4 +1072,19 @@ export async function buildReportEnvelope(
     default:
       throw new Error(`Unknown report hook: ${def.hookId}`);
   }
+}
+
+/**
+ * Build a report envelope. Every report returns at most REPORT_ROW_CAP rows;
+ * when a result is cut off there, the output says so (preview banner and a
+ * note on every export) instead of silently truncating.
+ */
+export async function buildReportEnvelope(
+  ...args: Parameters<typeof buildReportEnvelopeInner>
+): Promise<ReportEnvelope> {
+  const run = beginReportRun();
+  const envelope = await buildReportEnvelopeInner(...args);
+  if (!run.truncated) return envelope;
+  const note = `Output limited to the first ${REPORT_ROW_CAP.toLocaleString("en-US")} rows — narrow the filters to see the rest.`;
+  return { ...envelope, rowLimit: REPORT_ROW_CAP, notes: [note, ...(envelope.notes ?? [])] };
 }

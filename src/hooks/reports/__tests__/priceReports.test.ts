@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// rpc(fn, args) → builder with .range(); `rpc` records the call, `respond` supplies the page.
 const rpc = vi.fn();
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: (...a: unknown[]) => rpc(...a) } }));
+const respond = vi.fn();
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    rpc: (...a: unknown[]) => {
+      rpc(...a);
+      return { range: (from: number) => Promise.resolve(from === 0 ? respond() : { data: [], error: null }) };
+    },
+  },
+}));
 
 import { buildReportEnvelope } from "../useReportData";
 import { getReport } from "@/lib/reports/registry";
@@ -14,11 +23,14 @@ const ctx = {
   filters: [],
 };
 
-beforeEach(() => rpc.mockReset());
+beforeEach(() => {
+  rpc.mockReset();
+  respond.mockReset();
+});
 
 describe("purchase price report dispatch", () => {
   it("trend: passes filters, totals spend and prints methodology", async () => {
-    rpc.mockResolvedValue({ data: [{ item_code: "A", spend_12m: 100 }, { item_code: "B", spend_12m: 50.5 }], error: null });
+    respond.mockReturnValue({ data: [{ item_code: "A", spend_12m: 100 }, { item_code: "B", spend_12m: 50.5 }], error: null });
     const env = await buildReportEnvelope(getReport("PR-PRC-TRD-001")!, ctx, {
       basis: "received",
       asOf: "2026-09-25",
@@ -42,7 +54,7 @@ describe("purchase price report dispatch", () => {
   });
 
   it("history: ordered basis drops location, notes it, and labels item links", async () => {
-    rpc.mockResolvedValue({
+    respond.mockReturnValue({
       data: [
         { doc_number: "PO-1", unlinked: false, line_value_base: 10 },
         { doc_number: "PO-1", unlinked: true, line_value_base: 5 },
@@ -65,7 +77,7 @@ describe("purchase price report dispatch", () => {
   });
 
   it("comparison: defaults to the received basis and never sends a supplier filter", async () => {
-    rpc.mockResolvedValue({ data: [], error: null });
+    respond.mockReturnValue({ data: [], error: null });
     await buildReportEnvelope(getReport("PR-PRC-SUP-001")!, ctx, { period: { from: "2025-09-26", to: "2026-09-25" } });
     const args = rpc.mock.calls[0][1];
     expect(rpc.mock.calls[0][0]).toBe("report_supplier_price_comparison");
@@ -74,7 +86,7 @@ describe("purchase price report dispatch", () => {
   });
 
   it("surfaces access errors from the database", async () => {
-    rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "Not authorised to view purchase prices for this company" } });
+    respond.mockReturnValue({ data: null, error: { code: "42501", message: "Not authorised to view purchase prices for this company" } });
     await expect(
       buildReportEnvelope(getReport("PR-PRC-TRD-001")!, ctx, {}),
     ).rejects.toMatchObject({ code: "42501" });

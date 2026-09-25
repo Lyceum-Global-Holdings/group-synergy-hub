@@ -21,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { REPORT_REGISTRY, ReportDefinition, getReportsByModule, groupReports } from "@/lib/reports/registry";
 import { BarChart3, RotateCcw, Table2 } from "lucide-react";
 import { ReportParameterPanel } from "@/components/management/reports/ReportParameterPanel";
-import { ReportPreviewTable } from "@/components/management/reports/ReportPreviewTable";
+import { ReportPreviewTable, RowLimitBanner } from "@/components/management/reports/ReportPreviewTable";
 import { ReportVisuals } from "@/components/management/reports/ReportVisuals";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -160,7 +160,10 @@ export default function ReportsCenter() {
           params,
           includeCharts,
         });
-        toast.success(`${openReport.title} exported as ${format.toUpperCase()}`);
+        toast.success(
+          `${openReport.title} exported as ${format.toUpperCase()}` +
+            (envelope.rowLimit ? ` (first ${envelope.rowLimit.toLocaleString("en-US")} rows)` : ""),
+        );
       }
     } catch (e) {
       console.error(e);
@@ -329,6 +332,8 @@ export default function ReportsCenter() {
                     Include charts in PDF and Excel exports
                   </Label>
                 </div>
+
+                {previewEnvelope && <RowLimitBanner envelope={previewEnvelope} />}
 
                 {previewEnvelope && (
                   <Tabs value={previewView} onValueChange={(v) => setPreviewView(v as "charts" | "table")}>
