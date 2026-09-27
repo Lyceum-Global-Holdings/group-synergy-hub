@@ -13245,6 +13245,8 @@ export type Database = {
           avatar_url: string | null
           company_id: string | null
           created_at: string
+          deactivated_at: string | null
+          deactivated_by: string | null
           department: string | null
           email: string | null
           full_name: string | null
@@ -13258,6 +13260,8 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
           department?: string | null
           email?: string | null
           full_name?: string | null
@@ -13271,6 +13275,8 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string
+          deactivated_at?: string | null
+          deactivated_by?: string | null
           department?: string | null
           email?: string | null
           full_name?: string | null
@@ -22458,6 +22464,7 @@ export type Database = {
           avatar_url: string | null
           company_id: string | null
           created_at: string | null
+          deactivated_at: string | null
           department: string | null
           email: string | null
           full_name: string | null
@@ -22470,6 +22477,7 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string | null
+          deactivated_at?: string | null
           department?: string | null
           email?: never
           full_name?: string | null
@@ -22482,6 +22490,7 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string | null
+          deactivated_at?: string | null
           department?: string | null
           email?: never
           full_name?: string | null
@@ -24546,6 +24555,7 @@ export type Database = {
         }[]
       }
       my_location_scope: { Args: never; Returns: string[] }
+      needs_first_admin: { Args: never; Returns: boolean }
       next_catalog_item_code: {
         Args: { p_category_code: string }
         Returns: string
