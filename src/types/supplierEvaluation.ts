@@ -54,7 +54,7 @@ export interface SupplierEvaluationEntry {
   total_score: number;
   notes?: string;
   /** "grn" when scored from an approved goods receipt, "manual" when typed in. */
-  source?: "manual" | "grn";
+  source?: string;
   grn_id?: string | null;
   created_at: string;
   updated_at: string;

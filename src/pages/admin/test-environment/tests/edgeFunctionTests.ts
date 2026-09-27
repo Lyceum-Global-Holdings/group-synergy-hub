@@ -57,4 +57,5 @@ export const edgeFunctionTests: TestCase[] = [
   edgeFnTest("EF-009", "send-telegram-report"),
   edgeFnTest("EF-010", "test-telegram-connection"),
   edgeFnTest("EF-011", "sourcing-notify"),
+  edgeFnTest("EF-012", "contract-reminders"),
 ];
