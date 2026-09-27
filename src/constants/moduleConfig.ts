@@ -82,6 +82,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'supplier-registration', name: 'Supplier Registration', description: 'New supplier onboarding', url: '/sourcing/supplier-registration' },
       { key: 'supplier-evaluation', name: 'Supplier Evaluation', description: 'Performance assessment', url: '/sourcing/supplier-evaluation' },
       { key: 'supplier-scorecard', name: 'Supplier Scorecard', description: 'Supplier performance metrics', url: '/sourcing/supplier-scorecard' },
+      { key: 'rfq-management', name: 'RFQ Management', description: 'Invite suppliers to quote and collect quotes', url: '/sourcing/rfq-management' },
+      { key: 'quotation-comparison', name: 'Quotation Comparison', description: 'Compare quotes and award', url: '/sourcing/quotation-comparison' },
       { key: 'contracts', name: 'Contract Repository', description: 'Contract management', url: '/sourcing/contracts' },
       { key: 'blacklist', name: 'Blacklist / Risk Flags', description: 'Manage supplier risks', url: '/sourcing/blacklist' }
     ]

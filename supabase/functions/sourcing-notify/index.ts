@@ -1,312 +1,155 @@
+// Sourcing emails:
+//   { event: "registration_decision", registration_id } → the applicant hears
+//     that their supplier registration was approved or rejected (with reason);
+//   { event: "rfq_published", request_id } → every invited supplier (its email
+//     and its portal users) gets the RFQ with a link to quote in the portal.
+// The caller must be able to manage that company's sourcing.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { appUrl, emailLayout, escapeHtml, sendEmail } from "../_shared/email.ts";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const APP_URL = Deno.env.get("APP_URL") || "https://group-synergy-hub.lovable.app";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-const EMAIL_FROM = "Lyceum Procurement <notifications@resend.dev>";
-
-const EVENT_TYPES = [
-  "rfq_published",
-  "quotation_received",
-  "quotation_awarded",
-  "supplier_registered",
-  "supplier_blacklisted",
-  "generic",
-] as const;
-type EventType = (typeof EVENT_TYPES)[number];
-
-// Roles that receive notifications when no explicit recipients are given
-const DEFAULT_RECIPIENT_ROLES = ["super_admin", "admin", "manager"];
-
-const MAX_RECIPIENTS = 10;
-
-interface NotifyBody {
-  company_id?: string;
-  event_type?: string;
-  title?: string;
-  message?: string;
-  reference?: string;
-  entity_url?: string;
-  recipients?: string[];
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function cleanText(value: unknown, maxLen: number): string {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, maxLen);
-}
-
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-function buildEmail(
-  eventType: EventType,
-  title: string,
-  message: string,
-  reference: string,
-  link: string
-): { subject: string; html: string } {
-  const safeTitle = escapeHtml(title);
-  const safeMessage = escapeHtml(message).replace(/\n/g, "<br/>");
-  const safeReference = escapeHtml(reference);
-
-  const accent =
-    eventType === "supplier_blacklisted" ? "#dc2626" : "#2563eb";
-
-  const refBlock = safeReference
-    ? `<p style="margin:5px 0;"><strong>Reference:</strong> ${safeReference}</p>`
-    : "";
-
-  const msgBlock = safeMessage
-    ? `<p style="margin:15px 0;">${safeMessage}</p>`
-    : "";
-
-  const linkBlock = link
-    ? `<div style="margin:30px 0;">
-         <a href="${link}" style="background-color: ${accent}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
-           Open in Procurement System
-         </a>
-       </div>`
-    : "";
-
-  return {
-    subject: `${title}${safeReference ? ` — ${safeReference}` : ""}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: ${accent}; border-left: 4px solid ${accent}; padding-left: 12px;">${safeTitle}</h2>
-        <div style="background-color: #f8fafc; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          ${refBlock}
-        </div>
-        ${msgBlock}
-        ${linkBlock}
-        <p style="color: #6b7280; font-size: 14px;">This is an automated notification from your Procurement System.</p>
-      </div>
-    `,
-  };
-}
+const json = (status: number, body: Record<string, unknown>) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-  if (req.method !== "POST") {
-    return json(405, { error: "Method not allowed" });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // ── Authenticate the caller ──────────────────────────────────────────
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return json(401, { error: "Unauthorized" });
-    }
-
-    const callerClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return json(401, { error: "Unauthorized" });
-    }
-    const userId = claimsData.claims.sub as string;
-
-    // ── Validate input ──────────────────────────────────────────────────
-    const body = (await req.json().catch(() => null)) as NotifyBody | null;
-    if (!body || typeof body !== "object") {
-      return json(400, { error: "Invalid JSON body" });
-    }
-
-    const companyId = cleanText(body.company_id, 64);
-    if (!UUID_RE.test(companyId)) {
-      return json(400, { error: "Valid company_id is required" });
-    }
-
-    const eventType = cleanText(body.event_type, 50) as EventType;
-    if (!EVENT_TYPES.includes(eventType)) {
-      return json(400, {
-        error: `Invalid event_type. Allowed: ${EVENT_TYPES.join(", ")}`,
-      });
-    }
-
-    const title = cleanText(body.title, 200) || "Sourcing Notification";
-    const message = cleanText(body.message, 2000);
-    const reference = cleanText(body.reference, 100);
-
-    let entityUrl = cleanText(body.entity_url, 500);
-    if (entityUrl && !entityUrl.startsWith("/")) entityUrl = "";
-    const link = entityUrl
-      ? `${APP_URL}${entityUrl}`
-      : `${APP_URL}/sourcing/rfq-management`;
-
-    // Provided recipients: validated emails only
-    let providedRecipients: string[] = [];
-    if (Array.isArray(body.recipients)) {
-      providedRecipients = body.recipients
-        .filter((r): r is string => typeof r === "string")
-        .map((r) => r.trim().toLowerCase())
-        .filter((r) => EMAIL_RE.test(r) && r.length <= 255)
-        .slice(0, MAX_RECIPIENTS);
-    }
-
-    // Service client for lookups (recipient resolution, telegram settings)
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    // ── Verify caller belongs to this company (or is a super admin) ────
-    const { data: callerProfile } = await serviceClient
-      .from("profiles")
-      .select("role, company_id")
-      .eq("user_id", userId)
-      .eq("deactivated_at", "is", null)
-      .maybeSingle();
-
-    if (!callerProfile) {
-      return json(403, { error: "Profile not found" });
-    }
-
-    const isSuperAdmin = callerProfile.role === "super_admin";
-    const isMember =
-      callerProfile.company_id === companyId || isSuperAdmin;
-    if (!isMember) {
-      return json(403, { error: "Access denied to this company" });
-    }
-
-    // ── Resolve recipients ──────────────────────────────────────────────
-    let to: string[] = [];
-
-    if (providedRecipients.length > 0) {
-      // Restrict provided recipients to active members of the same company
-      const { data: members } = await serviceClient
-        .from("profiles")
-        .select("email")
-        .eq("company_id", companyId)
-        .eq("deactivated_at", "is", null)
-        .in("email", providedRecipients);
-
-      const memberEmails = new Set(
-        (members ?? []).map((m: { email: string | null }) =>
-          (m.email ?? "").toLowerCase()
-        )
-      );
-      to = providedRecipients.filter((r) => memberEmails.has(r));
-    } else {
-      const { data: staff } = await serviceClient
-        .from("profiles")
-        .select("email")
-        .eq("company_id", companyId)
-        .eq("deactivated_at", "is", null)
-        .in("role", DEFAULT_RECIPIENT_ROLES);
-
-      to = Array.from(
-        new Set(
-          (staff ?? [])
-            .map((s: { email: string | null }) => (s.email ?? "").toLowerCase())
-            .filter((e: string) => EMAIL_RE.test(e))
-        )
-      ).slice(0, MAX_RECIPIENTS);
-    }
-
-    if (to.length === 0) {
-      return json(422, {
-        error:
-          "No recipients resolved. Provide recipients (active members of this company) or ensure the company has admin/manager users.",
-      });
-    }
-
-    // ── Send email ──────────────────────────────────────────────────────
-    let emailSent = false;
-    let emailError: string | null = null;
-
-    if (RESEND_API_KEY) {
-      const { subject, html } = buildEmail(eventType, title, message, reference, link);
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({ from: EMAIL_FROM, to, subject, html }),
-      });
-      if (res.ok) {
-        emailSent = true;
-      } else {
-        emailError = (await res.text()).slice(0, 300);
-      }
-    } else {
-      emailError = "RESEND_API_KEY not configured";
-    }
-
-    // ── Telegram (optional, per company settings) ───────────────────────
-    let telegramSent = false;
-    let telegramError: string | null = null;
-
-    const { data: tgSettings } = await serviceClient
-      .from("telegram_settings")
-      .select("bot_token, chat_id, is_enabled")
-      .eq("company_id", companyId)
-      .maybeSingle();
-
-    if (tgSettings?.is_enabled && tgSettings.bot_token && tgSettings.chat_id) {
-      const text = [
-        `📢 ${title}`,
-        reference ? `Ref: ${reference}` : "",
-        message,
-        link,
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      const tgRes = await fetch(
-        `https://api.telegram.org/bot${tgSettings.bot_token}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: tgSettings.chat_id,
-            text,
-            parse_mode: "HTML",
-          }),
-        }
-      );
-      if (tgRes.ok) {
-        telegramSent = true;
-      } else {
-        telegramError = (await tgRes.text()).slice(0, 300);
-      }
-    }
-
-    return json(200, {
-      success: emailSent || telegramSent,
-      event_type: eventType,
-      recipients: to,
-      email_sent: emailSent,
-      email_error: emailError,
-      telegram_sent: telegramSent,
-      telegram_error: telegramError,
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) return json(401, { success: false, error: "Sign in first." });
+
+    const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const body = await req.json().catch(() => ({}));
+    const base = appUrl(req);
+
+    // Checks run as the caller, so they see the caller's company access.
+    const canManageCompany = async (companyId: string | null) => {
+      if (!companyId) return false;
+      const [{ data: company }, { data: procurement }, { data: isAdmin }] = await Promise.all([
+        userClient.rpc("can_access_company", { target_company_id: companyId }),
+        userClient.rpc("has_procurement_access", { _user_id: user.id }),
+        userClient.rpc("is_admin", { _user_id: user.id }),
+      ]);
+      return company === true && (procurement === true || isAdmin === true);
+    };
+
+    const companyName = async (companyId: string | null) => {
+      if (!companyId) return "our company";
+      const { data } = await admin.from("companies").select("name").eq("id", companyId).maybeSingle();
+      return data?.name ?? "our company";
+    };
+
+    if (body?.event === "registration_decision") {
+      const { data: reg } = await admin
+        .from("supplier_registration_requests")
+        .select("id, company_id, status, rejection_reason, supplier_data")
+        .eq("id", body.registration_id)
+        .maybeSingle();
+      if (!reg) return json(404, { success: false, error: "Registration not found" });
+      if (!(await canManageCompany(reg.company_id))) return json(403, { success: false, error: "Not allowed" });
+      if (reg.status !== "approved" && reg.status !== "rejected") {
+        return json(400, { success: false, error: "The registration has no decision yet" });
+      }
+
+      const data = (reg.supplier_data ?? {}) as Record<string, string | undefined>;
+      const to = data.email || data.primary_contact_email;
+      if (!to) return json(200, { success: true, sent: 0, skipped: "No email address on the registration" });
+
+      const company = await companyName(reg.company_id);
+      const supplierName = data.supplier_name || data.name || "your company";
+      const approved = reg.status === "approved";
+      const result = await sendEmail({
+        to,
+        subject: approved
+          ? `Your supplier registration with ${company} is approved`
+          : `Your supplier registration with ${company}`,
+        html: emailLayout({
+          heading: approved ? "Registration approved" : "Registration not approved",
+          body: approved
+            ? `<p>${escapeHtml(company)} has approved <b>${escapeHtml(supplierName)}</b> as a supplier. You can now receive requests for quotation and purchase orders.</p>
+               <p>To use the supplier portal, ask your contact at ${escapeHtml(company)} for a portal invitation.</p>`
+            : `<p>${escapeHtml(company)} has not approved the supplier registration for <b>${escapeHtml(supplierName)}</b>.</p>
+               ${reg.rejection_reason ? `<p><b>Reason:</b> ${escapeHtml(reg.rejection_reason)}</p>` : ""}
+               <p>If you think this is a mistake, contact ${escapeHtml(company)} directly.</p>`,
+        }),
+      });
+      if (!result.sent) console.warn("registration_decision email not sent:", result.error);
+      return json(200, { success: true, sent: result.sent ? 1 : 0, error: result.error });
+    }
+
+    if (body?.event === "rfq_published") {
+      const { data: rfq } = await admin
+        .from("rfq_rfp_requests")
+        .select("id, company_id, request_number, title, submission_deadline, status")
+        .eq("id", body.request_id)
+        .maybeSingle();
+      if (!rfq) return json(404, { success: false, error: "RFQ not found" });
+      if (!(await canManageCompany(rfq.company_id))) return json(403, { success: false, error: "Not allowed" });
+
+      const [{ data: invited }, { count: itemCount }] = await Promise.all([
+        admin.from("rfq_rfp_invited_suppliers").select("supplier_id, supplier:suppliers(name, email)").eq("request_id", rfq.id),
+        admin.from("rfq_rfp_items").select("id", { count: "exact", head: true }).eq("request_id", rfq.id),
+      ]);
+
+      const company = await companyName(rfq.company_id);
+      const deadline = rfq.submission_deadline
+        ? new Date(rfq.submission_deadline).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Colombo" })
+        : "the deadline in the portal";
+      const link = `${base}/portal/quotes`;
+
+      let sent = 0;
+      const failed: string[] = [];
+      for (const inv of invited ?? []) {
+        const supplier = inv.supplier as { name?: string; email?: string } | null;
+        // The supplier's own address plus its active portal users.
+        const { data: members } = await admin
+          .from("supplier_users")
+          .select("user_id")
+          .eq("supplier_id", inv.supplier_id)
+          .eq("is_active", true);
+        const recipients = new Set<string>();
+        if (supplier?.email) recipients.add(supplier.email.toLowerCase());
+        for (const m of members ?? []) {
+          const { data } = await admin.auth.admin.getUserById(m.user_id);
+          if (data?.user?.email) recipients.add(data.user.email.toLowerCase());
+        }
+        if (recipients.size === 0) {
+          failed.push(`${supplier?.name ?? inv.supplier_id}: no email address`);
+          continue;
+        }
+
+        const result = await sendEmail({
+          to: [...recipients],
+          subject: `Request for quotation ${rfq.request_number} from ${company}`,
+          html: emailLayout({
+            heading: `Request for quotation: ${rfq.title}`,
+            body: `<p>${escapeHtml(company)} invites <b>${escapeHtml(supplier?.name ?? "you")}</b> to quote for <b>${escapeHtml(rfq.title)}</b> (${escapeHtml(rfq.request_number)}, ${itemCount ?? 0} item${itemCount === 1 ? "" : "s"}).</p>
+                   <p>Submit your prices in the supplier portal by <b>${escapeHtml(deadline)}</b> (Sri Lanka time).</p>`,
+            action: { label: "Open in the supplier portal", url: link },
+            footer: "You receive this because your company is a registered supplier. Portal access is by invitation from the buyer.",
+          }),
+        });
+        if (result.sent) sent += 1;
+        else failed.push(`${supplier?.name ?? inv.supplier_id}: ${result.error}`);
+      }
+      if (failed.length) console.warn("rfq_published emails not sent:", failed);
+      return json(200, { success: true, sent, failed });
+    }
+
+    return json(400, { success: false, error: "Unknown event" });
   } catch (error) {
     console.error("sourcing-notify error:", error);
-    return json(500, { error: "Failed to send sourcing notification" });
+    return json(500, { success: false, error: "Could not send the notification" });
   }
 });

@@ -53,6 +53,9 @@ export interface SupplierEvaluationEntry {
   punctuality_score: number;
   total_score: number;
   notes?: string;
+  /** "grn" when scored from an approved goods receipt, "manual" when typed in. */
+  source?: "manual" | "grn";
+  grn_id?: string | null;
   created_at: string;
   updated_at: string;
   // Related data

@@ -358,3 +358,76 @@ export const useDeleteSupplierEvaluationEntry = () => {
     },
   });
 };
+// Filling evaluations from approved goods receipts (migration 20260928120000).
+// The functions are newer than the generated types.
+const rpc = <T,>(fn: string, args: Record<string, unknown>) =>
+  (supabase as unknown as { rpc: (f: string, a: Record<string, unknown>) => Promise<{ data: T; error: { message: string } | null }> }).rpc(fn, args);
+
+const deliveries = (n: number) => `${n} deliver${n === 1 ? "y" : "ies"}`;
+
+/** Adds the period's approved goods receipts to one draft evaluation. */
+export const usePopulateEvaluation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ evaluationId }: { evaluationId: string; quiet?: boolean }): Promise<number> => {
+      const { data, error } = await rpc<number>("populate_evaluation_from_deliveries", { p_evaluation_id: evaluationId });
+      if (error) throw new Error(error.message);
+      return data ?? 0;
+    },
+    onSuccess: (added, { evaluationId, quiet }) => {
+      queryClient.invalidateQueries({ queryKey: ["supplier-evaluation-entries", evaluationId] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-evaluation", evaluationId] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      if (quiet && added === 0) return;
+      toast({
+        title: added > 0 ? `Added ${deliveries(added)} from goods receipts` : "No new deliveries",
+        description: added > 0 ? undefined : "Every approved goods receipt in this period is already included.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Couldn't add deliveries", description: error.message, variant: "destructive" });
+    },
+  });
+};
+
+export interface GenerateEvaluationsResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  deliveries: number;
+}
+
+/** One evaluation per supplier that delivered to the company in the period. */
+export const useGenerateSupplierEvaluations = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ companyId, from, to }: { companyId: string; from: string; to: string }) => {
+      const { data, error } = await rpc<GenerateEvaluationsResult>("generate_supplier_evaluations", {
+        p_company_id: companyId,
+        p_from: from,
+        p_to: to,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      const parts = [
+        r.created > 0 && `${r.created} new evaluation${r.created === 1 ? "" : "s"}`,
+        r.updated > 0 && `${r.updated} updated`,
+        r.skipped > 0 && `${r.skipped} already completed`,
+      ].filter(Boolean);
+      toast({
+        title: parts.length ? parts.join(", ") : "Nothing new to evaluate",
+        description: r.deliveries > 0 ? `${deliveries(r.deliveries)} scored from goods receipts.` : "No new approved goods receipts in this period.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Couldn't evaluate suppliers", description: error.message, variant: "destructive" });
+    },
+  });
+};

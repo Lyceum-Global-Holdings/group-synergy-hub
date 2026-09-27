@@ -1,5 +1,8 @@
 // 3-way match: link an inbound einvoice to its PO and GRN, compute discrepancies.
-// Tolerances: qty ±5%, price ±2%, total ±1 unit currency.
+// Quantities are compared with what approved receipts accepted for each PO line,
+// prices with the PO, and the net total with received quantity × PO price.
+// Tolerances: qty ±5%, price ±2%, total ±2% (at least 1 unit of currency).
+// The match status is copied onto the payables invoice by a database trigger.
 // Callable by admins (with JWT) or by service-role (internal pipeline).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
@@ -49,40 +52,40 @@ serve(async (req) => {
 
     const { data: inv } = await admin
       .from("einvoices")
-      .select("id, po_id, grn_id, supplier_id, grand_total, currency, notes, invoice_number")
+      .select("id, company_id, po_id, grn_id, supplier_id, subtotal, grand_total, currency, notes, invoice_number, document_type, validation_report")
       .eq("id", einvoice_id)
       .maybeSingle();
     if (!inv) return jsonError("E-invoice not found", 404);
+    if (inv.document_type === "credit_note") {
+      return new Response(JSON.stringify({ ok: true, skipped: "credit notes are not three-way matched" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: lines } = await admin
       .from("einvoice_lines")
-      .select("id, line_no, item_code, description, quantity, unit_price, line_extension")
+      .select("id, line_no, item_code, description, quantity, unit_price, line_extension, po_line_id")
       .eq("einvoice_id", einvoice_id);
 
-    // Resolve PO if not already linked: try invoice_number, then notes (BuyerReference), then supplier
+    // Resolve the PO if it isn't linked yet, from the invoice's order reference
+    // (or buyer reference) within the same company and supplier.
     let poId = inv.po_id;
-    if (!poId && inv.invoice_number) {
-      const { data: poByRef } = await admin
-        .from("purchase_orders")
-        .select("id")
-        .eq("supplier_id", inv.supplier_id)
-        .eq("po_number", inv.invoice_number)
-        .limit(1)
-        .maybeSingle();
-      if (poByRef) poId = poByRef.id;
+    const report = (inv.validation_report ?? {}) as Record<string, unknown>;
+    for (const ref of [report.order_reference, report.buyer_reference]) {
+      if (poId || typeof ref !== "string" || !ref.trim()) continue;
+      let q = admin.from("purchase_orders").select("id").eq("company_id", inv.company_id).eq("po_number", ref.trim());
+      if (inv.supplier_id) q = q.eq("supplier_id", inv.supplier_id);
+      const { data: po } = await q.limit(1).maybeSingle();
+      if (po) poId = po.id;
     }
 
-    let grnId = inv.grn_id;
-    if (!grnId && poId) {
-      const { data: grn } = await admin
-        .from("goods_receipt_notes")
-        .select("id")
-        .eq("po_id", poId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (grn) grnId = grn.id;
-    }
+    // Goods received and accepted against the PO (approved receipts only).
+    const { data: grns } = poId
+      ? await admin.from("goods_receipt_notes").select("id, approved_date, created_at")
+          .eq("po_id", poId).in("status", ["approved", "completed"])
+          .order("approved_date", { ascending: false, nullsFirst: false })
+      : { data: [] as any[] };
+    const grnId = inv.grn_id ?? grns?.[0]?.id ?? null;
 
     const { data: poLines } = poId
       ? await admin.from("po_items")
@@ -90,23 +93,29 @@ serve(async (req) => {
           .eq("po_id", poId)
       : { data: [] as any[] };
 
-    const { data: grnLines } = grnId
-      ? await admin.from("grn_items").select("id, po_item_id, quantity_received").eq("grn_id", grnId)
+    const { data: grnLines } = (grns?.length ?? 0) > 0
+      ? await admin.from("grn_items").select("po_item_id, quantity_received, quantity_accepted").in("grn_id", grns!.map((g: any) => g.id))
       : { data: [] as any[] };
+    const acceptedFor = (poLineId: string) =>
+      (grnLines ?? []).filter((g: any) => g.po_item_id === poLineId)
+        .reduce((s: number, g: any) => s + Number(g.quantity_accepted ?? g.quantity_received ?? 0), 0);
 
     const discrepancies: any[] = [];
     let qtyOk = true;
     let priceOk = true;
+    let expectedValue = 0;
 
     for (const il of lines ?? []) {
-      const pl = (poLines ?? []).find((p: any) => p.item_code && il.item_code && p.item_code === il.item_code);
+      const pl = (poLines ?? []).find((p: any) => p.id === il.po_line_id)
+        ?? (poLines ?? []).find((p: any) => p.item_code && il.item_code && p.item_code.toLowerCase() === String(il.item_code).toLowerCase());
       if (!pl) {
         discrepancies.push({ line_no: il.line_no, code: "no_po_line", item_code: il.item_code });
         qtyOk = false; priceOk = false;
         continue;
       }
-      const recv = (grnLines ?? []).find((g: any) => g.po_item_id === pl.id)?.quantity_received ?? pl.quantity_ordered;
-      const qtyDelta = Math.abs(Number(il.quantity) - Number(recv)) / Math.max(Number(recv) || 1, 1);
+      // Without any approved receipt this is a two-way match against the order.
+      const recv = (grns?.length ?? 0) > 0 ? acceptedFor(pl.id) : Number(pl.quantity_ordered);
+      const qtyDelta = Math.abs(Number(il.quantity) - recv) / Math.max(recv || 1, 1);
       const priceDelta = Math.abs(Number(il.unit_price) - Number(pl.unit_price)) / Math.max(Number(pl.unit_price) || 1, 1);
       if (qtyDelta > QTY_TOL) {
         qtyOk = false;
@@ -116,12 +125,14 @@ serve(async (req) => {
         priceOk = false;
         discrepancies.push({ line_no: il.line_no, code: "price", invoiced: il.unit_price, po: pl.unit_price, delta_pct: priceDelta });
       }
+      expectedValue += recv * Number(pl.unit_price);
     }
 
-    const poTotal = (poLines ?? []).reduce((s: number, p: any) => s + Number(p.quantity_ordered) * Number(p.unit_price), 0);
-    const totalOk = Math.abs(Number(inv.grand_total ?? 0) - poTotal) <= TOTAL_TOL;
-    if (!totalOk && poTotal > 0) {
-      discrepancies.push({ code: "total", invoiced: inv.grand_total, po_total: poTotal });
+    // Net invoice value against what was received at the ordered price.
+    const invoiceNet = Number(inv.subtotal ?? 0);
+    const totalOk = Math.abs(invoiceNet - expectedValue) <= Math.max(TOTAL_TOL, expectedValue * PRICE_TOL);
+    if (!totalOk && expectedValue > 0) {
+      discrepancies.push({ code: "total", invoiced: invoiceNet, expected: expectedValue });
     }
 
     const allMatched = qtyOk && priceOk && totalOk && (lines?.length ?? 0) > 0;
@@ -131,7 +142,7 @@ serve(async (req) => {
         ? "matched"
         : discrepancies.length > 0 ? "discrepancy" : "partial";
 
-    const score = computeScore({ qtyOk, priceOk, totalOk, hasPo: !!poId, hasGrn: !!grnId });
+    const score = computeScore({ qtyOk, priceOk, totalOk, hasPo: !!poId, hasGrn: (grns?.length ?? 0) > 0 });
 
     await admin.from("einvoice_match_results").insert({
       einvoice_id,

@@ -30,6 +30,15 @@ import { format } from "date-fns";
 import { Contract } from "@/types/contracts";
 import { ColumnDef } from "@tanstack/react-table";
 import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
+import { needsRenewalDecision, renewalSummary } from "@/lib/contractRenewal";
+import { cn } from "@/lib/utils";
+
+const SUMMARY_TONE = {
+  ok: "text-emerald-700 dark:text-emerald-400",
+  soon: "text-amber-700 dark:text-amber-400",
+  overdue: "text-red-700 dark:text-red-400",
+  muted: "text-muted-foreground",
+};
 
 const Contracts = () => {
   const [search, setSearch] = useState("");
@@ -119,10 +128,20 @@ const Contracts = () => {
     {
       accessorKey: "expiry_date",
       header: "Expiry Date",
-      cell: ({ row }) =>
-        row.original.expiry_date
-          ? format(new Date(row.original.expiry_date), "PP")
-          : "-",
+      cell: ({ row }) => {
+        const c = row.original;
+        const summary = renewalSummary(c);
+        return (
+          <div>
+            <div>{c.expiry_date ? format(new Date(c.expiry_date), "PP") : "-"}</div>
+            {c.expiry_date && (
+              <div className={cn("text-xs", SUMMARY_TONE[summary.tone])}>
+                {summary.tone === "ok" ? "Renews automatically" : summary.tone === "muted" ? summary.detail : summary.label}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "status",
@@ -173,15 +192,8 @@ const Contracts = () => {
   ];
 
   const activeContracts = contracts?.filter((c) => c.status === "active") || [];
-  const expiringContracts =
-    contracts?.filter((c) => {
-      if (!c.expiry_date) return false;
-      const daysUntilExpiry = Math.ceil(
-        (new Date(c.expiry_date).getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24)
-      );
-      return daysUntilExpiry > 0 && daysUntilExpiry <= 90;
-    }) || [];
+  // Inside their reminder window and not renewing by themselves.
+  const expiringContracts = contracts?.filter((c) => needsRenewalDecision(c)) || [];
   const totalValue =
     contracts?.reduce((sum, c) => sum + (c.contract_value || 0), 0) || 0;
 
@@ -226,12 +238,12 @@ const Contracts = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
+            <CardTitle className="text-sm font-medium">Renewal Decisions Due</CardTitle>
             <AlertCircle className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{expiringContracts.length}</div>
-            <p className="text-xs text-muted-foreground">Within 90 days</p>
+            <p className="text-xs text-muted-foreground">Expiring within their reminder period</p>
           </CardContent>
         </Card>
 

@@ -27,6 +27,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useContractMutations } from "@/hooks/useContractMutations";
+import { ContractRenewalFields } from "./ContractRenewalFields";
+import { checkRenewal, renewalFormSchema, renewalPayload } from "./contractRenewalForm";
+import { policyFields, renewalPolicyOf } from "@/lib/contractRenewal";
 import { Contract } from "@/types/contracts";
 
 const formSchema = z.object({
@@ -42,7 +45,8 @@ const formSchema = z.object({
   payment_terms: z.string().optional(),
   contract_terms: z.string().optional(),
   notes: z.string().optional(),
-});
+  ...renewalFormSchema,
+}).superRefine(checkRenewal);
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -64,6 +68,8 @@ export const EditContractDialog = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       currency: "LKR",
+      renewal_policy: "none",
+      renewal_notice_days: "30",
     },
   });
 
@@ -82,6 +88,10 @@ export const EditContractDialog = ({
         payment_terms: contract.payment_terms || "",
         contract_terms: contract.contract_terms || "",
         notes: contract.notes || "",
+        renewal_policy: renewalPolicyOf(contract),
+        renewal_term_months: contract.renewal_term_months?.toString() ?? "",
+        max_renewal_count: contract.max_renewal_count?.toString() ?? "",
+        renewal_notice_days: contract.renewal_notice_days?.toString() ?? "30",
       });
     }
   }, [contract, open, form]);
@@ -98,7 +108,7 @@ export const EditContractDialog = ({
           contract_type: data.contract_type as any,
           contract_category: data.contract_category,
           effective_date: data.effective_date,
-          expiry_date: data.expiry_date,
+          expiry_date: data.expiry_date || null,
           contract_value: data.contract_value ? parseFloat(data.contract_value) : undefined,
           currency: data.currency,
           counterparty_name: data.counterparty_name,
@@ -106,6 +116,8 @@ export const EditContractDialog = ({
           payment_terms: data.payment_terms,
           contract_terms: data.contract_terms,
           notes: data.notes,
+          ...policyFields(data.renewal_policy),
+          ...renewalPayload(data),
         },
       });
       onOpenChange(false);
@@ -252,6 +264,12 @@ export const EditContractDialog = ({
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+
+              <ContractRenewalFields
+                control={form.control}
+                effectiveDate={form.watch("effective_date")}
+                expiryDate={form.watch("expiry_date")}
               />
 
               <FormField

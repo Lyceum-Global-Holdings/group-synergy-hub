@@ -3,6 +3,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { z } from "https://esm.sh/zod@3.23.8";
+import { appUrl, emailLayout, escapeHtml, sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,11 +112,25 @@ serve(async (req) => {
       });
     }
 
-    const origin = req.headers.get("origin") ?? "";
-    const acceptUrl = `${origin}/portal/accept-invite?token=${token}&id=${inv.id}`;
+    const acceptUrl = `${appUrl(req)}/portal/accept-invite?token=${token}&id=${inv.id}`;
+
+    const hours = body.expires_in_hours;
+    const validFor = hours % 24 === 0 ? `${hours / 24} day${hours === 24 ? "" : "s"}` : `${hours} hours`;
+    const email = await sendEmail({
+      to: inv.email,
+      subject: `You're invited to the ${supplier.name} supplier portal`,
+      html: emailLayout({
+        heading: "Join the supplier portal",
+        body: `<p>You've been invited to the supplier portal for <b>${escapeHtml(supplier.name)}</b>. There you can answer requests for quotation, submit invoices against purchase orders, and keep your company details up to date.</p>
+               <p>Open the link below, then set a password for <b>${escapeHtml(inv.email)}</b> (or sign in if you already have an account). The link works once and expires in ${validFor}.</p>`,
+        action: { label: "Accept invitation", url: acceptUrl },
+      }),
+      text: `You've been invited to the supplier portal for ${supplier.name}. Accept the invitation (link valid ${validFor}): ${acceptUrl}`,
+    });
+    if (!email.sent) console.warn("supplier-invite email not sent:", email.error);
 
     return new Response(
-      JSON.stringify({ success: true, invitation: inv, accept_url: acceptUrl, token }),
+      JSON.stringify({ success: true, invitation: inv, accept_url: acceptUrl, token, email_sent: email.sent }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

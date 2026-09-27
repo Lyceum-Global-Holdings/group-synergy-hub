@@ -41,8 +41,10 @@ export const InviteSupplierUserDialog = ({ open, onOpenChange, supplierId, suppl
       return;
     }
     setAcceptUrl((data as any).accept_url ?? null);
-    // Nothing is emailed: the admin shares the link below with the supplier.
-    toast({ title: "Invitation link created", description: `Copy the link and send it to ${email}.` });
+    const emailSent = (data as any).email_sent === true;
+    toast(emailSent
+      ? { title: "Invitation sent", description: `We emailed the link to ${email}. You can also copy it below.` }
+      : { title: "Invitation link created", description: `The email couldn't be sent. Copy the link and send it to ${email}.` });
   };
 
   return (

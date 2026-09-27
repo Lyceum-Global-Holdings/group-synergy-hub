@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Contract } from "@/types/contracts";
+import { Contract, ContractEvent } from "@/types/contracts";
 
 import { ContractStatus, ContractType } from "@/types/contracts";
 
@@ -131,6 +131,25 @@ export const useContractAmendments = (contractId: string) => {
 
       if (error) throw error;
       return data;
+    },
+    enabled: !!contractId,
+  });
+};
+
+/** Renewals, expiries and reminders, newest first (contract_events). */
+export const useContractEvents = (contractId: string | undefined) => {
+  return useQuery({
+    queryKey: ["contract-events", contractId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("contract_events")
+        .select("*")
+        .eq("contract_id", contractId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return (data ?? []) as ContractEvent[];
     },
     enabled: !!contractId,
   });

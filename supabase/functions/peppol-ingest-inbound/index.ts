@@ -1,8 +1,10 @@
-// Internal: ingest an inbound PEPPOL invoice from Storecove webhook payload.
-// Authenticates via service role bearer (called by peppol-webhook server-to-server).
-// Downloads the UBL XML if a URL is provided, parses minimum BIS 3.0 fields, inserts
-// einvoices(direction='inbound') + einvoice_lines, stores XML in storage, then triggers
-// peppol-three-way-match.
+// Internal: ingest an inbound PEPPOL invoice or credit note from a Storecove
+// webhook payload. Authenticates via service role bearer (called by
+// peppol-webhook server-to-server). Stores the UBL XML, then hands the parsed
+// document to record_inbound_einvoice, which routes it to our company and the
+// supplier by their PEPPOL IDs, links the PO from the order reference and puts
+// it in accounts payable. Finally runs the three-way match, whose result
+// follows the invoice into payables.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
@@ -45,89 +47,38 @@ serve(async (req) => {
 
     if (!xml) return jsonError("inbound document XML not available", 400);
 
-    const parsed = parseUblInvoice(xml);
+    const parsed = parseUbl(xml);
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-
-    // Resolve supplier_id from PEPPOL participant if possible
-    const supplierEndpointId: string | null = parsed.supplierEndpointId ?? null;
-    const { data: matchedSupplier } = supplierEndpointId
-      ? await admin.from("supplier_profiles_extended")
-          .select("supplier_id")
-          .eq("peppol_participant_id", supplierEndpointId)
-          .maybeSingle()
-          .then((r) => r as { data: { supplier_id: string } | null })
-      : { data: null };
-
-    // Resolve customer company from PEPPOL participant
-    const customerEndpointId: string | null = parsed.customerEndpointId ?? null;
-    const { data: matchedCompany } = customerEndpointId
-      ? await admin.from("companies")
-          .select("id")
-          .eq("peppol_participant_id", customerEndpointId)
-          .maybeSingle()
-          .then((r) => r as { data: { id: string } | null })
-      : { data: null };
 
     const xmlPath = `inbound/${guid}.xml`;
     await admin.storage.from("einvoices").upload(xmlPath, new Blob([xml], { type: "application/xml" }), {
       upsert: true, contentType: "application/xml",
     });
 
-    const { data: inv, error: invErr } = await admin.from("einvoices").insert({
-      direction: "inbound",
-      status: "received",
-      supplier_id: matchedSupplier?.supplier_id ?? null,
-      customer_company_id: matchedCompany?.id ?? null,
-      company_id: matchedCompany?.id ?? null,
-      invoice_number: parsed.invoiceNumber,
-      issue_date: parsed.issueDate,
-      due_date: parsed.dueDate,
-      currency: parsed.currency ?? "USD",
-      subtotal: parsed.subtotal ?? 0,
-      tax_total: parsed.taxTotal ?? 0,
-      grand_total: parsed.grandTotal ?? 0,
-      peppol_message_id: guid,
-      peppol_profile: parsed.profileId,
-      peppol_customization: parsed.customizationId,
-      ubl_xml_path: xmlPath,
-      validation_report: { source: "storecove_inbound", lines: parsed.lines.length },
-      notes: parsed.note,
-    }).select("id, supplier_id").single();
-
-    if (invErr || !inv) return jsonError(`insert einvoice failed: ${invErr?.message}`, 500);
-
-    if (parsed.lines.length > 0) {
-      await admin.from("einvoice_lines").insert(parsed.lines.map((l, i) => ({
-        einvoice_id: inv.id,
-        line_no: l.lineNo ?? i + 1,
-        item_code: l.itemCode,
-        description: l.description,
-        quantity: l.quantity,
-        unit: l.unit,
-        unit_price: l.unitPrice,
-        line_extension: l.lineExtension,
-        tax_category: l.taxCategory,
-        tax_rate: l.taxRate,
-        tax_amount: l.taxAmount,
-      })));
+    const { data: einvoiceId, error: recErr } = await admin.rpc("record_inbound_einvoice", {
+      p_doc: { ...parsed, message_id: guid, xml_path: xmlPath },
+    });
+    if (recErr || !einvoiceId) {
+      // Typically an unregistered PEPPOL ID: register it under the company, then replay.
+      console.error("peppol-ingest-inbound: not recorded", guid, recErr?.message);
+      return jsonError(recErr?.message ?? "not recorded", 422);
     }
 
-    await admin.from("einvoice_events").insert({
-      einvoice_id: inv.id,
-      event_type: "created",
-      payload: { source: "peppol_inbound", provider_message_id: guid },
-    });
+    // Match against the PO and GRN; the result is copied onto the payables invoice.
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/peppol-three-way-match`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+        body: JSON.stringify({ einvoice_id: einvoiceId }),
+      });
+      if (!r.ok) console.warn("three-way-match returned", r.status, await r.text());
+    } catch (e) {
+      console.warn("three-way-match dispatch failed", e);
+    }
 
-    // Fire-and-forget 3-way match
-    fetch(`${SUPABASE_URL}/functions/v1/peppol-three-way-match`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
-      body: JSON.stringify({ einvoice_id: inv.id }),
-    }).catch((e) => console.warn("three-way-match dispatch failed", e));
-
-    return new Response(JSON.stringify({ ok: true, einvoice_id: inv.id }), {
+    return new Response(JSON.stringify({ ok: true, einvoice_id: einvoiceId }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
@@ -143,51 +94,64 @@ function jsonError(error: unknown, status: number) {
   });
 }
 
-// Minimal UBL 2.1 / PEPPOL BIS 3.0 invoice parser (regex/walker; sufficient for header + lines).
-function parseUblInvoice(xml: string) {
-  const tag = (name: string, src = xml) =>
-    new RegExp(`<(?:[A-Za-z0-9]+:)?${name}[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9]+:)?${name}>`).exec(src)?.[1]?.trim();
-  const all = (name: string, src = xml) => {
-    const re = new RegExp(`<(?:[A-Za-z0-9]+:)?${name}[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9]+:)?${name}>`, "g");
-    const out: string[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(src)) !== null) out.push(m[1]);
-    return out;
-  };
-  const num = (s: string | undefined) => (s == null ? null : Number(s));
+// Minimal UBL 2.1 / PEPPOL BIS 3.0 parser for invoices and credit notes
+// (regex walker; enough for the header, parties, references and lines).
+export function parseUbl(xml: string) {
+  const re = (name: string, flags = "") =>
+    new RegExp(`<(?:[A-Za-z0-9]+:)?${name}(\\s[^>]*)?>([\\s\\S]*?)</(?:[A-Za-z0-9]+:)?${name}>`, flags);
+  // `src` is required on purpose: a missing parent section must give nothing,
+  // not a match from elsewhere in the document.
+  const tag = (name: string, src: string | undefined) => (src ? re(name).exec(src)?.[2]?.trim() : undefined);
+  const attr = (name: string, attribute: string, src: string | undefined) =>
+    src ? new RegExp(`${attribute}="([^"]+)"`).exec(re(name).exec(src)?.[1] ?? "")?.[1] : undefined;
+  const all = (name: string, src: string) => [...src.matchAll(re(name, "g"))].map((m) => m[2]);
+  const num = (s: string | undefined) => (s == null || s === "" ? null : Number(s));
+  const text = (s: string | undefined) => (s ? s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim() : null);
 
-  const supplierBlock = tag("AccountingSupplierParty");
-  const customerBlock = tag("AccountingCustomerParty");
-  const supplierEndpointId = supplierBlock ? tag("EndpointID", supplierBlock) ?? null : null;
-  const customerEndpointId = customerBlock ? tag("EndpointID", customerBlock) ?? null : null;
+  const isCreditNote = /<(?:[A-Za-z0-9]+:)?CreditNote[\s>]/.test(xml);
+  const party = (block: string | undefined) => ({
+    endpoint_id: text(tag("EndpointID", block)),
+    endpoint_scheme: attr("EndpointID", "schemeID", block) ?? null,
+    name: text(tag("Name", tag("PartyName", block))) ?? text(tag("RegistrationName", block)),
+    tax_id: text(tag("CompanyID", tag("PartyTaxScheme", block))) ?? text(tag("CompanyID", tag("PartyLegalEntity", block))),
+  });
 
-  const lines = all("InvoiceLine").map((src) => ({
-    lineNo: num(tag("ID", src)),
-    itemCode: tag("ID", tag("Item", src) ?? "") ?? null,
-    description: tag("Name", tag("Item", src) ?? "") ?? tag("Description", src) ?? null,
-    quantity: num(tag("InvoicedQuantity", src)) ?? 0,
-    unit: /unitCode="([^"]+)"/.exec(src)?.[1] ?? null,
-    unitPrice: num(tag("PriceAmount", src)) ?? 0,
-    lineExtension: num(tag("LineExtensionAmount", src)) ?? 0,
-    taxCategory: tag("ID", tag("ClassifiedTaxCategory", src) ?? "") ?? null,
-    taxRate: num(tag("Percent", tag("ClassifiedTaxCategory", src) ?? "")),
-    taxAmount: num(tag("TaxAmount", src)),
-  }));
+  const lines = all(isCreditNote ? "CreditNoteLine" : "InvoiceLine", xml).map((src, i) => {
+    const item = tag("Item", src);
+    const taxCat = tag("ClassifiedTaxCategory", item);
+    const lineExtension = num(tag("LineExtensionAmount", src)) ?? 0;
+    const taxRate = num(tag("Percent", taxCat)) ?? 0;
+    return {
+      line_no: num(tag("ID", src)) ?? i + 1,
+      item_code: text(tag("ID", tag("SellersItemIdentification", item))) ?? text(tag("ID", tag("BuyersItemIdentification", item))),
+      description: text(tag("Name", item)) ?? text(tag("Description", item)) ?? text(tag("Note", src)),
+      quantity: num(tag(isCreditNote ? "CreditedQuantity" : "InvoicedQuantity", src)) ?? 0,
+      unit: attr(isCreditNote ? "CreditedQuantity" : "InvoicedQuantity", "unitCode", src) ?? null,
+      unit_price: num(tag("PriceAmount", tag("Price", src))) ?? 0,
+      line_extension: lineExtension,
+      tax_category: text(tag("ID", taxCat)),
+      tax_rate: taxRate,
+      tax_amount: num(tag("TaxAmount", src)) ?? Math.round(lineExtension * taxRate) / 100,
+    };
+  });
 
-  const monetary = tag("LegalMonetaryTotal") ?? "";
+  const monetary = tag("LegalMonetaryTotal", xml);
   return {
-    profileId: tag("ProfileID") ?? null,
-    customizationId: tag("CustomizationID") ?? null,
-    invoiceNumber: tag("ID") ?? null,
-    issueDate: tag("IssueDate") ?? null,
-    dueDate: tag("DueDate") ?? null,
-    currency: tag("DocumentCurrencyCode") ?? null,
-    note: tag("Note") ?? null,
-    subtotal: num(tag("LineExtensionAmount", monetary)) ?? null,
-    taxTotal: num(tag("TaxAmount")) ?? null,
-    grandTotal: num(tag("PayableAmount", monetary)) ?? null,
-    supplierEndpointId,
-    customerEndpointId,
+    document_type: isCreditNote ? "credit_note" : "invoice",
+    profile_id: text(tag("ProfileID", xml)),
+    customization_id: text(tag("CustomizationID", xml)),
+    invoice_number: text(tag("ID", xml)),
+    issue_date: text(tag("IssueDate", xml)),
+    due_date: text(tag("DueDate", xml)) ?? text(tag("PaymentDueDate", xml)),
+    currency: text(tag("DocumentCurrencyCode", xml)),
+    note: text(tag("Note", xml)),
+    order_reference: text(tag("ID", tag("OrderReference", xml))),
+    buyer_reference: text(tag("BuyerReference", xml)),
+    subtotal: num(tag("LineExtensionAmount", monetary)) ?? num(tag("TaxExclusiveAmount", monetary)),
+    tax_total: num(tag("TaxAmount", tag("TaxTotal", xml))),
+    grand_total: num(tag("PayableAmount", monetary)) ?? num(tag("TaxInclusiveAmount", monetary)),
+    seller: party(tag("AccountingSupplierParty", xml)),
+    buyer: party(tag("AccountingCustomerParty", xml)),
     lines,
   };
 }

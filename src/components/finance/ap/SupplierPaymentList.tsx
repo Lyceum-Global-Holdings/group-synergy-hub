@@ -16,7 +16,7 @@ export function SupplierPaymentList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('supplier_payments')
-        .select('*, supplier:suppliers(supplier_name)')
+        .select('*, supplier:suppliers(name)')
         .eq('company_id', selectedCompany?.id)
         .order('payment_date', { ascending: false });
       if (error) throw error;
@@ -48,7 +48,7 @@ export function SupplierPaymentList() {
             ) : payments?.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.payment_number}</TableCell>
-                <TableCell>{p.supplier?.supplier_name || '-'}</TableCell>
+                <TableCell>{p.supplier?.name || '-'}</TableCell>
                 <TableCell>{format(new Date(p.payment_date), 'dd MMM yyyy')}</TableCell>
                 <TableCell className="capitalize">{p.payment_method || '-'}</TableCell>
                 <TableCell className="text-right">{currencySymbol} {p.total_amount?.toLocaleString()}</TableCell>

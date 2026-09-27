@@ -119,9 +119,9 @@ function VendorsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")
-        .select("id, supplier_name, supplier_code, status, payment_terms, email, phone, created_at")
+        .select("id, name, supplier_code, status, payment_terms, email, phone, created_at")
         .eq("company_id", selectedCompany!.id)
-        .order("supplier_name");
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -130,7 +130,7 @@ function VendorsTab() {
 
   const columns: DataTableColumn<any>[] = [
     { key: "supplier_code", header: "Code" },
-    { key: "supplier_name", header: "Supplier Name" },
+    { key: "name", header: "Supplier Name" },
     { key: "email", header: "Email", render: (r) => r.email || "—" },
     { key: "phone", header: "Phone", render: (r) => r.phone || "—" },
     { key: "payment_terms", header: "Payment Terms", render: (r) => r.payment_terms || "—" },
@@ -183,7 +183,7 @@ function DueInvoicesTable() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("supplier_invoices")
-        .select("*, supplier:suppliers(supplier_name)")
+        .select("*, supplier:suppliers(name)")
         .eq("company_id", selectedCompany!.id)
         .not("status", "in", '("paid","cancelled")')
         .order("due_date", { ascending: true })
@@ -196,7 +196,7 @@ function DueInvoicesTable() {
 
   const columns: DataTableColumn<any>[] = [
     { key: "invoice_number", header: "Invoice #" },
-    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.supplier_name || "—" },
+    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.name || "—" },
     { key: "due_date", header: "Due Date", render: (r) => formatDate(r.due_date) },
     { key: "gross_amount", header: "Amount", render: (r) => formatCurrency(r.gross_amount) },
     { key: "amount_paid", header: "Paid", render: (r) => formatCurrency(r.amount_paid) },
@@ -216,7 +216,7 @@ function DebitNotesTab() {
 
   const columns: DataTableColumn<any>[] = [
     { key: "debit_note_number", header: "Debit Note #" },
-    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.supplier_name || "—" },
+    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.name || "—" },
     { key: "debit_date", header: "Date", render: (r) => formatDate(r.debit_date) },
     { key: "amount", header: "Amount", render: (r) => formatCurrency(r.amount) },
     { key: "amount_applied", header: "Applied", render: (r) => formatCurrency(r.amount_applied) },
@@ -246,7 +246,7 @@ function VendorAdvancesTab() {
 
   const columns: DataTableColumn<any>[] = [
     { key: "advance_number", header: "Advance #" },
-    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.supplier_name || "—" },
+    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.name || "—" },
     { key: "advance_date", header: "Date", render: (r) => formatDate(r.advance_date) },
     { key: "amount", header: "Amount", render: (r) => formatCurrency(r.amount) },
     { key: "remaining_amount", header: "Remaining", render: (r) => formatCurrency(r.remaining_amount) },
@@ -276,7 +276,7 @@ function WHTTab() {
 
   const columns: DataTableColumn<any>[] = [
     { key: "certificate_number", header: "Certificate #" },
-    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.supplier_name || "—" },
+    { key: "supplier", header: "Supplier", render: (r) => r.supplier?.name || "—" },
     { key: "certificate_date", header: "Date", render: (r) => formatDate(r.certificate_date) },
     { key: "tax_period", header: "Tax Period", render: (r) => r.tax_period || "—" },
     { key: "gross_amount", header: "Gross", render: (r) => formatCurrency(r.gross_amount) },

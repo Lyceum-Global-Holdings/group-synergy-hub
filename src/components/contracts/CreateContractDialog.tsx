@@ -27,6 +27,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useContractMutations } from "@/hooks/useContractMutations";
+import { ContractRenewalFields } from "./ContractRenewalFields";
+import { checkRenewal, renewalFormSchema, renewalPayload } from "./contractRenewalForm";
+import { policyFields } from "@/lib/contractRenewal";
 
 const formSchema = z.object({
   contract_title: z.string().min(1, "Contract title is required"),
@@ -41,7 +44,8 @@ const formSchema = z.object({
   payment_terms: z.string().optional(),
   contract_terms: z.string().optional(),
   notes: z.string().optional(),
-});
+  ...renewalFormSchema,
+}).superRefine(checkRenewal);
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -61,6 +65,8 @@ export const CreateContractDialog = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       currency: "LKR",
+      renewal_policy: "none",
+      renewal_notice_days: "30",
     },
   });
 
@@ -72,7 +78,7 @@ export const CreateContractDialog = ({
         contract_type: data.contract_type as any,
         contract_category: data.contract_category,
         effective_date: data.effective_date,
-        expiry_date: data.expiry_date,
+        expiry_date: data.expiry_date || null,
         contract_value: data.contract_value ? parseFloat(data.contract_value) : undefined,
         currency: data.currency,
         counterparty_name: data.counterparty_name,
@@ -80,6 +86,8 @@ export const CreateContractDialog = ({
         payment_terms: data.payment_terms,
         contract_terms: data.contract_terms,
         notes: data.notes,
+        ...policyFields(data.renewal_policy),
+        ...renewalPayload(data),
       });
       form.reset();
       onOpenChange(false);
@@ -226,6 +234,12 @@ export const CreateContractDialog = ({
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+
+              <ContractRenewalFields
+                control={form.control}
+                effectiveDate={form.watch("effective_date")}
+                expiryDate={form.watch("expiry_date")}
               />
 
               <FormField

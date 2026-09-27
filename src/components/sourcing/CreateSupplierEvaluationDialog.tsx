@@ -37,7 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { useSuppliers } from "@/hooks/useSuppliers";
-import { useCreateSupplierEvaluation } from "@/hooks/useSupplierEvaluations";
+import { useCreateSupplierEvaluation, usePopulateEvaluation } from "@/hooks/useSupplierEvaluations";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSupplierItems } from "@/hooks/useSupplierItems";
 import { cn } from "@/lib/utils";
@@ -71,6 +71,7 @@ export function CreateSupplierEvaluationDialog({
   const { selectedCompany } = useCompany();
   const { data: suppliers = [] } = useSuppliers();
   const createEvaluationMutation = useCreateSupplierEvaluation();
+  const populate = usePopulateEvaluation();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -88,7 +89,7 @@ export function CreateSupplierEvaluationDialog({
     try {
       const supplierItem = supplierItems.find(si => si.warehouse_item_id === data.warehouse_item_id);
       
-      await createEvaluationMutation.mutateAsync({
+      const created = await createEvaluationMutation.mutateAsync({
         supplier_id: data.supplier_id,
         product_name: data.product_name,
         evaluation_period_start: data.evaluation_period_start.toISOString().split('T')[0],
@@ -97,6 +98,8 @@ export function CreateSupplierEvaluationDialog({
         supplier_item_id: supplierItem?.id || undefined,
         company_id: selectedCompany?.id,
       });
+      // Score the period's approved goods receipts straight away.
+      populate.mutate({ evaluationId: created.id });
       
       form.reset();
       onOpenChange(false);
@@ -111,7 +114,7 @@ export function CreateSupplierEvaluationDialog({
         <DialogHeader>
           <DialogTitle>Create New Supplier Evaluation</DialogTitle>
           <DialogDescription>
-            Start a new supplier performance evaluation for a specific product and time period.
+            Choose a supplier and period. Deliveries are scored from the approved goods receipts in that period: lateness against the PO due date, and how much was accepted.
           </DialogDescription>
         </DialogHeader>
 

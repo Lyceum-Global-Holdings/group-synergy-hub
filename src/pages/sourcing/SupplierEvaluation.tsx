@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, FileText, TrendingUp, Calendar, BarChart3, Eye, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, FileText, TrendingUp, Calendar, BarChart3, Eye, Edit, Trash2, PackageCheck } from "lucide-react";
 import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { useSupplierEvaluations, useDeleteSupplierEvaluation } from "@/hooks/useSupplierEvaluations";
 import { CreateSupplierEvaluationDialog } from "@/components/sourcing/CreateSupplierEvaluationDialog";
 import { SupplierEvaluationDetailsDialog } from "@/components/sourcing/SupplierEvaluationDetailsDialog";
+import { GenerateEvaluationsDialog } from "@/components/sourcing/GenerateEvaluationsDialog";
 import { SupplierEvaluation as SupplierEvaluationType } from "@/types/supplierEvaluation";
 import { ColumnDef } from "@tanstack/react-table";
 import { useNavigate } from "react-router-dom";
@@ -45,6 +46,7 @@ const SupplierEvaluation = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [performanceFilter, setPerformanceFilter] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<SupplierEvaluationType | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [deleteEvaluationId, setDeleteEvaluationId] = useState<string | null>(null);
@@ -241,7 +243,7 @@ const SupplierEvaluation = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Supplier Evaluation</h1>
           <p className="text-muted-foreground">
-            Manage and track supplier performance evaluations
+            Supplier performance scored from approved goods receipts: on-time delivery and accepted quantities
           </p>
         </div>
         <div className="flex gap-2">
@@ -249,9 +251,13 @@ const SupplierEvaluation = () => {
             <BarChart3 className="mr-2 h-4 w-4" />
             View Analytics
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New Evaluation
+          </Button>
+          <Button onClick={() => setIsGenerateOpen(true)}>
+            <PackageCheck className="mr-2 h-4 w-4" />
+            Evaluate all suppliers
           </Button>
         </div>
       </div>
@@ -353,6 +359,7 @@ const SupplierEvaluation = () => {
       </Card>
 
       {/* Dialogs */}
+      <GenerateEvaluationsDialog open={isGenerateOpen} onOpenChange={setIsGenerateOpen} />
       <CreateSupplierEvaluationDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}

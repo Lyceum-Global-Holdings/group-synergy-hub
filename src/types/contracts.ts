@@ -34,16 +34,19 @@ export interface Contract {
   // Dates
   contract_date: string;
   effective_date: string;
-  expiry_date?: string;
+  expiry_date?: string | null;
   notice_period_days?: number;
   renewal_notice_days: number;
   
-  // Renewal
+  // Renewal (acted on nightly by run_contract_lifecycle)
   auto_renew: boolean;
-  renewal_type?: RenewalType;
+  renewal_type?: RenewalType | null;
   renewal_terms?: string;
-  max_renewal_count?: number;
+  max_renewal_count?: number | null;
   renewal_count: number;
+  renewal_term_months?: number | null;
+  renewal_notice_sent_for?: string | null;
+  last_renewed_at?: string | null;
   
   // Parties
   primary_party_type?: string;
@@ -194,15 +197,16 @@ export interface CreateContractData {
   // Dates
   contract_date?: string;
   effective_date: string;
-  expiry_date?: string;
+  expiry_date?: string | null;
   notice_period_days?: number;
   renewal_notice_days?: number;
   
   // Renewal
   auto_renew?: boolean;
-  renewal_type?: RenewalType;
+  renewal_type?: RenewalType | null;
   renewal_terms?: string;
-  max_renewal_count?: number;
+  max_renewal_count?: number | null;
+  renewal_term_months?: number | null;
   
   // Parties
   primary_party_type?: string;
@@ -235,4 +239,18 @@ export interface CreateContractData {
   // Metadata
   notes?: string;
   tags?: any;
+}
+
+export type ContractEventType = "activated" | "renewal_due" | "auto_renewed" | "renewed" | "expired";
+
+export interface ContractEvent {
+  id: string;
+  contract_id: string;
+  event: ContractEventType;
+  old_expiry: string | null;
+  new_expiry: string | null;
+  note: string | null;
+  actor: string | null;
+  emailed_at: string | null;
+  created_at: string;
 }

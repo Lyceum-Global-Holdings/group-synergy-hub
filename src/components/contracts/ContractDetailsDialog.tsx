@@ -28,6 +28,7 @@ import { ContractDocumentsSection } from "./ContractDocumentsSection";
 import { EditContractDialog } from "./EditContractDialog";
 import { DeleteContractDialog } from "./DeleteContractDialog";
 import { ChangeContractStatusDialog } from "./ChangeContractStatusDialog";
+import { ContractRenewalPanel } from "./ContractRenewalPanel";
 
 interface ContractDetailsDialogProps {
   contract: Contract;
@@ -177,6 +178,8 @@ export const ContractDetailsDialog = ({
                 </CardContent>
               </Card>
             </div>
+
+            <ContractRenewalPanel contract={contract} />
 
             <Card>
               <CardHeader>

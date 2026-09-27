@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Calendar, FileText, TrendingUp, Plus, Edit, Trash2, ClipboardList, History, MessageSquare } from "lucide-react";
+import { Calendar, FileText, TrendingUp, Plus, Edit, Trash2, ClipboardList, History, MessageSquare, Loader2, PackageCheck } from "lucide-react";
 
 import {
   Dialog,
@@ -16,7 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SupplierEvaluation, SupplierEvaluationEntry } from "@/types/supplierEvaluation";
-import { useSupplierEvaluationEntries, useCreateSupplierEvaluationEntry } from "@/hooks/useSupplierEvaluations";
+import { useSupplierEvaluationEntries, useCreateSupplierEvaluationEntry, usePopulateEvaluation } from "@/hooks/useSupplierEvaluations";
 import { ColumnDef } from "@tanstack/react-table";
 import { BulkEvaluationEntryForm } from "./BulkEvaluationEntryForm";
 
@@ -40,6 +40,8 @@ export function SupplierEvaluationDetailsDialog({
   const [showBulkEntry, setShowBulkEntry] = useState(false);
   const { data: entries = [], isLoading } = useSupplierEvaluationEntries(evaluation.id);
   const createEntryMutation = useCreateSupplierEvaluationEntry();
+  const populate = usePopulateEvaluation();
+  const isDraft = evaluation.status === "draft";
 
   const columns: ColumnDef<SupplierEvaluationEntry>[] = [
     {
@@ -76,6 +78,20 @@ export function SupplierEvaluationDetailsDialog({
         if (entry.within_14_days) return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Within 14 Days (20)</Badge>;
         if (entry.over_14_days_late) return <Badge variant="outline" className="bg-red-100 text-red-800">Over 14 Days Late (0)</Badge>;
         return <Badge variant="outline">Not Set</Badge>;
+      },
+    },
+    {
+      header: "Source",
+      cell: ({ row }) => {
+        const entry = row.original;
+        return entry.source === "grn" ? (
+          <div className="max-w-[220px] space-y-1">
+            <Badge variant="outline" className="bg-sky-100 text-sky-800">Goods receipt</Badge>
+            {entry.notes && <div className="text-xs text-muted-foreground">{entry.notes}</div>}
+          </div>
+        ) : (
+          <Badge variant="outline">Entered by hand</Badge>
+        );
       },
     },
     {
@@ -238,11 +254,17 @@ export function SupplierEvaluationDetailsDialog({
                     <FileText className="h-5 w-5" />
                     {showBulkEntry ? "Add Delivery Records" : "Evaluation Entries"}
                   </CardTitle>
-                  {!showBulkEntry && (
-                    <Button size="sm" onClick={() => setShowBulkEntry(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Deliveries
-                    </Button>
+                  {!showBulkEntry && isDraft && (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setShowBulkEntry(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add by hand
+                      </Button>
+                      <Button size="sm" onClick={() => populate.mutate({ evaluationId: evaluation.id })} disabled={populate.isPending}>
+                        {populate.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4" />}
+                        Pull from goods receipts
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardHeader>

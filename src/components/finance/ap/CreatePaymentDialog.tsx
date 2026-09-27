@@ -45,7 +45,7 @@ export function CreatePaymentDialog({ open, onOpenChange }: Props) {
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers', selectedCompany?.id],
     queryFn: async () => {
-      const { data } = await supabase.from('suppliers').select('id, supplier_name').eq('company_id', selectedCompany?.id);
+      const { data } = await supabase.from('suppliers').select('id, name').order('name').eq('company_id', selectedCompany?.id);
       return data || [];
     },
     enabled: !!selectedCompany?.id,
@@ -110,7 +110,7 @@ export function CreatePaymentDialog({ open, onOpenChange }: Props) {
                     </FormControl>
                     <SelectContent>
                       {suppliers?.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

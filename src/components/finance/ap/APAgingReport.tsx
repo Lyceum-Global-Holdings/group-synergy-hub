@@ -15,7 +15,7 @@ export function APAgingReport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('supplier_invoices')
-        .select('*, supplier:suppliers(supplier_name)')
+        .select('*, supplier:suppliers(name)')
         .eq('company_id', selectedCompany?.id)
         .in('status', ['posted', 'partially_paid'])
         .order('supplier_id');
@@ -28,7 +28,7 @@ export function APAgingReport() {
   const today = new Date();
   const aging = invoices?.reduce((acc: any, inv: any) => {
     const supplierId = inv.supplier_id;
-    const supplierName = inv.supplier?.supplier_name || 'Unknown';
+    const supplierName = inv.supplier?.name || 'Unknown';
     const daysOverdue = differenceInDays(today, new Date(inv.due_date));
     const outstanding = inv.gross_amount - (inv.amount_paid || 0);
     
