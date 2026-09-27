@@ -22958,6 +22958,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      award_rfq: {
+        Args: { p_create_po?: boolean; p_quote_id: string }
+        Returns: string
+      }
       bootstrap_admin: {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
@@ -23079,6 +23083,8 @@ export type Database = {
         Args: { target_company_id: string }
         Returns: boolean
       }
+      can_act_for_supplier: { Args: { _supplier_id: string }; Returns: boolean }
+      can_manage_rfq: { Args: { _request_id: string }; Returns: boolean }
       can_manage_site_report_attendance: {
         Args: { _site_report_id: string }
         Returns: boolean
@@ -24231,6 +24237,10 @@ export type Database = {
         Args: { p_company_id: string; p_rows: Json }
         Returns: Json
       }
+      invoice_visible_to_supplier: {
+        Args: { _invoice_id: string }
+        Returns: boolean
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_admin_or_higher: { Args: { _user: string }; Returns: boolean }
       is_company_hod: {
@@ -24585,6 +24595,7 @@ export type Database = {
         Args: { p_company_id: string; p_parent_item_id: string }
         Returns: string
       }
+      po_visible_to_supplier: { Args: { _po_id: string }; Returns: boolean }
       preview_fifo_batch_issue: {
         Args: {
           p_company_id: string
@@ -24729,6 +24740,10 @@ export type Database = {
           message: string
           status: string
         }[]
+      }
+      quote_visible_to_supplier: {
+        Args: { _quote_id: string }
+        Returns: boolean
       }
       recompute_customer_invoice_totals: {
         Args: { p_invoice_id: string }
@@ -26315,6 +26330,22 @@ export type Database = {
         }
         Returns: string
       }
+      rfq_invite_suppliers: {
+        Args: { p_request_id: string; p_supplier_ids: string[] }
+        Returns: number
+      }
+      rfq_remove_invitation: {
+        Args: { p_request_id: string; p_supplier_id: string }
+        Returns: undefined
+      }
+      rfq_set_status: {
+        Args: { p_action: string; p_request_id: string }
+        Returns: string
+      }
+      rfq_visible_to_supplier: {
+        Args: { _request_id: string }
+        Returns: boolean
+      }
       run_fx_revaluation: {
         Args: {
           p_as_of_date: string
@@ -26592,6 +26623,31 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      submit_supplier_invoice: {
+        Args: {
+          p_due_date: string
+          p_invoice_date: string
+          p_invoice_number: string
+          p_lines: Json
+          p_notes?: string
+          p_po_id: string
+          p_tax_amount?: number
+        }
+        Returns: string
+      }
+      submit_supplier_quote: {
+        Args: {
+          p_delivery_commitment?: string
+          p_lines: Json
+          p_notes?: string
+          p_payment_terms?: string
+          p_request_id: string
+          p_supplier_id: string
+          p_validity_days?: number
+          p_warranty?: string
+        }
+        Returns: string
       }
       sync_production_order: {
         Args: { p_order_id: string }
