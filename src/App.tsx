@@ -112,7 +112,6 @@ const CostumeStock = lazy(() => import("./pages/tuh-modules/CostumeStock"));
 const CostumeRental = lazy(() => import("./pages/tuh-modules/CostumeRental"));
 const CostumeRentalView = lazy(() => import("./pages/tuh-modules/CostumeRentalView"));
 const MaterialDemandPlanning = lazy(() => import("./pages/procurement/MaterialDemandPlanning"));
-const RfqRfp = lazy(() => import("./pages/procurement/RfqRfp"));
 const BlanketPurchaseOrder = lazy(() => import("./pages/procurement/BlanketPurchaseOrder"));
 const StockAdjustment = lazy(() => import("./pages/warehouse/StockAdjustment"));
 const SupplierMaster = lazy(() => import("./pages/sourcing/SupplierMaster").then(m => ({ default: m.SupplierMaster })));
@@ -397,7 +396,9 @@ function App() {
                 <Route path="/tuh-modules/costume-rental/:rentalId" element={<CostumeRentalView />} />
                 <Route path="/procurement/bill-of-materials" element={<BillOfMaterials />} />
                 <Route path="/procurement/material-demand" element={<MaterialDemandPlanning />} />
-                <Route path="/procurement/rfq-rfp" element={<RfqRfp />} />
+                {/* Procurement opens the same RFQ workspace as Sourcing; the paths keep the procurement menu grant. */}
+                <Route path="/procurement/rfq-rfp" element={<RfqManagement />} />
+                <Route path="/procurement/rfq-rfp/compare" element={<QuotationComparison />} />
                 <Route path="/procurement/blanket-po" element={<BlanketPurchaseOrder />} />
                 <Route path="/warehouse/stock-adjustment" element={<StockAdjustment />} />
                 <Route path="/warehouse/grn" element={<GoodsReceiptNote />} />

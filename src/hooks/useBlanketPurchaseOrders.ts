@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUser } from "@/lib/currentUser";
+import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import type { 
   BlanketPurchaseOrder, 
@@ -10,17 +11,19 @@ import type {
 } from "@/types/blanketPurchaseOrder";
 
 export function useBlanketPurchaseOrders() {
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
   return useQuery({
-    queryKey: ['blanket-purchase-orders'],
+    queryKey: ['blanket-purchase-orders', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('blanket_purchase_orders')
         .select(`
           *,
           supplier:suppliers(name, email, phone),
           items:blanket_po_items(*)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+      if (!isViewingAllCompanies && selectedCompany?.id) query = query.eq('company_id', selectedCompany.id);
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as BlanketPurchaseOrder[];
@@ -62,6 +65,7 @@ export function useBlanketPurchaseOrder(id: string) {
 
 export function useCreateBlanketPurchaseOrder() {
   const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
 
   return useMutation({
     mutationFn: async (data: CreateBlanketPoData) => {
@@ -74,6 +78,8 @@ export function useCreateBlanketPurchaseOrder() {
         .from('blanket_purchase_orders')
         .insert({
           ...bpoData,
+          // Without a company the contract is invisible to everyone but super admins.
+          company_id: selectedCompany?.id ?? null,
           created_by: user.id,
         } as any)
         .select()
@@ -134,13 +140,10 @@ export function useApproveBlanketPurchaseOrder() {
       const user = getCachedUser();
       if (!user) throw new Error("Not authenticated");
 
+      // The database checks approval rights and records who activated it.
       const { error } = await supabase
         .from('blanket_purchase_orders')
-        .update({
-          contract_status: status,
-          approved_by: user.id,
-          approved_date: new Date().toISOString(),
-        })
+        .update({ contract_status: status })
         .eq('id', id);
 
       if (error) throw error;
@@ -167,9 +170,10 @@ export function useUpdateBpoStatus() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['blanket-purchase-orders'] });
-      toast.success("Status updated successfully");
+      queryClient.invalidateQueries({ queryKey: ['bpo-summary-stats'] });
+      toast.success(status === 'active' ? "Blanket PO is active" : `Blanket PO ${status}`);
     },
     onError: (error: Error) => {
       toast.error("Failed to update status: " + error.message);
@@ -200,12 +204,15 @@ export function useDeleteBlanketPurchaseOrder() {
 }
 
 export function useBpoSummaryStats() {
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
   return useQuery({
-    queryKey: ['bpo-summary-stats'],
+    queryKey: ['bpo-summary-stats', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('blanket_purchase_orders')
         .select('contract_status, total_contract_value, remaining_value');
+      if (!isViewingAllCompanies && selectedCompany?.id) query = query.eq('company_id', selectedCompany.id);
+      const { data, error } = await query;
 
       if (error) throw error;
 

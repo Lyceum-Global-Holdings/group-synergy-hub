@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSubmitPurchaseRequisition, useApprovePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
+import { useSubmitPurchaseRequisition, useApprovePurchaseRequisition, usePrApprovalBlockReason } from '@/hooks/usePurchaseRequisitions';
 import type { PurchaseRequisition, PrStatus } from '@/types/procurement';
 
 interface PrDetailsDialogProps {
@@ -57,7 +57,11 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
 
   const canEdit = pr.requested_by === user?.id && pr.status === 'draft';
   const canSubmit = pr.requested_by === user?.id && pr.status === 'draft';
-  const canApprove = user?.id && pr.status === 'submitted'; // In real app, check if user has approval permissions
+  // Approval rights come from the database (Department Head / HOD / company
+  // approvers or admins; never the requester).
+  const { data: approvalBlock, isSuccess: rightsKnown } = usePrApprovalBlockReason(pr.id, pr.status);
+  const awaitingApproval = pr.status === 'submitted' || pr.status === 'pending_approval';
+  const canApprove = awaitingApproval && rightsKnown && !approvalBlock;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -399,7 +403,7 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
 
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="comments">Comments (Optional)</Label>
+                          <Label htmlFor="comments">Comments (required to reject)</Label>
                           <Textarea
                             id="comments"
                             placeholder="Add any comments about this decision..."
@@ -420,7 +424,7 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
                           </Button>
                           <Button
                             onClick={() => handleApproval('rejected')}
-                            disabled={approvePrMutation.isPending}
+                            disabled={approvePrMutation.isPending || !comments.trim()}
                             variant="destructive"
                           >
                             <XCircle className="mr-2 h-4 w-4" />
@@ -434,7 +438,9 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
 
                 {!canEdit && !canSubmit && !canApprove && (
                   <div className="text-center py-8 text-muted-foreground">
-                    No actions available for this purchase requisition.
+                    {awaitingApproval && rightsKnown && approvalBlock
+                      ? `Waiting for approval. ${approvalBlock}.`
+                      : 'No actions available for this purchase requisition.'}
                   </div>
                 )}
               </CardContent>

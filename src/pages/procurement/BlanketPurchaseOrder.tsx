@@ -19,7 +19,7 @@ import {
 import { CreateBlanketPoDialog } from "@/components/procurement/CreateBlanketPoDialog";
 import { BlanketPoDetailsDialog } from "@/components/procurement/BlanketPoDetailsDialog";
 import { Progress } from "@/components/ui/progress";
-import type { BlanketPurchaseOrder, BlanketContractStatus } from "@/types/blanketPurchaseOrder";
+import type { BlanketContractStatus } from "@/types/blanketPurchaseOrder";
 
 const statusColors: Record<BlanketContractStatus, string> = {
   draft: "bg-gray-500",
@@ -43,9 +43,11 @@ export default function BlanketPurchaseOrderPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [selectedBpo, setSelectedBpo] = useState<BlanketPurchaseOrder | null>(null);
-  
+  const [selectedBpoId, setSelectedBpoId] = useState<string | null>(null);
+
   const { data: bpos = [], isLoading } = useBlanketPurchaseOrders();
+  // Read from the live list so remaining value and released quantities refresh after a release.
+  const selectedBpo = bpos.find((b) => b.id === selectedBpoId) ?? null;
   const { data: stats } = useBpoSummaryStats();
   const deleteBpo = useDeleteBlanketPurchaseOrder();
   const updateStatus = useUpdateBpoStatus();
@@ -59,7 +61,8 @@ export default function BlanketPurchaseOrderPage() {
       activeTab === "all" ||
       (activeTab === "active" && bpo.contract_status === "active") ||
       (activeTab === "draft" && bpo.contract_status === "draft") ||
-      (activeTab === "expiring" && bpo.contract_status === "active") ||
+      (activeTab === "expiring" && bpo.contract_status === "active" &&
+        new Date(bpo.contract_end_date).getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1000) ||
       (activeTab === "expired" && bpo.contract_status === "expired");
 
     return matchesSearch && matchesTab;
@@ -75,12 +78,8 @@ export default function BlanketPurchaseOrderPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number, currency = bpos[0]?.currency || 'LKR') =>
+    `${currency} ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const getUtilizationColor = (utilization: number) => {
     if (utilization >= 80) return "text-green-600";
@@ -215,9 +214,9 @@ export default function BlanketPurchaseOrderPage() {
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
-                              <div className="font-medium">{formatCurrency(bpo.total_contract_value)}</div>
+                              <div className="font-medium">{formatCurrency(bpo.total_contract_value, bpo.currency)}</div>
                               <div className="text-muted-foreground">
-                                {formatCurrency(bpo.remaining_value)} remaining
+                                {formatCurrency(bpo.remaining_value, bpo.currency)} remaining
                               </div>
                             </div>
                           </TableCell>
@@ -239,7 +238,9 @@ export default function BlanketPurchaseOrderPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setSelectedBpo(bpo)}
+                                onClick={() => setSelectedBpoId(bpo.id)}
+                                aria-label={`Open ${bpo.bpo_number}`}
+                                title="Open (items and releases)"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -248,6 +249,8 @@ export default function BlanketPurchaseOrderPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleStatusChange(bpo.id, "active")}
+                                  aria-label={`Activate ${bpo.bpo_number}`}
+                                  title="Activate (needs department head approval rights)"
                                 >
                                   <FileSignature className="h-4 w-4" />
                                 </Button>
@@ -300,7 +303,7 @@ export default function BlanketPurchaseOrderPage() {
         <BlanketPoDetailsDialog
           bpo={selectedBpo}
           open={!!selectedBpo}
-          onOpenChange={(open) => !open && setSelectedBpo(null)}
+          onOpenChange={(open) => !open && setSelectedBpoId(null)}
         />
       )}
     </div>

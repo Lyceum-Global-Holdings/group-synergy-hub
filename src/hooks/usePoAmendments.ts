@@ -1,100 +1,98 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "sonner";
+import { untypedRpc } from "@/lib/untypedRpc";
 import type { PoAmendment, CreatePoAmendmentData } from "@/types/purchaseOrder";
+
+// Amendments are requested and decided through database functions
+// (migration 20260928130000). They are numbered per PO (PO-…-A1), record the
+// before/after values, and change the PO only when approved.
+
+const SELECT = `
+  *,
+  approver_profile:profiles!po_amendments_approved_by_fkey(full_name, email),
+  purchase_order:purchase_orders(id, po_number, status, currency, supplier:suppliers(name))
+`;
+
+function refresh(qc: QueryClient, poId?: string) {
+  qc.invalidateQueries({ queryKey: ["po-amendments"] });
+  qc.invalidateQueries({ queryKey: ["po-amendment-block-reason"] });
+  qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+  if (poId) qc.invalidateQueries({ queryKey: ["purchase-order", poId] });
+}
 
 export function usePoAmendments(poId: string) {
   return useQuery({
-    queryKey: ['po-amendments', poId],
+    queryKey: ["po-amendments", poId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('po_amendments')
-        .select(`
-          *,
-          approver_profile:profiles!po_amendments_approved_by_fkey(full_name, email)
-        `)
-        .eq('po_id', poId)
-        .order('created_at', { ascending: false });
-
+        .from("po_amendments")
+        .select(SELECT)
+        .eq("po_id", poId)
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as PoAmendment[];
+      return data as unknown as PoAmendment[];
     },
     enabled: !!poId,
   });
 }
 
-export function useCreatePoAmendment() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: CreatePoAmendmentData) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { data: existingAmendments } = await supabase
-        .from('po_amendments')
-        .select('amendment_number')
-        .eq('po_id', data.po_id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      const lastNumber = existingAmendments && existingAmendments.length > 0
-        ? parseInt(existingAmendments[0].amendment_number.split('-').pop() || '0')
-        : 0;
-
-      const amendmentNumber = `POAMD-${String(lastNumber + 1).padStart(4, '0')}`;
-
-      const { data: amendment, error } = await supabase
-        .from('po_amendments')
-        .insert({
-          ...data,
-          amendment_number: amendmentNumber,
-          created_by: user.id,
-        })
-        .select()
-        .single();
-
+/** Amendments on the selected company's purchase orders, newest first. */
+export function useCompanyPoAmendments(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["po-amendments", "company", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("po_amendments")
+        .select(SELECT.replace("purchase_order:purchase_orders(", "purchase_order:purchase_orders!inner("))
+        .eq("purchase_order.company_id", companyId!)
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (error) throw error;
-      return amendment;
+      return data as unknown as PoAmendment[];
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['po-amendments', variables.po_id] });
-      queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.po_id] });
-      toast.success("Amendment created successfully");
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to create amendment: " + error.message);
-    },
+    enabled: !!companyId,
   });
 }
 
-export function useApprovePoAmendment() {
-  const queryClient = useQueryClient();
+/** Why the signed-in user can't decide this amendment, or null if they can. */
+export function usePoAmendmentBlockReason(amendmentId: string, pending: boolean) {
+  return useQuery({
+    queryKey: ["po-amendment-block-reason", amendmentId],
+    queryFn: () => untypedRpc<string | null>("po_amendment_block_reason", { p_amendment_id: amendmentId }),
+    enabled: !!amendmentId && pending,
+    staleTime: 30_000,
+  });
+}
 
+export function useCreatePoAmendment() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, poId }: { id: string; poId: string }) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("Not authenticated");
+    mutationFn: (data: CreatePoAmendmentData) =>
+      untypedRpc<string>("request_po_amendment", {
+        p_po_id: data.po_id,
+        p_type: data.amendment_type,
+        p_reason: data.reason,
+        p_notes: data.notes ?? null,
+        p_changes: data.changes ?? null,
+      }),
+    onSuccess: (_, variables) => {
+      refresh(qc, variables.po_id);
+      toast.success("Amendment requested. It changes the PO once approved.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
 
-      const { error } = await supabase
-        .from('po_amendments')
-        .update({
-          approved_by: user.id,
-          approved_date: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-      return { poId };
+export function useDecidePoAmendment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, approve, comments }: { id: string; poId: string; approve: boolean; comments?: string }) =>
+      untypedRpc<null>("decide_po_amendment", { p_amendment_id: id, p_approve: approve, p_comments: comments || null }),
+    onSuccess: (_, { poId, approve }) => {
+      refresh(qc, poId);
+      toast.success(approve ? "Amendment approved and applied to the PO" : "Amendment rejected");
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['po-amendments', data.poId] });
-      queryClient.invalidateQueries({ queryKey: ['purchase-order', data.poId] });
-      toast.success("Amendment approved successfully");
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to approve amendment: " + error.message);
-    },
+    onError: (error: Error) => toast.error(error.message),
   });
 }

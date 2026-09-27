@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,6 @@ export default function PoEmailApproval() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const token = searchParams.get('token');
-  const action = searchParams.get('action') as 'approve' | 'reject' | null;
 
   useEffect(() => {
     if (!token) {
@@ -34,61 +32,35 @@ export default function PoEmailApproval() {
     loadTokenData();
   }, [token]);
 
+  // The page is opened from an email, often without signing in, so the PO is
+  // loaded through the approval function rather than read from the tables.
   const loadTokenData = async () => {
     try {
       setLoading(true);
-      
-      // Validate token
-      const { data: tokenInfo, error: tokenError } = await supabase
-        .from('po_approval_tokens')
-        .select('*')
-        .eq('token', token)
-        .eq('used', false)
-        .single();
-
-      if (tokenError || !tokenInfo) {
-        setError("Invalid or expired approval token");
-        setLoading(false);
+      const { data, error, suggestion } = await invokeEdgeFunction('po-email-approval', {
+        body: { action: 'preview', token },
+      });
+      if (error || !data?.po) {
+        setError(suggestion || error?.message || "This approval link is not valid");
         return;
       }
-
-      // Check expiry
-      if (new Date(tokenInfo.expires_at) < new Date()) {
-        setError("This approval link has expired");
-        setLoading(false);
-        return;
-      }
-
-      setTokenData(tokenInfo);
-
-      // Fetch PO details
-      const { data: po, error: poError } = await supabase
-        .from('purchase_orders')
-        .select(`
-          *,
-          supplier:suppliers(name, email),
-          items:po_items(item_name, quantity_ordered, unit_price, total_price, unit_of_measure)
-        `)
-        .eq('id', tokenInfo.po_id)
-        .single();
-
-      if (poError || !po) {
-        setError("Purchase order not found");
-        setLoading(false);
-        return;
-      }
-
-      setPoData(po);
-      setLoading(false);
+      setTokenData(data);
+      setPoData(data.po);
+      if (data.blocked_reason) setError(data.blocked_reason);
     } catch (err: any) {
       console.error('Error loading token data:', err);
       setError(err.message || "Failed to load approval information");
+    } finally {
       setLoading(false);
     }
   };
 
   const handleApproval = async (approvalAction: 'approve' | 'reject') => {
     if (!token || !tokenData) return;
+    if (approvalAction === 'reject' && !comments.trim()) {
+      toast({ title: "Reason required", description: "Say why you're rejecting this purchase order.", variant: "destructive" });
+      return;
+    }
 
     try {
       setProcessing(true);
@@ -229,10 +201,10 @@ export default function PoEmailApproval() {
                       <td className="p-3 text-sm">{item.item_name}</td>
                       <td className="p-3 text-sm text-center">{item.quantity_ordered} {item.unit_of_measure}</td>
                       <td className="p-3 text-sm text-right">
-                        {poData.currency} {item.unit_price.toFixed(2)}
+                        {poData.currency} {Number(item.unit_price).toFixed(2)}
                       </td>
                       <td className="p-3 text-sm text-right">
-                        {poData.currency} {item.total_price.toFixed(2)}
+                        {poData.currency} {Number(item.total_price).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -241,14 +213,14 @@ export default function PoEmailApproval() {
             </div>
             <div className="mt-4 p-4 bg-muted rounded-lg">
               <p className="text-lg font-bold text-right">
-                Total Amount: {poData?.currency} {poData?.final_amount?.toFixed(2)}
+                Total Amount: {poData?.currency} {Number(poData?.final_amount ?? poData?.total_amount ?? 0).toFixed(2)}
               </p>
             </div>
           </div>
 
           {/* Comments Section */}
           <div>
-            <Label htmlFor="comments">Comments (Optional)</Label>
+            <Label htmlFor="comments">Comments (required to reject)</Label>
             <Textarea
               id="comments"
               value={comments}

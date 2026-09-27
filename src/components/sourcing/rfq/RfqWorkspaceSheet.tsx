@@ -16,6 +16,7 @@ import { useInviteSuppliers, useRemoveInvitation, useRfqAction, type RfqAction }
 import { cn } from "@/lib/utils";
 import type { SupplierQuote } from "@/types/rfqRfp";
 import { QuoteEntryDialog } from "./QuoteEntryDialog";
+import { useRfqPaths } from "./rfqPaths";
 import {
   QuoteStatusChip, RfqStatusChip, StatusChip, deadlineHint, formatDeadline, formatMoney, isOpenForQuotes,
 } from "./rfqStatus";
@@ -51,6 +52,7 @@ export function RfqWorkspaceSheet({ requestId, onOpenChange }: { requestId: stri
   const invite = useInviteSuppliers();
   const removeInvite = useRemoveInvitation();
   const act = useRfqAction();
+  const paths = useRfqPaths();
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
@@ -108,7 +110,7 @@ export function RfqWorkspaceSheet({ requestId, onOpenChange }: { requestId: stri
               )}
               {quotes.length > 0 && (
                 <Button asChild variant={rfq.status === "evaluation" ? "default" : "outline"} className="rounded-full">
-                  <Link to={`/sourcing/quotation-comparison?rfq=${rfq.id}`}>
+                  <Link to={`${paths.compare}?rfq=${rfq.id}`}>
                     <Scale className="mr-2 h-4 w-4" /> Compare quotes and award
                   </Link>
                 </Button>

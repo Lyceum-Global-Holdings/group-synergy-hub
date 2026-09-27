@@ -1,219 +1,116 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "sonner";
-import type { BlanketPoRelease, CreateBpoReleaseData, BpoReleaseStatus } from "@/types/blanketPurchaseOrder";
+import { untypedRpc } from "@/lib/untypedRpc";
+import type { BlanketPoRelease, CreateBpoReleaseData } from "@/types/blanketPurchaseOrder";
+
+// Releases (call-offs) against a blanket PO run through database functions
+// (migration 20260928130000). They are checked against the contract (active,
+// in date, quantity and value left, min/max order), and approving one creates
+// an approved purchase order at the contract price, received through the
+// normal GRN process.
+
+function refresh(qc: QueryClient, bpoId?: string) {
+  qc.invalidateQueries({ queryKey: ["bpo-releases"] });
+  qc.invalidateQueries({ queryKey: ["bpo-release-block-reason"] });
+  qc.invalidateQueries({ queryKey: ["blanket-purchase-orders"] });
+  qc.invalidateQueries({ queryKey: ["bpo-summary-stats"] });
+  qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+  if (bpoId) qc.invalidateQueries({ queryKey: ["blanket-purchase-order", bpoId] });
+}
 
 export function useBpoReleases(bpoId: string) {
   return useQuery({
-    queryKey: ['bpo-releases', bpoId],
+    queryKey: ["bpo-releases", bpoId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('blanket_po_releases')
+        .from("blanket_po_releases")
         .select(`
           *,
           items:blanket_po_release_items(
             *,
             bpo_item:blanket_po_items(item_name, item_code, unit_of_measure)
           ),
-          requested_by_profile:profiles!blanket_po_releases_requested_by_fkey(full_name, email),
-          approved_by_profile:profiles!blanket_po_releases_approved_by_fkey(full_name, email)
+          po:purchase_orders(id, po_number, status)
         `)
-        .eq('bpo_id', bpoId)
-        .order('release_date', { ascending: false });
-
+        .eq("bpo_id", bpoId)
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as BlanketPoRelease[];
+      const releases = (data ?? []) as unknown as BlanketPoRelease[];
+
+      // requested_by / approved_by point at auth.users, so names come from profiles separately.
+      const ids = [...new Set(releases.flatMap((r) => [r.requested_by, r.approved_by]).filter(Boolean))] as string[];
+      if (ids.length) {
+        const { data: people } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", ids);
+        const byId = new Map((people ?? []).map((p) => [p.user_id, { full_name: p.full_name ?? undefined, email: p.email ?? undefined }]));
+        for (const r of releases) {
+          if (r.requested_by) r.requested_by_profile = byId.get(r.requested_by);
+          if (r.approved_by) r.approved_by_profile = byId.get(r.approved_by);
+        }
+      }
+      return releases;
     },
     enabled: !!bpoId,
   });
 }
 
-export function useBpoRelease(id: string) {
+/** Why the signed-in user can't approve this release, or null if they can. */
+export function useBpoReleaseBlockReason(releaseId: string, submitted: boolean) {
   return useQuery({
-    queryKey: ['bpo-release', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('blanket_po_releases')
-        .select(`
-          *,
-          items:blanket_po_release_items(
-            *,
-            bpo_item:blanket_po_items(item_name, item_code, unit_of_measure)
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      return data as BlanketPoRelease;
-    },
-    enabled: !!id,
+    queryKey: ["bpo-release-block-reason", releaseId],
+    queryFn: () => untypedRpc<string | null>("bpo_release_block_reason", { p_release_id: releaseId }),
+    enabled: !!releaseId && submitted,
+    staleTime: 30_000,
   });
 }
 
 export function useCreateBpoRelease() {
-  const queryClient = useQueryClient();
-
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: CreateBpoReleaseData) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { items, ...releaseData } = data;
-
-      const { data: release, error: releaseError } = await supabase
-        .from('blanket_po_releases')
-        .insert({
-          ...releaseData,
-          requested_by: user.id,
-        } as any)
-        .select()
-        .single();
-
-      if (releaseError) throw releaseError;
-
-      const releaseItems = await Promise.all(
-        items.map(async (item) => {
-          const { data: bpoItem } = await supabase
-            .from('blanket_po_items')
-            .select('unit_price')
-            .eq('id', item.bpo_item_id)
-            .single();
-
-          return {
-            release_id: release.id,
-            bpo_item_id: item.bpo_item_id,
-            quantity_requested: item.quantity_requested,
-            quantity_approved: item.quantity_requested,
-            unit_price: bpoItem?.unit_price || 0,
-            total_price: (bpoItem?.unit_price || 0) * item.quantity_requested,
-            delivery_date: item.delivery_date,
-            delivery_location_id: item.delivery_location_id,
-            notes: item.notes,
-          };
-        })
-      );
-
-      const { error: itemsError } = await supabase
-        .from('blanket_po_release_items')
-        .insert(releaseItems);
-
-      if (itemsError) throw itemsError;
-
-      return release;
-    },
+    mutationFn: (data: CreateBpoReleaseData) =>
+      untypedRpc<string>("create_bpo_release", {
+        p_bpo_id: data.bpo_id,
+        p_lines: data.items.map((i) => ({
+          bpo_item_id: i.bpo_item_id,
+          quantity: i.quantity_requested,
+          delivery_date: i.delivery_date ?? null,
+          notes: i.notes ?? null,
+        })),
+        p_expected_delivery_date: data.expected_delivery_date || null,
+        p_delivery_location: data.delivery_location || null,
+        p_urgency: data.urgency_level ?? "normal",
+        p_notes: data.notes || null,
+      }),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bpo-releases', variables.bpo_id] });
-      queryClient.invalidateQueries({ queryKey: ['blanket-purchase-order', variables.bpo_id] });
-      toast.success("Release created successfully");
+      refresh(qc, variables.bpo_id);
+      toast.success("Release submitted for approval");
     },
-    onError: (error: Error) => {
-      toast.error("Failed to create release: " + error.message);
-    },
+    onError: (error: Error) => toast.error(error.message),
   });
 }
 
-export function useUpdateBpoReleaseStatus() {
-  const queryClient = useQueryClient();
-
+export function useDecideBpoRelease() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, status, bpoId }: { id: string; status: BpoReleaseStatus; bpoId: string }) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const updateData: any = { release_status: status };
-      
-      if (status === 'approved') {
-        updateData.approved_by = user.id;
-        updateData.approved_date = new Date().toISOString();
-      }
-
-      const { error } = await supabase
-        .from('blanket_po_releases')
-        .update(updateData)
-        .eq('id', id);
-
-      if (error) throw error;
-
-      return { bpoId };
+    mutationFn: ({ releaseId, approve, comments }: { releaseId: string; bpoId: string; approve: boolean; comments?: string }) =>
+      untypedRpc<string | null>("decide_bpo_release", { p_release_id: releaseId, p_approve: approve, p_comments: comments || null }),
+    onSuccess: (_, { bpoId, approve }) => {
+      refresh(qc, bpoId);
+      toast.success(approve ? "Release approved; its purchase order is ready to send" : "Release rejected");
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['bpo-releases'] });
-      queryClient.invalidateQueries({ queryKey: ['blanket-purchase-order', data.bpoId] });
-      toast.success("Release status updated successfully");
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to update release status: " + error.message);
-    },
+    onError: (error: Error) => toast.error(error.message),
   });
 }
 
-export function useReceiveBpoRelease() {
-  const queryClient = useQueryClient();
-
+export function useCancelBpoRelease() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ 
-      releaseId, 
-      bpoId,
-      items 
-    }: { 
-      releaseId: string;
-      bpoId: string;
-      items: { id: string; quantity_received: number }[] 
-    }) => {
-      for (const item of items) {
-        const { error } = await supabase
-          .from('blanket_po_release_items')
-          .update({ quantity_received: item.quantity_received })
-          .eq('id', item.id);
-
-        if (error) throw error;
-      }
-
-      const { error: statusError } = await supabase
-        .from('blanket_po_releases')
-        .update({ 
-          release_status: 'received',
-          actual_delivery_date: new Date().toISOString(),
-        })
-        .eq('id', releaseId);
-
-      if (statusError) throw statusError;
-
-      return { bpoId };
+    mutationFn: ({ releaseId }: { releaseId: string; bpoId: string }) =>
+      untypedRpc<null>("cancel_bpo_release", { p_release_id: releaseId }),
+    onSuccess: (_, { bpoId }) => {
+      refresh(qc, bpoId);
+      toast.success("Release withdrawn");
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['bpo-releases'] });
-      queryClient.invalidateQueries({ queryKey: ['blanket-purchase-order', data.bpoId] });
-      toast.success("Release received successfully");
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to receive release: " + error.message);
-    },
-  });
-}
-
-export function useDeleteBpoRelease() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, bpoId }: { id: string; bpoId: string }) => {
-      const { error } = await supabase
-        .from('blanket_po_releases')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      return { bpoId };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['bpo-releases'] });
-      queryClient.invalidateQueries({ queryKey: ['blanket-purchase-order', data.bpoId] });
-      toast.success("Release deleted successfully");
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to delete release: " + error.message);
-    },
+    onError: (error: Error) => toast.error(error.message),
   });
 }

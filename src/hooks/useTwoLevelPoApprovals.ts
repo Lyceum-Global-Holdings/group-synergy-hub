@@ -1,263 +1,119 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getCachedUser } from "@/lib/currentUser";
 import { toast } from "@/hooks/use-toast";
-import { useCurrentUserRoles } from "./useCurrentUserRoles";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
+import { untypedRpc } from "@/lib/untypedRpc";
 
+// Purchase-order approval runs through checked database functions
+// (migration 20260928130000): the database decides who may approve at each
+// level, so the buttons only reflect what it will allow.
 
-interface ApproveAsMerchandiserParams {
-  poId: string;
-  comments?: string;
+type Level = "merchandiser" | "department_head";
+
+function refreshPo(qc: QueryClient, poId: string) {
+  qc.invalidateQueries({ queryKey: ["purchase-orders"] });
+  qc.invalidateQueries({ queryKey: ["purchase-order", poId] });
+  qc.invalidateQueries({ queryKey: ["po-approvals", poId] });
+  qc.invalidateQueries({ queryKey: ["po-approval-block-reason", poId] });
 }
 
-interface SendDeptHeadEmailParams {
-  poId: string;
-  poNumber: string;
-  deptHeadEmail: string;
-}
+const fail = (title: string) => (error: Error) =>
+  toast({ title, description: error.message, variant: "destructive" });
 
-interface ApproveAsDeptHeadParams {
-  poId: string;
-  comments?: string;
-}
-
-interface RejectPoParams {
-  poId: string;
-  reason: string;
-  approvalLevel: 'merchandiser' | 'department_head';
-}
-
-export const useSubmitForMerchandiserApproval = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ poId }: { poId: string }) => {
-      // Update PO status to pending_approval (merchandiser level)
-      const { error: updateError } = await supabase
-        .from('purchase_orders')
-        .update({ 
-          status: 'pending_approval' as any,
-          approval_level: 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', poId);
-
-      if (updateError) throw updateError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      toast({
-        title: "Success",
-        description: "PO submitted for merchandiser approval.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit PO for approval",
-        variant: "destructive",
-      });
-    },
+/**
+ * Why the signed-in user can't approve or reject this PO right now, or null if
+ * they can. Only asked while the PO is waiting for approval.
+ */
+export const usePoApprovalBlockReason = (poId: string, status: string | undefined) => {
+  const pending = status === "pending_approval" || status === "pending_dept_head_approval";
+  return useQuery({
+    queryKey: ["po-approval-block-reason", poId, status],
+    queryFn: () => untypedRpc<string | null>("po_approval_block_reason", { p_po_id: poId }),
+    enabled: !!poId && pending,
+    staleTime: 30_000,
   });
 };
 
-export const useApprovePOAsMerchandiser = () => {
-  const queryClient = useQueryClient();
-
+export const useSubmitForMerchandiserApproval = () => {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ poId, comments }: ApproveAsMerchandiserParams) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("User not authenticated");
-
-      const userId = user.id;
-
-      // Update PO with merchandiser approval - NO EMAIL SENT
-      const { error: updateError } = await supabase
-        .from('purchase_orders')
-        .update({
-          merchandiser_approved_by: userId,
-          merchandiser_approved_date: new Date().toISOString(),
-          merchandiser_comments: comments || null,
-          status: 'pending_dept_head_approval' as any,
-          approval_level: 2,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', poId);
-
-      if (updateError) throw updateError;
-
-      // Create approval record
-      await supabase
-        .from('po_approvals')
-        .insert({
-          po_id: poId,
-          approver_id: userId,
-          action: 'approved',
-          comments: comments || null,
-          approval_level: 'merchandiser',
-          approval_method: 'manual'
-        });
+    mutationFn: ({ poId }: { poId: string }) => untypedRpc<null>("submit_po_for_approval", { p_po_id: poId }),
+    onSuccess: (_, { poId }) => {
+      refreshPo(qc, poId);
+      toast({ title: "Submitted", description: "The PO is waiting for merchandiser approval." });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    onError: fail("Couldn't submit the PO"),
+  });
+};
+
+/** Approve at whichever level the PO is waiting for. */
+export const useApprovePo = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ poId, comments }: { poId: string; comments?: string }) =>
+      untypedRpc<string>("decide_po_approval", { p_po_id: poId, p_approve: true, p_comments: comments || null }),
+    onSuccess: (status, { poId }) => {
+      refreshPo(qc, poId);
       toast({
-        title: "Success",
-        description: "PO approved by merchandiser. You can now send it to department head.",
+        title: "Approved",
+        description:
+          status === "approved"
+            ? "The PO is fully approved and can be sent to the supplier."
+            : "The PO now waits for department head approval.",
       });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to approve PO",
-        variant: "destructive",
-      });
+    onError: fail("Couldn't approve the PO"),
+  });
+};
+
+export const useApprovePOAsMerchandiser = useApprovePo;
+export const useApprovePOAsDeptHead = useApprovePo;
+
+export const useRejectPO = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ poId, reason }: { poId: string; reason: string; approvalLevel?: Level }) =>
+      untypedRpc<string>("decide_po_approval", { p_po_id: poId, p_approve: false, p_comments: reason }),
+    onSuccess: (_, { poId }) => {
+      refreshPo(qc, poId);
+      toast({ title: "PO rejected", description: "The creator can revise it and submit again." });
     },
+    onError: fail("Couldn't reject the PO"),
+  });
+};
+
+/** Pull a pending PO back to draft so its lines can be edited (clears approvals). */
+export const useWithdrawPo = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ poId }: { poId: string }) => {
+      const { error } = await supabase.from("purchase_orders").update({ status: "draft" }).eq("id", poId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: (_, { poId }) => {
+      refreshPo(qc, poId);
+      toast({ title: "Withdrawn", description: "The PO is back in draft. Submit it again when it's ready." });
+    },
+    onError: fail("Couldn't withdraw the PO"),
   });
 };
 
 export const useSendDeptHeadApprovalEmail = () => {
-  const queryClient = useQueryClient();
-
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ poId, poNumber, deptHeadEmail }: SendDeptHeadEmailParams) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("User not authenticated");
-
-      // Send email to department head
-      const { error, suggestion } = await invokeEdgeFunction('po-email-approval', {
-        body: {
-          action: 'send_email',
-          po_id: poId,
-          approver_email: deptHeadEmail,
-          approval_level: 'department_head'
-        }
+    mutationFn: async ({ poId, deptHeadEmail, approvalLevel = "department_head" }: {
+      poId: string; poNumber?: string; deptHeadEmail: string; approvalLevel?: Level;
+    }) => {
+      const { data, error, suggestion } = await invokeEdgeFunction("po-email-approval", {
+        body: { action: "send_email", po_id: poId, approver_email: deptHeadEmail, approval_level: approvalLevel },
       });
-
-      if (error) {
-        console.error('Error sending approval email:', error);
-        throw new Error(suggestion || 'Failed to send approval email');
-      }
+      if (error) throw new Error(suggestion || error.message || "Failed to send the approval email");
+      return data as { message?: string };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      toast({
-        title: "Success",
-        description: "Approval email sent to department head",
-      });
+    onSuccess: (data, { poId }) => {
+      refreshPo(qc, poId);
+      toast({ title: "Email sent", description: data?.message || "Approval email sent" });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-export const useApprovePOAsDeptHead = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ poId, comments }: ApproveAsDeptHeadParams) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("User not authenticated");
-
-      const userId = user.id;
-
-      // Final approval
-      const { error: updateError } = await supabase
-        .from('purchase_orders')
-        .update({
-          department_head_approved_by: userId,
-          department_head_approved_date: new Date().toISOString(),
-          department_head_comments: comments || null,
-          status: 'approved',
-          approval_level: 3,
-          approved_by: userId,
-          approved_date: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', poId);
-
-      if (updateError) throw updateError;
-
-      // Create approval record
-      await supabase
-        .from('po_approvals')
-        .insert({
-          po_id: poId,
-          approver_id: userId,
-          action: 'approved',
-          comments: comments || null,
-          approval_level: 'department_head',
-          approval_method: 'manual'
-        });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      toast({
-        title: "Success",
-        description: "PO fully approved. Ready to send to supplier.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to approve PO",
-        variant: "destructive",
-      });
-    },
-  });
-};
-
-export const useRejectPO = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ poId, reason, approvalLevel }: RejectPoParams) => {
-      const user = getCachedUser();
-      if (!user) throw new Error("User not authenticated");
-
-      const userId = user.id;
-
-      // Reject PO
-      const { error: updateError } = await supabase
-        .from('purchase_orders')
-        .update({
-          status: 'rejected',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', poId);
-
-      if (updateError) throw updateError;
-
-      // Create rejection record
-      await supabase
-        .from('po_approvals')
-        .insert({
-          po_id: poId,
-          approver_id: userId,
-          action: 'rejected',
-          comments: reason,
-          approval_level: approvalLevel,
-          approval_method: 'manual'
-        });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      toast({
-        title: "PO Rejected",
-        description: "Purchase order has been rejected.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to reject PO",
-        variant: "destructive",
-      });
-    },
+    onError: fail("Couldn't send the approval email"),
   });
 };

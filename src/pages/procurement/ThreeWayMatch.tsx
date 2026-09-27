@@ -22,7 +22,7 @@ import {
   FileCheck,
   XCircle,
   Loader2,
-  Zap,
+  RefreshCw,
   Eye,
 } from "lucide-react";
 import { useState } from "react";
@@ -41,9 +41,9 @@ function statusBadge(status: MatchStatus) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function formatCurrency(val: number | null) {
+function formatCurrency(val: number | null, currency?: string) {
   if (val === null || val === undefined) return "—";
-  return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${currency ? `${currency} ` : ""}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function MatchTable({
@@ -69,10 +69,10 @@ function MatchTable({
           <TableRow>
             <TableHead>Invoice #</TableHead>
             <TableHead>PO #</TableHead>
-            <TableHead>GRN #</TableHead>
+            <TableHead>GRNs</TableHead>
             <TableHead>Supplier</TableHead>
             <TableHead className="text-right">PO Amount</TableHead>
-            <TableHead className="text-right">GRN Amount</TableHead>
+            <TableHead className="text-right">Received Value</TableHead>
             <TableHead className="text-right">Invoice Amount</TableHead>
             <TableHead className="text-right">Variance</TableHead>
             <TableHead>Status</TableHead>
@@ -84,17 +84,20 @@ function MatchTable({
             <TableRow key={r.invoiceId} className="cursor-pointer hover:bg-muted/50">
               <TableCell className="font-medium">{r.invoiceNumber}</TableCell>
               <TableCell>{r.poNumber}</TableCell>
-              <TableCell>{r.grnNumber ?? "—"}</TableCell>
+              <TableCell>{r.grnNumbers ?? "—"}</TableCell>
               <TableCell>{r.supplierName}</TableCell>
-              <TableCell className="text-right">{formatCurrency(r.poAmount)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(r.grnAmount)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(r.invoiceAmount)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(r.poAmount, r.currency)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(r.receivedAmount, r.currency)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(r.invoiceAmount, r.currency)}</TableCell>
               <TableCell className="text-right">
-                <span className={r.variancePercent === 0 ? "text-green-600" : "text-destructive"}>
+                <span className={Math.abs(r.variancePercent) < 0.05 ? "text-green-600" : "text-muted-foreground"}>
                   {r.variancePercent > 0 ? "+" : ""}{r.variancePercent.toFixed(1)}%
                 </span>
               </TableCell>
-              <TableCell>{statusBadge(r.status)}</TableCell>
+              <TableCell>
+                {statusBadge(r.status)}
+                {r.decided && <span className="ml-1 text-xs text-muted-foreground">by a person</span>}
+              </TableCell>
               <TableCell className="text-right">
                 <Button variant="ghost" size="sm" onClick={() => onView(r)}>
                   <Eye className="h-4 w-4 mr-1" />
@@ -113,16 +116,19 @@ export default function ThreeWayMatch() {
   const {
     matchResults,
     isLoading,
+    error,
     stats,
-    statsLoading,
-    approveMatch,
-    flagException,
-    rejectMatch,
-    autoMatch,
+    runAll,
+    isRunning,
+    decide,
     isUpdating,
   } = useThreeWayMatch();
+  const statsLoading = isLoading;
 
-  const [selectedResult, setSelectedResult] = useState<MatchResult | null>(null);
+  // Keep the open invoice in sync with refreshed results.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedResult = matchResults.find((r) => r.invoiceId === selectedId) ?? null;
+  const setSelectedResult = (r: MatchResult | null) => setSelectedId(r?.invoiceId ?? null);
 
   const filterByStatus = (status: MatchStatus) =>
     matchResults.filter((r) => r.status === status);
@@ -133,14 +139,14 @@ export default function ThreeWayMatch() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">3-Way Match</h1>
           <p className="text-muted-foreground">
-            Match Purchase Orders, Goods Receipts, and Invoices
+            Supplier invoices checked against the purchase order price and the quantity accepted on goods receipts
           </p>
         </div>
         <div className="flex items-center gap-2">
           <GenerateReportButton template="PR-3WM-001" />
-          <Button onClick={autoMatch} disabled={isUpdating}>
-            <Zap className="h-4 w-4 mr-2" />
-            Auto-Match All
+          <Button onClick={runAll} disabled={isRunning} title="Save the current result on every invoice that no one has decided yet">
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? "animate-spin" : ""}`} />
+            Save Match Results
           </Button>
         </div>
       </div>
@@ -155,7 +161,7 @@ export default function ThreeWayMatch() {
             <div className="text-2xl font-bold">
               {statsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats.pending}
             </div>
-            <p className="text-xs text-muted-foreground">Awaiting verification</p>
+            <p className="text-xs text-muted-foreground">Waiting for goods receipt</p>
           </CardContent>
         </Card>
         <Card>
@@ -166,7 +172,7 @@ export default function ThreeWayMatch() {
             <div className="text-2xl font-bold text-green-600">
               {statsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats.matched}
             </div>
-            <p className="text-xs text-muted-foreground">Successfully matched</p>
+            <p className="text-xs text-muted-foreground">Received and priced as ordered</p>
           </CardContent>
         </Card>
         <Card>
@@ -177,7 +183,7 @@ export default function ThreeWayMatch() {
             <div className="text-2xl font-bold text-amber-600">
               {statsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats.exception}
             </div>
-            <p className="text-xs text-muted-foreground">Requires review</p>
+            <p className="text-xs text-muted-foreground">Needs a finance decision</p>
           </CardContent>
         </Card>
         <Card>
@@ -188,10 +194,16 @@ export default function ThreeWayMatch() {
             <div className="text-2xl font-bold text-destructive">
               {statsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats.failed}
             </div>
-            <p className="text-xs text-muted-foreground">Match failed</p>
+            <p className="text-xs text-muted-foreground">Refused by finance</p>
           </CardContent>
         </Card>
       </div>
+
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {(error as Error).message}
+        </p>
+      )}
 
       {/* Loading State */}
       {isLoading && (
@@ -227,7 +239,7 @@ export default function ThreeWayMatch() {
               <CardHeader>
                 <CardTitle>Pending Matches</CardTitle>
                 <CardDescription>
-                  Invoices awaiting 3-way match verification
+                  Invoices whose goods haven't been received (or whose lines don't tie to the PO) yet
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -281,7 +293,7 @@ export default function ThreeWayMatch() {
       )}
 
       {/* Detail Dialog */}
-      <Dialog open={!!selectedResult} onOpenChange={() => setSelectedResult(null)}>
+      <Dialog open={!!selectedResult} onOpenChange={(open) => !open && setSelectedResult(null)}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -291,9 +303,7 @@ export default function ThreeWayMatch() {
           {selectedResult && (
             <ThreeWayMatchDetail
               result={selectedResult}
-              onApprove={(id) => { approveMatch(id); setSelectedResult(null); }}
-              onFlagException={(id) => { flagException(id); setSelectedResult(null); }}
-              onReject={(id) => { rejectMatch(id); setSelectedResult(null); }}
+              onDecide={(accept, reason) => decide(selectedResult.invoiceId, accept, reason, () => setSelectedResult(null))}
               isUpdating={isUpdating}
             />
           )}

@@ -16,6 +16,7 @@ import { QuoteStatusChip, RfqStatusChip, formatDeadline, formatMoney } from "@/c
 import { useCompany } from "@/contexts/CompanyContext";
 import { useRfqRfpRequest, useRfqRfpRequests } from "@/hooks/useRfqRfp";
 import { useAwardRfq } from "@/hooks/useRfqWorkflow";
+import { useRfqPaths } from "@/components/sourcing/rfq/rfqPaths";
 import { cn } from "@/lib/utils";
 import type { SupplierQuote } from "@/types/rfqRfp";
 
@@ -25,6 +26,7 @@ const AWARDABLE_QUOTE = ["submitted", "under_evaluation", "shortlisted"];
 export default function QuotationComparison() {
   const { selectedCompany } = useCompany();
   const [params, setParams] = useSearchParams();
+  const paths = useRfqPaths();
   const rfqId = params.get("rfq") ?? undefined;
   const { data: rfqs = [] } = useRfqRfpRequests(selectedCompany?.id);
   const { data: rfq, isLoading } = useRfqRfpRequest(rfqId);
@@ -89,7 +91,7 @@ export default function QuotationComparison() {
 
       {!rfqId ? (
         <DataCard>
-          <EmptyState icon={Scale} title="Choose an RFQ" description="Pick an RFQ above, or open one from RFQ Management and choose “Compare quotes and award”." action={<Button asChild variant="outline" className="rounded-full"><Link to="/sourcing/rfq-management">Go to RFQ Management</Link></Button>} />
+          <EmptyState icon={Scale} title="Choose an RFQ" description="Pick an RFQ above, or open one from RFQ Management and choose “Compare quotes and award”." action={<Button asChild variant="outline" className="rounded-full"><Link to={paths.list}>Go to RFQ Management</Link></Button>} />
         </DataCard>
       ) : isLoading || !rfq ? (
         <div className="flex h-40 items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading…</div>

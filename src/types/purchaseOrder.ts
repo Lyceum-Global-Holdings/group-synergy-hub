@@ -252,17 +252,43 @@ export interface PoAmendment {
   created_at: string;
   approved_by?: string;
   approved_date?: string;
+  /** pending → approved (changes applied to the PO) or rejected. */
+  status?: PoAmendmentStatus;
+  rejected_by?: string;
+  rejected_date?: string;
+  rejection_reason?: string;
+  applied_at?: string;
   approver_profile?: {
     full_name?: string;
     email?: string;
   };
+  purchase_order?: {
+    id: string;
+    po_number: string;
+    status: PoStatus;
+    currency?: string;
+    supplier?: { name?: string } | null;
+  } | null;
 }
+
+export type PoAmendmentStatus = 'pending' | 'approved' | 'rejected';
+
+/**
+ * The change an amendment makes, by type (checked and applied by the database):
+ *   price_change          { lines: [{ po_item_id, unit_price }] }
+ *   quantity_change       { lines: [{ po_item_id, quantity }] }
+ *   delivery_date_change  { expected_delivery_date }
+ *   terms_change          { payment_terms?, delivery_terms? }
+ *   item_addition         { lines: [{ item_name, item_code?, quantity, unit_price, unit_of_measure? }] }
+ *   item_removal          { lines: [{ po_item_id }] }
+ *   other                 no change to apply
+ */
+export type PoAmendmentChanges = Record<string, unknown> | null;
 
 export interface CreatePoAmendmentData {
   po_id: string;
   amendment_type: PoAmendmentType;
   reason: string;
   notes?: string;
-  previous_value?: any;
-  new_value?: any;
+  changes?: PoAmendmentChanges;
 }

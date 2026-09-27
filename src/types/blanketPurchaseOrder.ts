@@ -97,6 +97,10 @@ export interface BlanketPoRelease {
     full_name?: string;
     email?: string;
   };
+  /** The purchase order created when the release was approved. */
+  po_id?: string | null;
+  po?: { id: string; po_number: string; status: string } | null;
+  decision_notes?: string | null;
 }
 
 export interface BlanketPoReleaseItem {
@@ -194,7 +198,7 @@ export interface CreateBlanketPoData {
 
 export interface CreateBpoReleaseData {
   bpo_id: string;
-  release_date: string;
+  release_date?: string;
   delivery_location?: string;
   expected_delivery_date?: string;
   urgency_level?: UrgencyLevel;

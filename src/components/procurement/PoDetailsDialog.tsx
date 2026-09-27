@@ -11,19 +11,21 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Send, Package, Edit, FileText, Check, X, Clock, FilePlus } from "lucide-react";
 import { useSendPurchaseOrder, usePurchaseOrder } from "@/hooks/usePurchaseOrders";
-import { useSubmitPurchaseOrder, useApprovePurchaseOrder, usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
-import { 
-  useSubmitForMerchandiserApproval, 
-  useApprovePOAsMerchandiser, 
+import { usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
+import {
+  useSubmitForMerchandiserApproval,
+  useApprovePOAsMerchandiser,
   useApprovePOAsDeptHead,
   useRejectPO,
-  useSendDeptHeadApprovalEmail
+  useSendDeptHeadApprovalEmail,
+  usePoApprovalBlockReason,
+  useWithdrawPo,
 } from "@/hooks/useTwoLevelPoApprovals";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 import { CreatePoAmendmentDialog } from "@/components/procurement/CreatePoAmendmentDialog";
 import { PoAmendmentsTab } from "@/components/procurement/PoAmendmentsTab";
-import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
+import { getCachedUserId } from "@/lib/currentUser";
 import { PoDocument } from "@/components/procurement/PoDocument";
 import { PoDocumentDreamTeam } from "@/components/procurement/PoDocumentDreamTeam";
 
@@ -76,24 +78,21 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const rejectMutation = useRejectPO();
   const sendDeptHeadEmailMutation = useSendDeptHeadApprovalEmail();
   const { data: approvals = [] } = usePurchaseOrderApprovals(purchaseOrder.id);
-  const { data: userRoles = [] } = useCurrentUserRoles();
-  
-  const isAdmin = userRoles.some(role => role.role === 'admin' || role.role === 'super_admin');
-  const isMerchandiser = userRoles.some(role => 
-    role.role_name === 'Merchandiser' || 
-    role.role?.toLowerCase().includes('merchand')
-  );
-  const isDeptHead = userRoles.some(role => 
-    role.role_name === 'Department Head' || 
-    role.role?.toLowerCase().includes('dept') ||
-    role.role?.toLowerCase().includes('department')
-  );
+  const withdrawMutation = useWithdrawPo();
+  // The database decides who may approve (role or company approver, own PO,
+  // both levels by one person, amount limits); the buttons follow its answer.
+  const { data: blockReason, isSuccess: rightsKnown } = usePoApprovalBlockReason(po.id, po.status);
+  const currentUserId = getCachedUserId();
 
-  const canSubmitForApproval = po.status === 'draft';
-  const canMerchandiserApprove = po.status === 'pending_approval' && (isMerchandiser || isAdmin);
-  const canDeptHeadApprove = po.status === 'pending_dept_head_approval' && (isDeptHead || isAdmin);
+  const isPending = po.status === 'pending_approval' || po.status === 'pending_dept_head_approval';
+  const canDecide = isPending && rightsKnown && !blockReason;
+  const canSubmitForApproval = po.status === 'draft' || po.status === 'rejected';
+  const canMerchandiserApprove = po.status === 'pending_approval' && canDecide;
+  const canDeptHeadApprove = po.status === 'pending_dept_head_approval' && canDecide;
+  const canWithdraw = isPending && po.created_by === currentUserId;
   const canSend = po.status === 'approved';
-  const canAmend = !['cancelled', 'completed'].includes(po.status);
+  const canAmend = ['approved', 'sent', 'acknowledged', 'partially_received'].includes(po.status);
+  const emailLevel = po.status === 'pending_approval' ? 'merchandiser' : 'department_head';
 
   const handleSubmitForApproval = () => {
     submitMerchandiserMutation.mutate({
@@ -122,7 +121,8 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
     sendDeptHeadEmailMutation.mutate({
       poId: purchaseOrder.id,
       poNumber: purchaseOrder.po_number,
-      deptHeadEmail
+      deptHeadEmail,
+      approvalLevel: emailLevel,
     });
     setDeptHeadEmail("");
   };
@@ -229,6 +229,12 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   </Button>
                 </>
               )}
+              {canWithdraw && (
+                <Button size="sm" variant="outline" onClick={() => withdrawMutation.mutate({ poId: purchaseOrder.id })} disabled={withdrawMutation.isPending}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Withdraw to Draft
+                </Button>
+              )}
               {canSend && (
                 <Button size="sm" onClick={handleSend} disabled={sendMutation.isPending}>
                   <Send className="h-4 w-4 mr-2" />
@@ -242,6 +248,11 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                 </Button>
               )}
           </div>
+          {isPending && rightsKnown && blockReason && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {po.status === 'pending_approval' ? 'Waiting for merchandiser approval' : 'Waiting for department head approval'}. {blockReason}.
+            </p>
+          )}
         </DialogHeader>
 
         <Tabs defaultValue="details" className="space-y-6">
@@ -599,7 +610,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
           </TabsContent>
 
           <TabsContent value="amendments" className="space-y-6">
-            <PoAmendmentsTab poId={po.id} isAdmin={isAdmin} />
+            <PoAmendmentsTab poId={po.id} />
           </TabsContent>
 
           <TabsContent value="approvals" className="space-y-6">
@@ -652,17 +663,19 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             )}
 
             {/* Send Department Head Email Section */}
-            {po.status === 'pending_dept_head_approval' && (isMerchandiser || isAdmin || po.merchandiser_approved_by) && (
+            {isPending && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Send Approval Email to Department Head</CardTitle>
+                  <CardTitle className="text-lg">
+                    Ask {emailLevel === 'merchandiser' ? 'a Merchandiser' : 'the Department Head'} to Approve by Email
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Enter the department head's email to send them an approval request.
+                    The approver needs an ERP account with {emailLevel === 'merchandiser' ? 'merchandiser' : 'department head'} approval rights for this company. They get a one-time link valid for 7 days.
                   </p>
                   <div>
-                    <Label htmlFor="dept-head-email">Department Head Email</Label>
+                    <Label htmlFor="dept-head-email">Approver Email</Label>
                     <input
                       id="dept-head-email"
                       type="email"
@@ -809,7 +822,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
         <CreatePoAmendmentDialog
           open={showAmendmentDialog}
           onOpenChange={setShowAmendmentDialog}
-          poId={po.id}
+          purchaseOrder={po}
         />
 
         {/* PDF View Dialog */}

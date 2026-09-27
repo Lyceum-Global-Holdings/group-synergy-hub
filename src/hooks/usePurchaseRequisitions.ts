@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { toast } from '@/hooks/use-toast';
+import { untypedRpc } from '@/lib/untypedRpc';
 import type { PurchaseRequisition, CreatePrData, PrItem, PrStatus } from '@/types/procurement';
 
 export const usePurchaseRequisitions = () => {
@@ -247,44 +248,21 @@ export const useSubmitPurchaseRequisition = () => {
   });
 };
 
+// Approval is decided in the database (decide_purchase_requisition): Department
+// Head / HOD / company approvers or admins, never the requester.
 export const useApprovePurchaseRequisition = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ id, action, comments }: { id: string; action: 'approved' | 'rejected'; comments?: string }) => {
-      if (!user?.id) throw new Error('User not authenticated');
-
-      // Update PR status
-      const updateData: any = { status: action };
-      if (action === 'approved') {
-        updateData.approved_by = user.id;
-        updateData.approved_date = new Date().toISOString();
-      } else if (action === 'rejected' && comments) {
-        updateData.rejection_reason = comments;
-      }
-
-      const { error: updateError } = await supabase
-        .from('purchase_requisitions')
-        .update(updateData)
-        .eq('id', id);
-
-      if (updateError) throw updateError;
-
-      // Add approval record
-      const { error: approvalError } = await supabase
-        .from('pr_approvals')
-        .insert({
-          pr_id: id,
-          approver_id: user.id,
-          action,
-          comments,
-        });
-
-      if (approvalError) throw approvalError;
-    },
-    onSuccess: () => {
+    mutationFn: ({ id, action, comments }: { id: string; action: 'approved' | 'rejected'; comments?: string }) =>
+      untypedRpc<null>('decide_purchase_requisition', {
+        p_pr_id: id,
+        p_approve: action === 'approved',
+        p_comments: comments || null,
+      }),
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['purchase-requisitions'] });
+      queryClient.invalidateQueries({ queryKey: ['pr-approval-block-reason', id] });
       toast({
         title: 'Purchase Requisition Processed',
         description: 'The purchase requisition has been processed successfully.',
@@ -299,6 +277,15 @@ export const useApprovePurchaseRequisition = () => {
     },
   });
 };
+
+/** Why the signed-in user can't approve this requisition, or null if they can. */
+export const usePrApprovalBlockReason = (prId: string, status: string | undefined) =>
+  useQuery({
+    queryKey: ['pr-approval-block-reason', prId, status],
+    queryFn: () => untypedRpc<string | null>('pr_approval_block_reason', { p_pr_id: prId }),
+    enabled: !!prId && (status === 'submitted' || status === 'pending_approval'),
+    staleTime: 30_000,
+  });
 
 export const useDeletePurchaseRequisition = () => {
   const queryClient = useQueryClient();
