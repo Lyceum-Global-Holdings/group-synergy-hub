@@ -48,7 +48,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
   cachedUserId = session?.user?.id ?? null;
 });
 
-// Selected company is stored by CompanyContext as 'selectedCompanyId' in localStorage.
+// CompanyContext stores the chosen company as 'selectedCompanyId' in localStorage.
 function readCompanyId(): string | null {
   try {
     return window.localStorage.getItem("selectedCompanyId");

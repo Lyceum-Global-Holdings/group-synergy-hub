@@ -5,6 +5,7 @@ import { Company } from '@/types/company';
 import { GLSettings } from '@/types/generalLedger';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency as baseFormatCurrency } from '@/lib/utils';
 
@@ -23,9 +24,39 @@ interface CompanyContextType {
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
+// The chosen company survives a refresh. Stored per user (a company id, or
+// "all" for the super-admin All Companies view) so a shared computer doesn't
+// carry one person's choice over to the next. 'selectedCompanyId' is also read
+// by performance telemetry (main.tsx).
+const ALL_COMPANIES = 'all';
+const choiceKey = (userId: string) => `selectedCompany:${userId}`;
+
+function readChoice(userId: string | undefined): string | null {
+  if (!userId) return null;
+  try {
+    return window.localStorage.getItem(choiceKey(userId));
+  } catch {
+    return null;
+  }
+}
+
+function writeChoice(userId: string | undefined, choice: string | null) {
+  if (!userId) return;
+  try {
+    if (choice) window.localStorage.setItem(choiceKey(userId), choice);
+    else window.localStorage.removeItem(choiceKey(userId));
+    if (choice && choice !== ALL_COMPANIES) window.localStorage.setItem('selectedCompanyId', choice);
+    else window.localStorage.removeItem('selectedCompanyId');
+  } catch {
+    // Storage blocked (private window): the choice just isn't remembered.
+  }
+}
+
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const { companies = [], isLoading } = useCompanies();
   const { data: isSuperAdmin, isLoading: isSuperAdminLoading } = useSuperAdmin();
+  const { user } = useAuth();
+  const userId = user?.id;
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isViewingAllCompanies, setIsViewingAllCompanies] = useState(false);
   
@@ -57,7 +88,20 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     
     if (safeCompanies.length > 0 && !selectedCompany && !isViewingAllCompanies) {
       console.log('[CompanyContext] Auto-select - companies:', safeCompanies.length, 'isSuperAdmin:', isSuperAdmin);
-      
+
+      // Restore the last choice if the user can still use it.
+      const saved = readChoice(userId);
+      if (saved === ALL_COMPANIES && isSuperAdmin === true) {
+        setIsViewingAllCompanies(true);
+        return;
+      }
+      const savedCompany = saved ? safeCompanies.find((c) => c.id === saved) : undefined;
+      if (savedCompany) {
+        setSelectedCompany(savedCompany);
+        return;
+      }
+      if (saved) writeChoice(userId, null);
+
       if (isSuperAdmin === true && safeCompanies.length > 1) {
         // Super admin with multiple companies: default to "All Companies" view
         console.log('[CompanyContext] Setting super admin to view all companies');
@@ -68,7 +112,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       }
       // Non-super-admin with multiple companies: leave unselected (must choose manually)
     }
-  }, [safeCompanies, selectedCompany, isViewingAllCompanies, isSuperAdmin, isSuperAdminLoading]);
+  }, [safeCompanies, selectedCompany, isViewingAllCompanies, isSuperAdmin, isSuperAdminLoading, userId]);
 
   // Update selectedCompany when companies data changes (e.g., after module allocation update)
   useEffect(() => {
@@ -84,9 +128,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     if (company === null) {
       setIsViewingAllCompanies(true);
       setSelectedCompany(null);
+      writeChoice(userId, ALL_COMPANIES);
     } else {
       setIsViewingAllCompanies(false);
       setSelectedCompany(company);
+      writeChoice(userId, company.id);
     }
   };
 

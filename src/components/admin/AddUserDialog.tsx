@@ -40,7 +40,8 @@ const userSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  // Matches the admin-create-user function, which refuses shorter passwords.
+  password: z.string().min(8, "Password must be at least 8 characters"),
   company: z.string().min(1, "Company is required"),
   role: z.string().min(1, "Please select a role"),
   department: z.string().optional(),
@@ -365,7 +366,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
                     <FormLabel>Password</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input placeholder="Enter password" type={showPassword ? "text" : "password"} {...field} />
+                        <Input placeholder="At least 8 characters" autoComplete="new-password" type={showPassword ? "text" : "password"} {...field} />
                         <button
                           type="button"
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
