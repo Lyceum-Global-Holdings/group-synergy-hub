@@ -64,8 +64,6 @@ function buildEmail(
 ): { subject: string; html: string } {
   const safeTitle = escapeHtml(title);
   const safeMessage = escapeHtml(message).replace(/\n/g, "<br/>");
-  const safeRef = escapeHtml(reference前后 || reference);
-  void safeRef;
   const safeReference = escapeHtml(reference);
 
   const accent =
