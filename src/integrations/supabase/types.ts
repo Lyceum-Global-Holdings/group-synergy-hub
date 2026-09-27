@@ -5136,6 +5136,50 @@ export type Database = {
           },
         ]
       }
+      contract_events: {
+        Row: {
+          actor: string | null
+          contract_id: string
+          created_at: string
+          emailed_at: string | null
+          event: string
+          id: string
+          new_expiry: string | null
+          note: string | null
+          old_expiry: string | null
+        }
+        Insert: {
+          actor?: string | null
+          contract_id: string
+          created_at?: string
+          emailed_at?: string | null
+          event: string
+          id?: string
+          new_expiry?: string | null
+          note?: string | null
+          old_expiry?: string | null
+        }
+        Update: {
+          actor?: string | null
+          contract_id?: string
+          created_at?: string
+          emailed_at?: string | null
+          event?: string
+          id?: string
+          new_expiry?: string | null
+          note?: string | null
+          old_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_events_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_obligations: {
         Row: {
           assigned_to: string | null
@@ -5327,6 +5371,7 @@ export type Database = {
           id: string
           insurance_details: string | null
           insurance_required: boolean | null
+          last_renewed_at: string | null
           max_renewal_count: number | null
           notes: string | null
           notice_period_days: number | null
@@ -5338,6 +5383,8 @@ export type Database = {
           priority: Database["public"]["Enums"]["contract_priority"]
           renewal_count: number | null
           renewal_notice_days: number | null
+          renewal_notice_sent_for: string | null
+          renewal_term_months: number | null
           renewal_terms: string | null
           renewal_type: Database["public"]["Enums"]["renewal_type"] | null
           risk_level: Database["public"]["Enums"]["contract_risk_level"] | null
@@ -5386,6 +5433,7 @@ export type Database = {
           id?: string
           insurance_details?: string | null
           insurance_required?: boolean | null
+          last_renewed_at?: string | null
           max_renewal_count?: number | null
           notes?: string | null
           notice_period_days?: number | null
@@ -5397,6 +5445,8 @@ export type Database = {
           priority?: Database["public"]["Enums"]["contract_priority"]
           renewal_count?: number | null
           renewal_notice_days?: number | null
+          renewal_notice_sent_for?: string | null
+          renewal_term_months?: number | null
           renewal_terms?: string | null
           renewal_type?: Database["public"]["Enums"]["renewal_type"] | null
           risk_level?: Database["public"]["Enums"]["contract_risk_level"] | null
@@ -5445,6 +5495,7 @@ export type Database = {
           id?: string
           insurance_details?: string | null
           insurance_required?: boolean | null
+          last_renewed_at?: string | null
           max_renewal_count?: number | null
           notes?: string | null
           notice_period_days?: number | null
@@ -5456,6 +5507,8 @@ export type Database = {
           priority?: Database["public"]["Enums"]["contract_priority"]
           renewal_count?: number | null
           renewal_notice_days?: number | null
+          renewal_notice_sent_for?: string | null
+          renewal_term_months?: number | null
           renewal_terms?: string | null
           renewal_type?: Database["public"]["Enums"]["renewal_type"] | null
           risk_level?: Database["public"]["Enums"]["contract_risk_level"] | null
@@ -8004,7 +8057,7 @@ export type Database = {
           compliance_profile: Database["public"]["Enums"]["einvoice_compliance_profile"]
           corrected_einvoice_id: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           currency: string
           customer_company_id: string | null
           direction: Database["public"]["Enums"]["einvoice_direction"]
@@ -8037,7 +8090,7 @@ export type Database = {
           compliance_profile?: Database["public"]["Enums"]["einvoice_compliance_profile"]
           corrected_einvoice_id?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           currency?: string
           customer_company_id?: string | null
           direction: Database["public"]["Enums"]["einvoice_direction"]
@@ -8070,7 +8123,7 @@ export type Database = {
           compliance_profile?: Database["public"]["Enums"]["einvoice_compliance_profile"]
           corrected_einvoice_id?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           currency?: string
           customer_company_id?: string | null
           direction?: Database["public"]["Enums"]["einvoice_direction"]
@@ -17738,6 +17791,7 @@ export type Database = {
           failed_but_accepted: boolean | null
           failed_returned: boolean | null
           five_days_late: boolean | null
+          grn_id: string | null
           id: string
           notes: string | null
           over_14_days_late: boolean | null
@@ -17748,6 +17802,7 @@ export type Database = {
           punctuality_score: number
           quality_score: number
           receipt_date: string
+          source: string
           total_score: number
           updated_at: string
           warehouse_item_id: string | null
@@ -17760,6 +17815,7 @@ export type Database = {
           failed_but_accepted?: boolean | null
           failed_returned?: boolean | null
           five_days_late?: boolean | null
+          grn_id?: string | null
           id?: string
           notes?: string | null
           over_14_days_late?: boolean | null
@@ -17770,6 +17826,7 @@ export type Database = {
           punctuality_score?: number
           quality_score?: number
           receipt_date: string
+          source?: string
           total_score?: number
           updated_at?: string
           warehouse_item_id?: string | null
@@ -17782,6 +17839,7 @@ export type Database = {
           failed_but_accepted?: boolean | null
           failed_returned?: boolean | null
           five_days_late?: boolean | null
+          grn_id?: string | null
           id?: string
           notes?: string | null
           over_14_days_late?: boolean | null
@@ -17792,6 +17850,7 @@ export type Database = {
           punctuality_score?: number
           quality_score?: number
           receipt_date?: string
+          source?: string
           total_score?: number
           updated_at?: string
           warehouse_item_id?: string | null
@@ -17804,6 +17863,13 @@ export type Database = {
             columns: ["evaluation_id"]
             isOneToOne: false
             referencedRelation: "supplier_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_evaluation_entries_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
             referencedColumns: ["id"]
           },
           {
@@ -18074,6 +18140,7 @@ export type Database = {
           created_by: string | null
           currency: string | null
           due_date: string
+          einvoice_id: string | null
           exchange_rate: number | null
           gl_account_id: string | null
           grn_id: string | null
@@ -18090,6 +18157,7 @@ export type Database = {
           sap_document_number: string | null
           sap_last_sync_at: string | null
           sap_sync_status: string | null
+          source: string
           status: string | null
           supplier_id: string | null
           tax_amount: number | null
@@ -18103,6 +18171,7 @@ export type Database = {
           created_by?: string | null
           currency?: string | null
           due_date: string
+          einvoice_id?: string | null
           exchange_rate?: number | null
           gl_account_id?: string | null
           grn_id?: string | null
@@ -18119,6 +18188,7 @@ export type Database = {
           sap_document_number?: string | null
           sap_last_sync_at?: string | null
           sap_sync_status?: string | null
+          source?: string
           status?: string | null
           supplier_id?: string | null
           tax_amount?: number | null
@@ -18132,6 +18202,7 @@ export type Database = {
           created_by?: string | null
           currency?: string | null
           due_date?: string
+          einvoice_id?: string | null
           exchange_rate?: number | null
           gl_account_id?: string | null
           grn_id?: string | null
@@ -18148,6 +18219,7 @@ export type Database = {
           sap_document_number?: string | null
           sap_last_sync_at?: string | null
           sap_sync_status?: string | null
+          source?: string
           status?: string | null
           supplier_id?: string | null
           tax_amount?: number | null
@@ -18160,6 +18232,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoices_einvoice_id_fkey"
+            columns: ["einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
             referencedColumns: ["id"]
           },
           {
@@ -23331,6 +23410,14 @@ export type Database = {
         }
         Returns: Json
       }
+      contract_extend: {
+        Args: { p_expiry: string; p_months: number }
+        Returns: string
+      }
+      contract_term_months: {
+        Args: { p_effective: string; p_expiry: string }
+        Returns: number
+      }
       convert_quotation_to_invoice: {
         Args: { p_quotation_id: string }
         Returns: {
@@ -23556,6 +23643,10 @@ export type Database = {
         Returns: string
       }
       escalate_pending_approvals: { Args: never; Returns: undefined }
+      evaluation_fill_from_grns: {
+        Args: { p_evaluation_id: string }
+        Returns: number
+      }
       find_catalog_item_by_code: {
         Args: { p_code: string; p_target_company_id?: string }
         Returns: {
@@ -23627,6 +23718,10 @@ export type Database = {
       generate_service_code: { Args: never; Returns: string }
       generate_srn_number: { Args: { _company_id: string }; Returns: string }
       generate_supplier_code: { Args: never; Returns: string }
+      generate_supplier_evaluations: {
+        Args: { p_company_id: string; p_from: string; p_to: string }
+        Returns: Json
+      }
       generate_transfer_number: { Args: never; Returns: string }
       generate_work_order_number: { Args: never; Returns: string }
       get_all_companies_minimal: {
@@ -24595,7 +24690,15 @@ export type Database = {
         Args: { p_company_id: string; p_parent_item_id: string }
         Returns: string
       }
+      peppol_owner: {
+        Args: { p_id: string; p_owner_type: string; p_scheme: string }
+        Returns: string
+      }
       po_visible_to_supplier: { Args: { _po_id: string }; Returns: boolean }
+      populate_evaluation_from_deliveries: {
+        Args: { p_evaluation_id: string }
+        Returns: number
+      }
       preview_fifo_batch_issue: {
         Args: {
           p_company_id: string
@@ -24797,6 +24900,7 @@ export type Database = {
               message: string
             }[]
           }
+      record_inbound_einvoice: { Args: { p_doc: Json }; Returns: string }
       record_tool_calibration: {
         Args: {
           p_calibration_date?: string
@@ -24880,6 +24984,10 @@ export type Database = {
           p_request_id: string
           p_stage: string
         }
+        Returns: undefined
+      }
+      refresh_supplier_rating: {
+        Args: { p_supplier_id: string }
         Returns: undefined
       }
       reject_goods_receipt_note: {
@@ -25054,6 +25162,10 @@ export type Database = {
       remove_item_from_inventory: {
         Args: { p_item_id: string }
         Returns: undefined
+      }
+      renew_contract: {
+        Args: { p_contract_id: string; p_new_expiry: string; p_note?: string }
+        Returns: string
       }
       rental_costume_available_units: {
         Args: {
@@ -26346,6 +26458,7 @@ export type Database = {
         Args: { _request_id: string }
         Returns: boolean
       }
+      run_contract_lifecycle: { Args: { p_today?: string }; Returns: Json }
       run_fx_revaluation: {
         Args: {
           p_as_of_date: string
@@ -26649,6 +26762,7 @@ export type Database = {
         }
         Returns: string
       }
+      sync_einvoice_to_ap: { Args: { p_einvoice_id: string }; Returns: string }
       sync_production_order: {
         Args: { p_order_id: string }
         Returns: undefined
