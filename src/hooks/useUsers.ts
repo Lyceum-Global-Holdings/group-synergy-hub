@@ -3,6 +3,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 
+/**
+ * True only for the very first account of a fresh system (no administrator and
+ * no other login). Anything else — including an error, e.g. before migration
+ * 20260927140000 is applied — counts as false.
+ */
+export const useNeedsFirstAdmin = (enabled = true) => {
+  return useQuery({
+    queryKey: ['needs-first-admin'],
+    enabled,
+    staleTime: Infinity,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await (supabase as any).rpc('needs_first_admin');
+      if (error) return false;
+      return data === true;
+    },
+  });
+};
+
 // Hook to bootstrap admin user (for first-time setup)
 export const useBootstrapAdmin = () => {
   const queryClient = useQueryClient();
@@ -22,6 +40,7 @@ export const useBootstrapAdmin = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['needs-first-admin'] });
       toast.success('Admin privileges granted successfully');
     },
     onError: (error: any) => {
@@ -47,6 +66,8 @@ export interface User {
     app_role: string;
   }>;
   last_sign_in_at: string | null;
+  /** Set when the user was removed but kept because records reference them. */
+  deactivated_at: string | null;
 }
 
 export interface Role {
@@ -108,6 +129,8 @@ export const useUsers = () => {
           updated_at: profile.updated_at,
           roles: roles,
           last_sign_in_at: null, // We'll skip auth.admin for now as it requires service role
+          // Added in migration 20260927140000; not in the generated types yet.
+          deactivated_at: (profile as { deactivated_at?: string | null }).deactivated_at ?? null,
         };
       }) || [];
 

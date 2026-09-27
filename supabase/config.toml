@@ -30,6 +30,9 @@ verify_jwt = false
 [functions.mfa-recovery]
 verify_jwt = false
 
+[functions.admin-delete-user]
+verify_jwt = false
+
 [functions.supplier-invite]
 verify_jwt = false
 

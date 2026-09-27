@@ -1,61 +1,57 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { getCachedUser } from "@/lib/currentUser";
 import { toast } from 'sonner';
 
+export type DeleteUserOutcome = 'deleted' | 'deactivated';
+
+/**
+ * Removes a user's access for good (super admins only), via the
+ * admin-delete-user edge function: the login is blocked and all access removed.
+ * Users who appear on no records are deleted outright; everyone else is
+ * deactivated so their name stays on the records they created or approved.
+ */
 export const useDeleteUser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (userId: string) => {
-      // Verify super admin status first
-      const user = getCachedUser();
-      if (!user) throw new Error('Not authenticated');
-      
-      const { data: isSuperAdmin, error: checkError } = await supabase
-        .rpc('is_super_admin', { _user_id: user.id });
-      
-      if (checkError) throw checkError;
-      if (!isSuperAdmin) {
-        throw new Error('Only super administrators can delete users');
+    mutationFn: async (userId: string): Promise<{ userId: string; outcome: DeleteUserOutcome }> => {
+      const { data, error } = await supabase.functions.invoke<{
+        success: boolean;
+        outcome?: DeleteUserOutcome;
+        error?: string;
+      }>('admin-delete-user', { body: { userId } });
+
+      if (error || !data) {
+        let message = 'Could not delete the user. Try again.';
+        try {
+          const body = await (error as { context?: Response } | null)?.context?.json();
+          if (body?.error) message = body.error;
+        } catch {
+          // keep the generic message
+        }
+        throw new Error(message);
       }
-
-      // First delete user roles
-      const { error: rolesError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      if (rolesError) throw rolesError;
-
-      // Then delete profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('user_id', userId);
-
-      if (profileError) throw profileError;
-
-      // Finally delete from auth (this requires admin privileges)
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      if (authError) {
-        console.error('Auth deletion error:', authError);
-        // Don't throw here as profile is already deleted
-      }
-
-      return { userId };
+      if (!data.success || !data.outcome) throw new Error(data.error ?? 'Could not delete the user.');
+      return { userId, outcome: data.outcome };
     },
-    onSuccess: () => {
+    onSuccess: ({ outcome }) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['roles'] });
-      toast.success('User deleted successfully');
+      if (outcome === 'deleted') {
+        toast.success('User deleted');
+      } else {
+        toast.success('User deactivated', {
+          description: "Their login no longer works. They're kept because their name appears on records they created or approved.",
+        });
+      }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error('User deletion failed:', error);
       toast.error(`Failed to delete user: ${error.message}`);
     },
   });
 };
+
 
 export const useUpdateRole = () => {
   const queryClient = useQueryClient();

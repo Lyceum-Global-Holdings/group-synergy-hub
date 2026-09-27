@@ -9,6 +9,8 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
+import { useNeedsFirstAdmin } from "@/hooks/useUsers";
+import { AdminBootstrap } from "@/components/admin/AdminBootstrap";
 import {
   useDashboardAnalytics,
   useDashboardRealtime,
@@ -94,6 +96,8 @@ export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { canOpenPath } = useAccessibleNav();
   const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
+  // Fresh system only: offer the first account the Super Administrator role.
+  const { data: needsFirstAdmin } = useNeedsFirstAdmin(!isAdminOrHigher);
   const { data: profile } = useCurrentUserProfile();
   const { data: locations } = useDashboardLocations(selectedCompany?.id);
   const activeLocationId = globalLocationId;
@@ -113,6 +117,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      {needsFirstAdmin && <AdminBootstrap />}
+
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

@@ -335,7 +335,7 @@ export default function UserRoleManagement() {
                         const userCompany = companies?.find(c => c.id === (user as any).company_id);
                         
                         return (
-                          <TableRow key={user.id}>
+                          <TableRow key={user.id} className={user.deactivated_at ? 'opacity-60' : undefined}>
                             <TableCell className="flex items-center space-x-3">
                               <Avatar>
                                 <AvatarImage src={user.avatar_url || ''} />
@@ -376,9 +376,19 @@ export default function UserRoleManagement() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={user.last_sign_in_at ? 'default' : 'secondary'}>
-                                {user.last_sign_in_at ? 'Active' : 'Inactive'}
-                              </Badge>
+                              {user.deactivated_at ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-destructive/40 text-destructive"
+                                  title={`Deactivated ${format(new Date(user.deactivated_at), 'MMM dd, yyyy')}. Kept because records reference this user.`}
+                                >
+                                  Deactivated
+                                </Badge>
+                              ) : (
+                                <Badge variant={user.last_sign_in_at ? 'default' : 'secondary'}>
+                                  {user.last_sign_in_at ? 'Active' : 'Inactive'}
+                                </Badge>
+                              )}
                             </TableCell>
                             <TableCell>
                               {user.last_sign_in_at ? 
@@ -386,6 +396,9 @@ export default function UserRoleManagement() {
                                 'Never'}
                             </TableCell>
                             <TableCell className="text-right">
+                              {user.deactivated_at ? (
+                                <span className="text-xs text-muted-foreground">No actions</span>
+                              ) : (
                               <div className="flex justify-end space-x-2">
                                 {isSuperAdmin && (
                                   <Button 
@@ -406,6 +419,7 @@ export default function UserRoleManagement() {
                                   </Button>
                                 )}
                               </div>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -507,7 +521,7 @@ export default function UserRoleManagement() {
         open={deleteUserOpen}
         onOpenChange={setDeleteUserOpen}
         title="Delete User"
-        description="Are you sure you want to delete this user? This will permanently remove the user account and all associated data."
+        description="Their login stops working immediately and all their access is removed. If they appear on any records (orders, receipts, approvals), they're kept as a deactivated user so those records still show their name; otherwise they're deleted completely."
         itemName={selectedUser?.full_name || selectedUser?.email}
         onConfirm={handleConfirmDeleteUser}
         isLoading={deleteUser.isPending}
