@@ -141,6 +141,9 @@ DECLARE
   t record;
   v_pred text;
   v_scope constant text := '(SELECT public.my_location_scope())';
+  -- The cast makes ANY(...) take the array itself. Without it, Postgres reads
+  -- ANY ((SELECT ...)) as "each row of a subquery" and compares uuid = uuid[].
+  v_ids constant text := '(SELECT public.my_location_scope())::uuid[]';
 BEGIN
   FOR t IN
     SELECT * FROM (VALUES
@@ -202,12 +205,12 @@ BEGIN
         v_scope, t.parent_tbl, t.tbl, t.parent_key);
     ELSIF t.col2 IS NOT NULL THEN
       v_pred := format(
-        '((%1$I IS NULL AND %2$I IS NULL) OR %3$s IS NULL OR %1$I = ANY (%3$s) OR %2$I = ANY (%3$s))',
-        t.col1, t.col2, v_scope);
+        '((%1$I IS NULL AND %2$I IS NULL) OR %3$s IS NULL OR %1$I = ANY (%4$s) OR %2$I = ANY (%4$s))',
+        t.col1, t.col2, v_scope, v_ids);
     ELSE
       v_pred := format(
-        '(%1$I IS NULL OR %2$s IS NULL OR %1$I = ANY (%2$s))',
-        t.col1, v_scope);
+        '(%1$I IS NULL OR %2$s IS NULL OR %1$I = ANY (%3$s))',
+        t.col1, v_scope, v_ids);
     END IF;
 
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', 'Location scope', t.tbl);
