@@ -18754,6 +18754,7 @@ export type Database = {
           submitted_at: string | null
           submitted_by: string | null
           supplier_data: Json
+          supplier_id: string | null
           updated_at: string
         }
         Insert: {
@@ -18770,6 +18771,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           supplier_data: Json
+          supplier_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -18786,6 +18788,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           supplier_data?: Json
+          supplier_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -18794,6 +18797,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_registration_requests_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -22804,6 +22814,13 @@ export type Database = {
           p_reason_code: string
         }
         Returns: Json
+      }
+      admin_user_sign_ins: {
+        Args: never
+        Returns: {
+          last_sign_in_at: string
+          user_id: string
+        }[]
       }
       approve_grn_with_allocations: {
         Args: { p_allocations: Json; p_grn_id: string }
