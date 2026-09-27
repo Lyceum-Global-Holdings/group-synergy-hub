@@ -2399,10 +2399,12 @@ export type Database = {
           approved_date: string | null
           bpo_id: string
           created_at: string
+          decision_notes: string | null
           delivery_location: string | null
           expected_delivery_date: string | null
           id: string
           notes: string | null
+          po_id: string | null
           release_date: string
           release_number: string
           release_status: Database["public"]["Enums"]["bpo_release_status"]
@@ -2417,10 +2419,12 @@ export type Database = {
           approved_date?: string | null
           bpo_id: string
           created_at?: string
+          decision_notes?: string | null
           delivery_location?: string | null
           expected_delivery_date?: string | null
           id?: string
           notes?: string | null
+          po_id?: string | null
           release_date?: string
           release_number: string
           release_status?: Database["public"]["Enums"]["bpo_release_status"]
@@ -2435,10 +2439,12 @@ export type Database = {
           approved_date?: string | null
           bpo_id?: string
           created_at?: string
+          decision_notes?: string | null
           delivery_location?: string | null
           expected_delivery_date?: string | null
           id?: string
           notes?: string | null
+          po_id?: string | null
           release_date?: string
           release_number?: string
           release_status?: Database["public"]["Enums"]["bpo_release_status"]
@@ -2453,6 +2459,13 @@ export type Database = {
             columns: ["bpo_id"]
             isOneToOne: false
             referencedRelation: "blanket_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blanket_po_releases_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -12329,6 +12342,7 @@ export type Database = {
           amendment_date: string
           amendment_number: string
           amendment_type: Database["public"]["Enums"]["po_amendment_type"]
+          applied_at: string | null
           approved_by: string | null
           approved_date: string | null
           created_at: string
@@ -12339,11 +12353,16 @@ export type Database = {
           po_id: string
           previous_value: Json | null
           reason: string
+          rejected_by: string | null
+          rejected_date: string | null
+          rejection_reason: string | null
+          status: string
         }
         Insert: {
           amendment_date?: string
           amendment_number: string
           amendment_type: Database["public"]["Enums"]["po_amendment_type"]
+          applied_at?: string | null
           approved_by?: string | null
           approved_date?: string | null
           created_at?: string
@@ -12354,11 +12373,16 @@ export type Database = {
           po_id: string
           previous_value?: Json | null
           reason: string
+          rejected_by?: string | null
+          rejected_date?: string | null
+          rejection_reason?: string | null
+          status?: string
         }
         Update: {
           amendment_date?: string
           amendment_number?: string
           amendment_type?: Database["public"]["Enums"]["po_amendment_type"]
+          applied_at?: string | null
           approved_by?: string | null
           approved_date?: string | null
           created_at?: string
@@ -12369,6 +12393,10 @@ export type Database = {
           po_id?: string
           previous_value?: Json | null
           reason?: string
+          rejected_by?: string | null
+          rejected_date?: string | null
+          rejection_reason?: string | null
+          status?: string
         }
         Relationships: [
           {
@@ -18061,6 +18089,7 @@ export type Database = {
           id: string
           invoice_id: string | null
           line_number: number
+          po_item_id: string | null
           quantity: number | null
           tax_amount: number | null
           tax_code_id: string | null
@@ -18075,6 +18104,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           line_number: number
+          po_item_id?: string | null
           quantity?: number | null
           tax_amount?: number | null
           tax_code_id?: string | null
@@ -18089,6 +18119,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           line_number?: number
+          po_item_id?: string | null
           quantity?: number | null
           tax_amount?: number | null
           tax_code_id?: string | null
@@ -18121,6 +18152,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoice_lines_po_item_id_fkey"
+            columns: ["po_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_items"
             referencedColumns: ["id"]
           },
           {
@@ -18161,6 +18199,9 @@ export type Database = {
           status: string | null
           supplier_id: string | null
           tax_amount: number | null
+          three_way_match_by: string | null
+          three_way_match_checked_at: string | null
+          three_way_match_notes: string | null
           three_way_match_status: string | null
           updated_at: string | null
         }
@@ -18192,6 +18233,9 @@ export type Database = {
           status?: string | null
           supplier_id?: string | null
           tax_amount?: number | null
+          three_way_match_by?: string | null
+          three_way_match_checked_at?: string | null
+          three_way_match_notes?: string | null
           three_way_match_status?: string | null
           updated_at?: string | null
         }
@@ -18223,6 +18267,9 @@ export type Database = {
           status?: string | null
           supplier_id?: string | null
           tax_amount?: number | null
+          three_way_match_by?: string | null
+          three_way_match_checked_at?: string | null
+          three_way_match_notes?: string | null
           three_way_match_status?: string | null
           updated_at?: string | null
         }
@@ -22901,6 +22948,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      apply_po_decision: {
+        Args: {
+          p_approve: boolean
+          p_comments: string
+          p_level?: string
+          p_method?: string
+          p_po_id: string
+          p_user: string
+        }
+        Returns: string
+      }
       approve_grn_with_allocations: {
         Args: { p_allocations: Json; p_grn_id: string }
         Returns: Json
@@ -23045,6 +23103,18 @@ export type Database = {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
       }
+      bpo_item_available: {
+        Args: { p_bpo_item_id: string; p_exclude_release?: string }
+        Returns: number
+      }
+      bpo_release_block_reason: {
+        Args: { p_release_id: string }
+        Returns: string
+      }
+      bpo_value_available: {
+        Args: { p_bpo_id: string; p_exclude_release?: string }
+        Returns: number
+      }
       bulk_change_stock_owner: {
         Args: {
           _from_owner: string
@@ -23168,6 +23238,11 @@ export type Database = {
         Args: { _site_report_id: string }
         Returns: boolean
       }
+      can_review_invoice_match: {
+        Args: { p_company_id: string }
+        Returns: boolean
+      }
+      cancel_bpo_release: { Args: { p_release_id: string }; Returns: undefined }
       cancel_material_issue: {
         Args: { p_min_id: string; p_reason?: string }
         Returns: {
@@ -23269,6 +23344,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      check_bpo_release: { Args: { p_release_id: string }; Returns: undefined }
       check_duplicate_supplier: {
         Args: {
           p_email?: string
@@ -23461,6 +23537,17 @@ export type Database = {
           asset_id: string
         }[]
       }
+      create_bpo_release: {
+        Args: {
+          p_bpo_id: string
+          p_delivery_location?: string
+          p_expected_delivery_date?: string
+          p_lines: Json
+          p_notes?: string
+          p_urgency?: string
+        }
+        Returns: string
+      }
       create_material_return_with_items:
         | {
             Args: {
@@ -23629,6 +23716,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_bpo_release: {
+        Args: { p_approve: boolean; p_comments?: string; p_release_id: string }
+        Returns: string
+      }
+      decide_po_amendment: {
+        Args: {
+          p_amendment_id: string
+          p_approve: boolean
+          p_comments?: string
+        }
+        Returns: undefined
+      }
+      decide_po_approval: {
+        Args: { p_approve: boolean; p_comments?: string; p_po_id: string }
+        Returns: string
+      }
+      decide_purchase_requisition: {
+        Args: { p_approve: boolean; p_comments?: string; p_pr_id: string }
+        Returns: undefined
+      }
+      decide_three_way_match: {
+        Args: { p_accept: boolean; p_invoice_id: string; p_reason?: string }
+        Returns: string
+      }
       delete_partial_piece: { Args: { p_id: string }; Returns: undefined }
       ensure_opening_batch_for_bin_allocation: {
         Args: { _allocation_id: string }
@@ -23643,6 +23754,10 @@ export type Database = {
         Returns: string
       }
       escalate_pending_approvals: { Args: never; Returns: undefined }
+      evaluate_three_way_match: {
+        Args: { p_invoice_id: string }
+        Returns: string
+      }
       evaluation_fill_from_grns: {
         Args: { p_evaluation_id: string }
         Returns: number
@@ -24294,6 +24409,15 @@ export type Database = {
           warehouse_item_id: string
         }[]
       }
+      has_approval_authority: {
+        Args: {
+          p_amount?: number
+          p_company_id: string
+          p_level: string
+          p_user: string
+        }
+        Returns: boolean
+      }
       has_construction_access: { Args: { _user_id: string }; Returns: boolean }
       has_dashboard_access: {
         Args: { _dashboard_id: string; _user_id: string }
@@ -24694,11 +24818,27 @@ export type Database = {
         Args: { p_id: string; p_owner_type: string; p_scheme: string }
         Returns: string
       }
+      plan_po_amendment: {
+        Args: { p_changes: Json; p_po_id: string; p_type: string }
+        Returns: Json
+      }
+      po_amendment_block_reason: {
+        Args: { p_amendment_id: string }
+        Returns: string
+      }
+      po_approval_block_reason: { Args: { p_po_id: string }; Returns: string }
+      po_approval_block_reason_for: {
+        Args: { p_level?: string; p_po_id: string; p_user: string }
+        Returns: string
+      }
+      po_is_locked: { Args: { p_status: string }; Returns: boolean }
+      po_status_of: { Args: { p_po_id: string }; Returns: string }
       po_visible_to_supplier: { Args: { _po_id: string }; Returns: boolean }
       populate_evaluation_from_deliveries: {
         Args: { p_evaluation_id: string }
         Returns: number
       }
+      pr_approval_block_reason: { Args: { p_pr_id: string }; Returns: string }
       preview_fifo_batch_issue: {
         Args: {
           p_company_id: string
@@ -26378,6 +26518,16 @@ export type Database = {
           period_debit: number
         }[]
       }
+      request_po_amendment: {
+        Args: {
+          p_changes?: Json
+          p_notes?: string
+          p_po_id: string
+          p_reason: string
+          p_type: string
+        }
+        Returns: string
+      }
       reserve_material_issue: { Args: { p_min_id: string }; Returns: Json }
       resolve_public_portal_company: {
         Args: { _slug: string }
@@ -26475,6 +26625,15 @@ export type Database = {
           original_base_balance: number
           revalued_balance: number
           unrealized_gain_loss: number
+        }[]
+      }
+      run_three_way_match: { Args: { p_invoice_id: string }; Returns: string }
+      run_three_way_match_all: {
+        Args: { p_company_id: string }
+        Returns: {
+          exceptions: number
+          matched: number
+          pending: number
         }[]
       }
       search_warehouse_item_catalog: {
@@ -26697,6 +26856,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      submit_po_for_approval: { Args: { p_po_id: string }; Returns: undefined }
       submit_rental_for_approval: {
         Args: { p_id: string }
         Returns: {
@@ -26766,6 +26926,69 @@ export type Database = {
       sync_production_order: {
         Args: { p_order_id: string }
         Returns: undefined
+      }
+      three_way_match_lines: {
+        Args: {
+          p_invoice_id: string
+          p_price_tolerance?: number
+          p_qty_tolerance?: number
+        }
+        Returns: {
+          invoice_qty: number
+          invoice_unit_price: number
+          invoiced_before: number
+          item_code: string
+          item_name: string
+          po_item_id: string
+          po_qty: number
+          po_unit_price: number
+          price_status: string
+          qty_status: string
+          received_qty: number
+          unit_of_measure: string
+        }[]
+      }
+      three_way_match_lines_internal: {
+        Args: {
+          p_invoice_id: string
+          p_price_tolerance?: number
+          p_qty_tolerance?: number
+        }
+        Returns: {
+          invoice_qty: number
+          invoice_unit_price: number
+          invoiced_before: number
+          item_code: string
+          item_name: string
+          po_item_id: string
+          po_qty: number
+          po_unit_price: number
+          price_status: string
+          qty_status: string
+          received_qty: number
+          unit_of_measure: string
+        }[]
+      }
+      three_way_match_overview: {
+        Args: { p_company_id: string }
+        Returns: {
+          computed_status: string
+          currency: string
+          decided: boolean
+          grn_numbers: string
+          invoice_amount: number
+          invoice_date: string
+          invoice_id: string
+          invoice_number: string
+          lines: Json
+          notes: string
+          po_amount: number
+          po_id: string
+          po_number: string
+          received_amount: number
+          stored_status: string
+          supplier_name: string
+        }[]
       }
       tool_adjustment_post_ledger: {
         Args: {
@@ -26877,6 +27100,10 @@ export type Database = {
       }
       user_has_location_access: {
         Args: { _location_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_in_company: {
+        Args: { p_company_id: string; p_user: string }
         Returns: boolean
       }
       user_location_allowed: {
