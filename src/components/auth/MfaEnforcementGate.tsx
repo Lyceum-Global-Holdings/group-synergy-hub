@@ -8,12 +8,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, X } from "lucide-react";
 
-const PRIVILEGED_ROLES = new Set(["admin", "super_admin", "moderator"]);
+const PRIVILEGED_ROLES = new Set(["admin", "super_admin"]);
 const EXEMPT_PATH_PREFIXES = ["/auth", "/portal", "/public-supplier-registration"];
 
 /**
  * Enforces the MFA policy from `security_settings`:
- *   required_admins → admin/super_admin/moderator must enroll TOTP
+ *   required_admins → admin/super_admin must enroll TOTP
  *   required_all    → every signed-in user must enroll TOTP
  *
  * Within the configured grace period a dismissible banner is shown; after the

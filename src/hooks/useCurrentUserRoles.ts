@@ -16,7 +16,7 @@ const getRoleInfo = (appRole: string) => {
   const roleMap: Record<string, { display: string; priority: number }> = {
     super_admin: { display: "Super Admin", priority: 4 },
     admin: { display: "Admin", priority: 3 },
-    moderator: { display: "Moderator", priority: 2 },
+    manager: { display: "Manager", priority: 2 },
     user: { display: "User", priority: 1 },
   };
   return roleMap[appRole] || { display: "User", priority: 0 };

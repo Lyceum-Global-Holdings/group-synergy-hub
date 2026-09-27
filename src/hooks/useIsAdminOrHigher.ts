@@ -10,10 +10,9 @@ export const useIsAdminOrHigher = () => {
   const isLoading = rolesLoading || superAdminLoading || adminLoading;
   
   // Check roles from user_roles table
-  const hasRoleFromTable = userRoles.some(role => 
-    role.role === 'admin' || 
-    role.role === 'super_admin' || 
-    role.role === 'moderator'
+  const hasRoleFromTable = userRoles.some(role =>
+    role.role === 'admin' ||
+    role.role === 'super_admin'
   );
   
   // Also check via RPC functions (these use SECURITY DEFINER and bypass RLS)

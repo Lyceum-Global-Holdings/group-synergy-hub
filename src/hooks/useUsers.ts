@@ -66,6 +66,8 @@ export interface User {
     app_role: string;
   }>;
   last_sign_in_at: string | null;
+  /** False when sign-in times could not be loaded, so "never" can't be claimed. */
+  sign_in_known: boolean;
   /** Set when the user was removed but kept because records reference them. */
   deactivated_at: string | null;
 }
@@ -113,6 +115,16 @@ export const useUsers = () => {
 
       if (userRolesError) throw userRolesError;
 
+      // Sign-in times live in auth.users; admins read them through a
+      // SECURITY DEFINER function (migration 20260927160000).
+      const { data: signIns, error: signInsError } = await (supabase as any).rpc('admin_user_sign_ins');
+      const signInKnown = !signInsError;
+      const lastSignIn = new Map<string, string | null>(
+        ((signIns ?? []) as Array<{ user_id: string; last_sign_in_at: string | null }>).map(
+          (r) => [r.user_id, r.last_sign_in_at],
+        ),
+      );
+
       const users = profiles?.map(profile => {
         // Find roles for this user
         const userRoleData = userRoles?.filter(ur => ur.user_id === profile.user_id) || [];
@@ -128,7 +140,8 @@ export const useUsers = () => {
           created_at: profile.created_at,
           updated_at: profile.updated_at,
           roles: roles,
-          last_sign_in_at: null, // We'll skip auth.admin for now as it requires service role
+          last_sign_in_at: lastSignIn.get(profile.user_id) ?? null,
+          sign_in_known: signInKnown && lastSignIn.has(profile.user_id),
           // Added in migration 20260927140000; not in the generated types yet.
           deactivated_at: (profile as { deactivated_at?: string | null }).deactivated_at ?? null,
         };

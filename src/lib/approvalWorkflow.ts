@@ -114,10 +114,11 @@ export class ApprovalWorkflowEngine {
         .single();
 
       if (stage?.required_role) {
+        // required_role is a role level (user / manager / admin), not a role name.
         const { data: users } = await supabase
           .from('user_roles')
-          .select('user_id, roles!inner(name)')
-          .eq('roles.name', stage.required_role);
+          .select('user_id, roles!inner(app_role)')
+          .eq('roles.app_role', stage.required_role as 'user' | 'manager' | 'admin');
 
         return users?.map(u => u.user_id) || [];
       }

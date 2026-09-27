@@ -1,5 +1,5 @@
 interface ApprovalRoleConfig {
-  app_role: 'user' | 'moderator' | 'admin';
+  app_role: 'user' | 'manager' | 'admin';
   permission: string;
   stages: number[];
   max_supplier_value: number | null;
@@ -14,8 +14,8 @@ export const APPROVAL_ROLES = {
     max_supplier_value: 50000,
     display_name: 'Procurement Officer',
   },
-  MODERATOR: {
-    app_role: 'moderator',
+  MANAGER: {
+    app_role: 'manager',
     permission: 'can_approve_suppliers',
     stages: [2, 3],
     max_supplier_value: 500000,

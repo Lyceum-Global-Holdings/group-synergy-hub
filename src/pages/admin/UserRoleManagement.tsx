@@ -384,16 +384,18 @@ export default function UserRoleManagement() {
                                 >
                                   Deactivated
                                 </Badge>
+                              ) : !user.sign_in_known ? (
+                                <span className="text-muted-foreground" title="Sign-in times couldn't be loaded">—</span>
+                              ) : user.last_sign_in_at ? (
+                                <Badge variant="default">Active</Badge>
                               ) : (
-                                <Badge variant={user.last_sign_in_at ? 'default' : 'secondary'}>
-                                  {user.last_sign_in_at ? 'Active' : 'Inactive'}
-                                </Badge>
+                                <Badge variant="secondary">Never signed in</Badge>
                               )}
                             </TableCell>
                             <TableCell>
-                              {user.last_sign_in_at ? 
-                                format(new Date(user.last_sign_in_at), 'MMM dd, yyyy HH:mm') : 
-                                'Never'}
+                              {user.last_sign_in_at
+                                ? format(new Date(user.last_sign_in_at), 'MMM dd, yyyy HH:mm')
+                                : user.sign_in_known ? 'Never' : '—'}
                             </TableCell>
                             <TableCell className="text-right">
                               {user.deactivated_at ? (
