@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.supplier-upload-sign]
 verify_jwt = false
+
+[functions.contract-reminders]
+verify_jwt = false
