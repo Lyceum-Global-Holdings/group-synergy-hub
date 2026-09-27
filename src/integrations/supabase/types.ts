@@ -16211,6 +16211,7 @@ export type Database = {
         Row: {
           allowed_mfa_factors: string[]
           created_at: string
+          enforce_location_access: boolean
           id: string
           mfa_grace_period_days: number
           mfa_policy: Database["public"]["Enums"]["mfa_policy"]
@@ -16224,6 +16225,7 @@ export type Database = {
         Insert: {
           allowed_mfa_factors?: string[]
           created_at?: string
+          enforce_location_access?: boolean
           id?: string
           mfa_grace_period_days?: number
           mfa_policy?: Database["public"]["Enums"]["mfa_policy"]
@@ -16237,6 +16239,7 @@ export type Database = {
         Update: {
           allowed_mfa_factors?: string[]
           created_at?: string
+          enforce_location_access?: boolean
           id?: string
           mfa_grace_period_days?: number
           mfa_policy?: Database["public"]["Enums"]["mfa_policy"]
@@ -24518,6 +24521,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      location_scope_ids: { Args: { _user_id: string }; Returns: string[] }
       log_einvoice_event: {
         Args: {
           p_einvoice_id: string
@@ -24541,6 +24545,7 @@ export type Database = {
           statement_line_id: string
         }[]
       }
+      my_location_scope: { Args: never; Returns: string[] }
       next_catalog_item_code: {
         Args: { p_category_code: string }
         Returns: string
@@ -24653,6 +24658,39 @@ export type Database = {
             }
             Returns: undefined
           }
+      purchase_price_facts: {
+        Args: {
+          p_basis?: string
+          p_catalog_item_id?: string
+          p_category_id?: string
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_location_id?: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          catalog_item_id: string
+          doc_number: string
+          fx_rate: number
+          gross_unit_price: number
+          item_code: string
+          item_name: string
+          line_id: string
+          line_value_base: number
+          net_unit_price: number
+          net_unit_price_base: number
+          po_number: string
+          product_key: string
+          quantity: number
+          supplier_id: string
+          supplier_name: string
+          txn_currency: string
+          txn_date: string
+          unlinked: boolean
+          uom: string
+        }[]
+      }
       purge_inactive_inventory_item: {
         Args: { p_item_id: string; p_reason: string }
         Returns: Json
@@ -25737,6 +25775,73 @@ export type Database = {
           wip_qty: number
         }[]
       }
+      report_purchase_history: {
+        Args: {
+          p_basis?: string
+          p_catalog_item_id?: string
+          p_category_id?: string
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_location_id?: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          chg_vs_prev: number
+          discount_pct: number
+          doc_number: string
+          fx_rate: number
+          gross_unit_price: number
+          item_code: string
+          item_name: string
+          line_value_base: number
+          net_unit_price: number
+          net_unit_price_base: number
+          po_number: string
+          quantity: number
+          supplier_name: string
+          txn_currency: string
+          txn_date: string
+          unlinked: boolean
+          uom: string
+        }[]
+      }
+      report_purchase_price_trend: {
+        Args: {
+          p_as_of?: string
+          p_basis?: string
+          p_catalog_item_id?: string
+          p_category_id?: string
+          p_company_id: string
+          p_location_id?: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          chg_3m_vs_12m: number
+          chg_last_vs_12m: number
+          fx_missing: number
+          item_code: string
+          item_name: string
+          last_date: string
+          last_price: number
+          last_supplier: string
+          lines_12m: number
+          max_12m: number
+          min_12m: number
+          qty_12m: number
+          qty_1m: number
+          qty_3m: number
+          qty_6m: number
+          spend_12m: number
+          suppliers_12m: number
+          uom: string
+          volatility_12m: number
+          wap_12m: number
+          wap_1m: number
+          wap_3m: number
+          wap_6m: number
+        }[]
+      }
       report_quote_comparison: {
         Args: { p_company_id: string; p_request_id?: string }
         Returns: {
@@ -25917,6 +26022,34 @@ export type Database = {
               unit_name: string
             }[]
           }
+      report_supplier_price_comparison: {
+        Args: {
+          p_basis?: string
+          p_catalog_item_id?: string
+          p_category_id?: string
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_location_id?: string
+        }
+        Returns: {
+          fx_missing: number
+          item_code: string
+          item_name: string
+          last_date: string
+          last_price: number
+          lines: number
+          min_price: number
+          price_rank: number
+          qty_share: number
+          quantity: number
+          spend: number
+          supplier_name: string
+          uom: string
+          vs_best_pct: number
+          wap: number
+        }[]
+      }
       report_supplier_scorecard: {
         Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
         Returns: {
@@ -26546,6 +26679,10 @@ export type Database = {
         Returns: boolean
       }
       user_has_location_access: {
+        Args: { _location_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_location_allowed: {
         Args: { _location_id: string; _user_id: string }
         Returns: boolean
       }
