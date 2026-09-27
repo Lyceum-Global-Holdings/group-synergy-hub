@@ -8,9 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { SubmitInvoiceDialog } from "@/components/portal/SubmitInvoiceDialog";
-import { StatusChip, formatMoney } from "@/components/sourcing/rfq/rfqStatus";
-import { usePortalApInvoices, usePortalPurchaseOrders } from "@/hooks/usePortalSourcing";
 
 interface InvoiceRow {
   id: string;
@@ -28,18 +25,6 @@ interface InvoiceRow {
   ubl_xml_path: string | null;
 }
 
-// Accounts-payable status as the supplier sees it.
-const AP_STATUS = (status: string): { label: string; tone: "slate" | "blue" | "amber" | "green" | "red" } => {
-  switch (status) {
-    case "pending_approval": return { label: "Awaiting approval", tone: "amber" };
-    case "approved": case "posted": return { label: "Approved", tone: "blue" };
-    case "partially_paid": return { label: "Partly paid", tone: "blue" };
-    case "paid": return { label: "Paid", tone: "green" };
-    case "cancelled": return { label: "Cancelled", tone: "red" };
-    default: return { label: "Received", tone: "slate" };
-  }
-};
-
 const PROFILE_LABEL: Record<string, string> = {
   peppol_bis_3: "PEPPOL",
   ksa_zatca_phase2: "ZATCA",
@@ -56,10 +41,6 @@ export default function PortalInvoices() {
   const [matchOpen, setMatchOpen] = useState<InvoiceRow | null>(null);
   const [matchData, setMatchData] = useState<any | null>(null);
   const canSend = activeMembership && ["owner", "admin"].includes(activeMembership.portal_role);
-  const canInvoice = !!activeMembership && activeMembership.portal_role !== "viewer";
-  const { data: apInvoices = [], isLoading: apLoading } = usePortalApInvoices(activeSupplierId);
-  const { data: purchaseOrders = [] } = usePortalPurchaseOrders(activeSupplierId);
-  const [submitting, setSubmitting] = useState(false);
 
   const refresh = async () => {
     if (!activeSupplierId) return;
@@ -126,59 +107,9 @@ export default function PortalInvoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Invoices</h1>
-          <p className="text-sm text-muted-foreground">Invoice the purchase orders you've received and follow their approval and payment.</p>
-        </div>
-        {canInvoice && (
-          <Button onClick={() => setSubmitting(true)} disabled={purchaseOrders.length === 0} title={purchaseOrders.length === 0 ? "No purchase orders have been sent to you yet" : undefined}>
-            <Receipt className="mr-2 h-4 w-4" /> Submit invoice
-          </Button>
-        )}
-      </div>
-
+      <h1 className="text-2xl font-semibold">PEPPOL E-Invoices</h1>
       <Card>
-        <CardHeader><CardTitle>Invoices against purchase orders</CardTitle></CardHeader>
-        <CardContent>
-          {apLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Purchase order</TableHead>
-                    <TableHead>Invoice date</TableHead>
-                    <TableHead>Due</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {apInvoices.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="font-mono">{inv.invoice_number}</TableCell>
-                      <TableCell className="font-mono">{inv.po?.po_number ?? "—"}</TableCell>
-                      <TableCell>{new Date(inv.invoice_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{new Date(inv.due_date).toLocaleDateString()}</TableCell>
-                      <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(inv.gross_amount, inv.currency)}</TableCell>
-                      <TableCell><StatusChip {...AP_STATUS(inv.status)} /></TableCell>
-                    </TableRow>
-                  ))}
-                  {apInvoices.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No invoices submitted yet</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <SubmitInvoiceDialog open={submitting} onOpenChange={setSubmitting} purchaseOrders={purchaseOrders} />
-
-      <Card>
-        <CardHeader><CardTitle>PEPPOL e-invoices</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Recent invoices</CardTitle></CardHeader>
         <CardContent>
           {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
             <Table>

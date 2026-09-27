@@ -1,149 +1,124 @@
-import { useMemo, useState } from "react";
-import { FileQuestion, FilePlus, Hourglass, Scale, Trophy } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FileText, FilePlus, History, Clock } from "lucide-react";
 import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
-import { CreateRfqRfpDialog } from "@/components/procurement/CreateRfqRfpDialog";
-import { RfqWorkspaceSheet } from "@/components/sourcing/rfq/RfqWorkspaceSheet";
-import { RfqStatusChip, deadlineHint, formatDeadline, formatMoney, isOpenForQuotes } from "@/components/sourcing/rfq/rfqStatus";
-import { DataCard, EmptyState, SearchField, Segmented, StatTile, Toolbar } from "@/components/warehouse/master/masterUi";
-import { useCompany } from "@/contexts/CompanyContext";
-import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
-import { useRfqRfpRequests } from "@/hooks/useRfqRfp";
-import type { RfqRfpRequest } from "@/types/rfqRfp";
-
-type Filter = "all" | "draft" | "open" | "evaluation" | "done";
-
-const matchesFilter = (r: RfqRfpRequest, f: Filter) =>
-  f === "all" ||
-  (f === "draft" && r.status === "draft") ||
-  (f === "open" && isOpenForQuotes(r.status)) ||
-  (f === "evaluation" && r.status === "evaluation") ||
-  (f === "done" && ["awarded", "closed", "cancelled"].includes(r.status));
-
-const closingSoon = (r: RfqRfpRequest) =>
-  isOpenForQuotes(r.status) &&
-  !!r.submission_deadline &&
-  new Date(r.submission_deadline).getTime() - Date.now() < 3 * 86_400_000;
 
 export default function RfqManagement() {
-  const { selectedCompany } = useCompany();
-  const { data: rfqs = [], isLoading } = useRfqRfpRequests(selectedCompany?.id);
-  const [creating, setCreating] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
-  const [search, setSearch] = useState("");
-  useOpenFromQuery("new", { "1": () => setCreating(true) });
-
-  const counts = useMemo(() => {
-    const c = { all: rfqs.length, draft: 0, open: 0, evaluation: 0, done: 0, soon: 0, awarded: 0 };
-    for (const r of rfqs) {
-      for (const f of ["draft", "open", "evaluation", "done"] as const) if (matchesFilter(r, f)) c[f] += 1;
-      if (closingSoon(r)) c.soon += 1;
-      if (r.status === "awarded") c.awarded += 1;
-    }
-    return c;
-  }, [rfqs]);
-
-  const q = search.trim().toLowerCase();
-  const rows = rfqs.filter(
-    (r) => matchesFilter(r, filter) && (!q || r.title.toLowerCase().includes(q) || r.request_number.toLowerCase().includes(q)),
-  );
-
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">RFQ Management</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Invite approved suppliers to quote, collect their prices through the supplier portal, then compare and award.
+          <h1 className="text-3xl font-bold tracking-tight">RFQ/RFP Management</h1>
+          <p className="text-muted-foreground">
+            Create and manage Request for Quotations and Proposals
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <GenerateReportButton template="SR-RFQ-REG-001" />
-          <Button className="rounded-full" onClick={() => setCreating(true)}>
-            <FilePlus className="mr-2 h-4 w-4" /> New RFQ
+          <Button>
+            <FilePlus className="h-4 w-4 mr-2" />
+            New RFQ
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile icon={FileQuestion} label="Open for quotes" value={counts.open} loading={isLoading} onClick={() => setFilter("open")} active={filter === "open"} />
-        <StatTile icon={Hourglass} label="Closing within 3 days" value={counts.soon} tone={counts.soon ? "alert" : "default"} loading={isLoading} />
-        <StatTile icon={Scale} label="Evaluating" value={counts.evaluation} loading={isLoading} onClick={() => setFilter("evaluation")} active={filter === "evaluation"} />
-        <StatTile icon={Trophy} label="Awarded" value={counts.awarded} tone="good" loading={isLoading} />
-      </div>
+      <Tabs defaultValue="active-rfq" className="w-full">
+        <TabsList>
+          <TabsTrigger value="active-rfq">
+            <FileText className="h-4 w-4 mr-2" />
+            Active RFQs
+          </TabsTrigger>
+          <TabsTrigger value="active-rfp">
+            <FileText className="h-4 w-4 mr-2" />
+            Active RFPs
+          </TabsTrigger>
+          <TabsTrigger value="pending">
+            <Clock className="h-4 w-4 mr-2" />
+            Pending Response
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <History className="h-4 w-4 mr-2" />
+            History
+          </TabsTrigger>
+        </TabsList>
 
-      <Toolbar>
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchField value={search} onChange={setSearch} placeholder="Search RFQ number or title…" />
-          <Segmented<Filter>
-            label="Status"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: "all", label: "All", count: counts.all },
-              { value: "draft", label: "Draft", count: counts.draft },
-              { value: "open", label: "Open", count: counts.open },
-              { value: "evaluation", label: "Evaluating", count: counts.evaluation },
-              { value: "done", label: "Finished", count: counts.done },
-            ]}
-          />
-        </div>
-      </Toolbar>
+        <TabsContent value="active-rfq" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Request for Quotations</CardTitle>
+              <CardDescription>
+                Manage ongoing RFQs sent to suppliers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No active RFQs at the moment</p>
+                <Button variant="outline" className="mt-4">
+                  <FilePlus className="h-4 w-4 mr-2" />
+                  Create New RFQ
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <DataCard footer={`${rows.length} of ${rfqs.length} RFQs`}>
-        {!isLoading && rows.length === 0 ? (
-          <EmptyState
-            icon={FileQuestion}
-            title={rfqs.length === 0 ? "No RFQs yet" : "No RFQs match"}
-            description={rfqs.length === 0 ? "Create an RFQ, invite approved suppliers and publish it to collect quotes." : "Try another search or status."}
-            action={rfqs.length === 0 ? <Button className="rounded-full" onClick={() => setCreating(true)}>New RFQ</Button> : undefined}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>RFQ</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Quotes due</TableHead>
-                  <TableHead className="text-right">Suppliers</TableHead>
-                  <TableHead className="text-right">Quotes</TableHead>
-                  <TableHead className="text-right">Lowest total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r) => {
-                  const submitted = (r.quotes ?? []).filter((x) => x.status !== "draft");
-                  const lowest = submitted.length ? Math.min(...submitted.map((x) => Number(x.total_quoted_amount ?? 0))) : null;
-                  return (
-                    <TableRow key={r.id} className="cursor-pointer" onClick={() => setOpenId(r.id)}>
-                      <TableCell>
-                        <div className="font-medium">{r.title}</div>
-                        <div className="font-mono text-xs text-muted-foreground">{r.request_number}</div>
-                      </TableCell>
-                      <TableCell><RfqStatusChip status={r.status} /></TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div>{formatDeadline(r.submission_deadline)}</div>
-                        {isOpenForQuotes(r.status) && (
-                          <div className={closingSoon(r) ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{deadlineHint(r.submission_deadline)}</div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{r.invited_suppliers?.length ?? 0}</TableCell>
-                      <TableCell className="text-right tabular-nums">{submitted.length}</TableCell>
-                      <TableCell className="whitespace-nowrap text-right tabular-nums">{formatMoney(lowest, r.currency)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </DataCard>
+        <TabsContent value="active-rfp" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Request for Proposals</CardTitle>
+              <CardDescription>
+                Manage ongoing RFPs for complex procurement needs
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No active RFPs at the moment</p>
+                <Button variant="outline" className="mt-4">
+                  <FilePlus className="h-4 w-4 mr-2" />
+                  Create New RFP
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <CreateRfqRfpDialog open={creating} onOpenChange={setCreating} />
-      <RfqWorkspaceSheet requestId={openId} onOpenChange={(o) => !o && setOpenId(null)} />
+        <TabsContent value="pending" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Responses</CardTitle>
+              <CardDescription>
+                RFQs and RFPs awaiting supplier responses
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-muted-foreground">
+                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No pending responses</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>RFQ/RFP History</CardTitle>
+              <CardDescription>
+                View completed and cancelled requests
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-muted-foreground">
+                <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No historical records found</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

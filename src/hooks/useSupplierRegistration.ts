@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCachedUser } from "@/lib/currentUser";
 import { SupplierRegistrationRequest, DuplicateSupplier } from "@/types/supplierRegistration";
 import { toast } from "sonner";
-import { notifyRegistrationDecision } from "@/lib/sourcingNotify";
 
 export function useSupplierRegistrations(companyId?: string) {
   return useQuery({
@@ -298,11 +297,10 @@ export function useApproveRegistration() {
 
       return supplier;
     },
-    onSuccess: (_supplier, { id }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supplier-registrations'] });
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       toast.success("Supplier approved and created");
-      void notifyRegistrationDecision(id);
     },
     onError: (error: any) => {
       toast.error(`Failed to approve: ${error.message}`);
@@ -339,10 +337,9 @@ export function useRejectRegistration() {
         notes: reason,
       });
     },
-    onSuccess: (_data, { id }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supplier-registrations'] });
       toast.success("Registration rejected");
-      void notifyRegistrationDecision(id);
     },
     onError: (error: any) => {
       toast.error(`Failed to reject: ${error.message}`);
