@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ export default function MfaChallenge() {
   const [code, setCode] = useState('');
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Set while a recovery code is processed, so the redirect below does not race it.
+  const recovering = useRef(false);
 
   useEffect(() => {
     supabase.auth.mfa.listFactors().then(({ data }) => {
@@ -27,7 +29,7 @@ export default function MfaChallenge() {
 
   // If user is already AAL2 (or has no verified factor), bounce them out
   useEffect(() => {
-    if (mfa.loading) return;
+    if (mfa.loading || recovering.current) return;
     if (mfa.currentLevel === 'aal2' || !mfa.hasVerifiedFactor) {
       navigate('/', { replace: true });
     }
@@ -38,12 +40,39 @@ export default function MfaChallenge() {
     setBusy(true);
     try {
       if (recoveryMode) {
-        const { data, error } = await supabase.rpc('consume_mfa_recovery_code', { p_code: code });
-        if (error) throw error;
-        if (!data) throw new Error('Invalid or already-used recovery code.');
+        recovering.current = true;
+        // The server checks the code once and, if valid, removes the old
+        // authenticator; a recovery code alone cannot complete the MFA step.
+        const { data, error } = await supabase.functions.invoke<{ success: boolean; error?: string }>(
+          'mfa-recovery',
+          { body: { code } },
+        );
+        if (error || !data) {
+          let message = 'Could not check the recovery code. Try again.';
+          try {
+            const body = await (error as { context?: Response } | null)?.context?.json();
+            if (body?.error) message = body.error;
+          } catch {
+            // keep the generic message
+          }
+          throw new Error(message);
+        }
+        if (!data.success) throw new Error(data.error ?? 'That recovery code is wrong or has already been used.');
+
+        // Pick up the removed authenticator so the app stops asking for a code.
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          await supabase.auth.signOut();
+          toast({
+            title: 'Recovery code accepted',
+            description: 'Sign in again, then set up your authenticator app.',
+          });
+          navigate('/auth', { replace: true });
+          return;
+        }
         toast({
           title: 'Recovery code accepted',
-          description: 'Please re-enroll your authenticator from Account → Security.',
+          description: 'Your old authenticator was removed. Set up a new one now.',
         });
         navigate('/account/mfa', { replace: true });
         return;
@@ -60,6 +89,7 @@ export default function MfaChallenge() {
       mfa.refresh();
       navigate('/', { replace: true });
     } catch (e: any) {
+      recovering.current = false;
       toast({ title: 'Verification failed', description: e.message, variant: 'destructive' });
     } finally {
       setBusy(false);

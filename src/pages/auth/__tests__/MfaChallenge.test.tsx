@@ -54,7 +54,7 @@ describe("MfaChallenge", () => {
     expect(navigateMock).not.toHaveBeenCalledWith("/", expect.anything());
   });
 
-  it("recovery code success → routes to /account/mfa for re-enrollment", async () => {
+  it("recovery code success → removes the authenticator and routes to /account/mfa", async () => {
     seedEnrolledAal1();
     const user = userEvent.setup();
     renderWithRouter(<MfaChallenge />, { route: "/auth/mfa" });
@@ -66,7 +66,29 @@ describe("MfaChallenge", () => {
     await waitFor(() =>
       expect(navigateMock).toHaveBeenCalledWith("/account/mfa", { replace: true }),
     );
-    expect(mfaState.recoveryCodes.has("GOOD1-XXXXX")).toBe(false);
+    expect(supabaseMock.functions.invoke).toHaveBeenCalledWith("mfa-recovery", {
+      body: { code: "GOOD1-XXXXX" },
+    });
+    expect(supabaseMock.auth.refreshSession).toHaveBeenCalled();
+    expect(mfaState.recoveryCodes.size).toBe(0);
+    expect(mfaState.factors).toHaveLength(0);
+    // No verified factor left, so the session no longer needs AAL2: no loop back to /auth/mfa.
+    expect(mfaState.aal.nextLevel).toBe("aal1");
+  });
+
+  it("recovery code accepted but session refresh fails → signs out and asks to sign in again", async () => {
+    seedEnrolledAal1();
+    mfaState.refreshError = "Refresh token revoked";
+    const user = userEvent.setup();
+    renderWithRouter(<MfaChallenge />, { route: "/auth/mfa" });
+
+    await user.click(await screen.findByRole("button", { name: /use a recovery code/i }));
+    await user.type(screen.getByLabelText(/recovery code/i), "GOOD2-XXXXX");
+    await user.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/auth", { replace: true }));
+    expect(supabaseMock.auth.signOut).toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalledWith("/account/mfa", expect.anything());
   });
 
   it("recovery code reuse fails on second attempt", async () => {
@@ -82,9 +104,10 @@ describe("MfaChallenge", () => {
     await user.click(screen.getByRole("button", { name: /^verify$/i }));
 
     await waitFor(() =>
-      expect(screen.getByText(/invalid or already-used recovery code/i)).toBeInTheDocument(),
+      expect(screen.getByText(/wrong or has already been used/i)).toBeInTheDocument(),
     );
     expect(navigateMock).not.toHaveBeenCalledWith("/account/mfa", expect.anything());
+    expect(mfaState.factors).toHaveLength(1);
   });
 
   it("auto-redirects when AAL already aal2", async () => {

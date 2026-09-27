@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { REPORT_REGISTRY } from "@/lib/reports/registry";
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 
 type SingleProps = {
   template: string;
@@ -48,9 +49,13 @@ function buildHref(template: string, params?: GenerateReportButtonProps["params"
  */
 export function GenerateReportButton(props: GenerateReportButtonProps) {
   const navigate = useNavigate();
+  const { canOpenPath } = useAccessibleNav();
   const label = props.label ?? "Generate Report";
   const variant = props.variant ?? "outline";
   const size = props.size ?? "default";
+
+  // Hidden for users whose role cannot open the Reports Center.
+  if (!canOpenPath("/management/reports")) return null;
 
   if ("template" in props && props.template) {
     return (

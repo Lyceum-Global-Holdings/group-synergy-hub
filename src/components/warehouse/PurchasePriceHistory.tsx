@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { MONTH_PRESETS, toIsoDate, trailingMonths } from "@/lib/reports/period";
 import { cn } from "@/lib/utils";
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 
 type Basis = "received" | "ordered";
 type Months = 1 | 3 | 6 | 12;
@@ -70,6 +71,7 @@ const BASES: { key: Basis; label: string }[] = [
  */
 export function PurchasePriceHistory({ catalogItemId, companyId: itemCompanyId }: Props) {
   const { selectedCompany, formatCurrency } = useCompany();
+  const canOpenReports = useAccessibleNav().canOpenPath("/management/reports");
   const companyId = selectedCompany?.id ?? itemCompanyId ?? null;
   const [basis, setBasis] = useState<Basis>("received");
   const [months, setMonths] = useState<Months>(12);
@@ -270,7 +272,7 @@ export function PurchasePriceHistory({ catalogItemId, companyId: itemCompanyId }
           </>
         )}
 
-        {catalogItemId && companyId && !error && (
+        {catalogItemId && companyId && !error && canOpenReports && (
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <Link to={reportLink("PR-PRC-HIS-001")} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
               Full purchase history <ArrowUpRight className="h-3 w-3" />

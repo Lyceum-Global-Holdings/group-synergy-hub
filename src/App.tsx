@@ -84,6 +84,7 @@ import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { markRouteChange } from "@/lib/perfTelemetry";
 import { prefetchCommonRoutesOnIdle, prefetchNeighborRoutesOnIdle } from "@/lib/routePreload";
 import { RouteSkeleton } from "@/components/layout/RouteSkeleton";
+import { ModuleAccessGuard } from "@/components/layout/ModuleAccessGuard";
 import { isScannerShell } from "@/lib/scannerShell";
 import RootErrorBoundary from "./components/common/RootErrorBoundary";
 
@@ -259,9 +260,11 @@ const ProtectedLayout = () => (
           <CostumeCartProvider>
             <AppLayout>
               <MfaEnforcementGate>
-                <Suspense fallback={<RouteSkeleton />}>
-                  <Outlet />
-                </Suspense>
+                <ModuleAccessGuard>
+                  <Suspense fallback={<RouteSkeleton />}>
+                    <Outlet />
+                  </Suspense>
+                </ModuleAccessGuard>
               </MfaEnforcementGate>
             </AppLayout>
           </CostumeCartProvider>

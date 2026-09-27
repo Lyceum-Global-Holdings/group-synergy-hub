@@ -35,8 +35,10 @@ import { ToolDueAlertsTab } from "@/components/warehouse/tools/ToolDueAlertsTab"
 import { DeleteConfirmationDialog } from "@/components/admin/DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseTool } from "@/types/toolManagement";
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 
 export default function ToolManagement() {
+  const canOpenReports = useAccessibleNav().canOpenPath("/management/reports");
   const [activeTab, setActiveTab] = useState("inventory");
   const [showCreateTool, setShowCreateTool] = useState(false);
   const [showIssueTool, setShowIssueTool] = useState(false);
@@ -85,12 +87,14 @@ export default function ToolManagement() {
             Find action
             <kbd className="ml-2 hidden sm:inline-flex h-5 items-center rounded border bg-muted px-1.5 text-[10px] font-medium">⌘K</kbd>
           </Button>
-          <Button asChild variant="outline">
-            <Link to="/management/reports?template=WH-TOOL-LED-001">
-              <FileBarChart className="h-4 w-4 mr-2" />
-              Generate Report
-            </Link>
-          </Button>
+          {canOpenReports && (
+            <Button asChild variant="outline">
+              <Link to="/management/reports?template=WH-TOOL-LED-001">
+                <FileBarChart className="h-4 w-4 mr-2" />
+                Generate Report
+              </Link>
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">

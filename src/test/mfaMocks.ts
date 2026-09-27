@@ -14,12 +14,15 @@ export const mfaState: {
   factors: Factor[];
   recoveryCodes: Set<string>;
   authStateListeners: Array<(event: string, session: unknown) => void>;
+  /** When set, auth.refreshSession fails with this message. */
+  refreshError: string | null;
 } = {
   user: null,
   aal: { currentLevel: "aal1", nextLevel: "aal1" },
   factors: [],
   recoveryCodes: new Set(),
   authStateListeners: [],
+  refreshError: null,
 };
 
 export function resetMfaMockState() {
@@ -28,6 +31,20 @@ export function resetMfaMockState() {
   mfaState.factors = [];
   mfaState.recoveryCodes = new Set();
   mfaState.authStateListeners = [];
+  mfaState.refreshError = null;
+}
+
+/** Mirrors supabase/functions/mfa-recovery: a valid code removes the factors. */
+function mfaRecovery(code: string) {
+  const normalized = code.trim().toUpperCase();
+  if (!mfaState.recoveryCodes.has(normalized)) {
+    return { success: false, error: "That recovery code is wrong or has already been used." };
+  }
+  const removed = mfaState.factors.length;
+  mfaState.factors = [];
+  mfaState.recoveryCodes = new Set();
+  mfaState.aal = { currentLevel: "aal1", nextLevel: "aal1" };
+  return { success: true, factorsRemoved: removed };
 }
 
 export const supabaseMock = {
@@ -44,6 +61,11 @@ export const supabaseMock = {
       mfaState.user = null;
       return { error: null };
     }),
+    refreshSession: vi.fn(async () =>
+      mfaState.refreshError
+        ? { data: { session: null }, error: { message: mfaState.refreshError } }
+        : { data: { session: mfaState.user ? { user: mfaState.user } : null }, error: null },
+    ),
     mfa: {
       getAuthenticatorAssuranceLevel: vi.fn(async () => ({
         data: { ...mfaState.aal },
@@ -99,6 +121,14 @@ export const supabaseMock = {
         },
       ),
     },
+  },
+  functions: {
+    invoke: vi.fn(async (name: string, options?: { body?: { code?: string } }) => {
+      if (name === "mfa-recovery") {
+        return { data: mfaRecovery(options?.body?.code ?? ""), error: null };
+      }
+      return { data: null, error: { message: `Unknown function ${name}` } };
+    }),
   },
   rpc: vi.fn(async (fn: string, args?: { p_code?: string }) => {
     if (fn === "generate_mfa_recovery_codes") {

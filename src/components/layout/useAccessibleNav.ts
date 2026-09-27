@@ -4,6 +4,7 @@ import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useUserEffectiveModules } from "@/hooks/useModuleAccess";
 import { useUserPins, type PinnedSubmodule } from "@/hooks/useSidebarPins";
 import { moduleConfig, normalizeCompanyModules } from "@/constants/moduleConfig";
+import { resolveModuleRoute } from "@/components/layout/moduleRoutes";
 import type { Company } from "@/types/company";
 import type { LucideIcon } from "lucide-react";
 
@@ -35,10 +36,12 @@ export type NavModule = {
  *  - others: company modules ∩ the user's effective module/sub-module grants
  */
 export function useAccessibleNav() {
-  const { selectedCompany, companies, isViewingAllCompanies } = useCompany();
-  const { data: isSuperAdmin } = useSuperAdmin();
+  const { selectedCompany, companies, isViewingAllCompanies, isLoading: companiesLoading } = useCompany();
+  const superAdminQuery = useSuperAdmin();
+  const isSuperAdmin = superAdminQuery.data;
   const { user } = useAuth();
-  const { data: userEffectiveModules } = useUserEffectiveModules(user?.id);
+  const effectiveModulesQuery = useUserEffectiveModules(user?.id);
+  const userEffectiveModules = effectiveModulesQuery.data;
   const { data: allPins } = useUserPins();
 
   const modulesOf = (company: Company) => {
@@ -149,6 +152,26 @@ export function useAccessibleNav() {
   /** True when the user can open this module → sub-module in the current scope. */
   const canOpen = (moduleKey: string, submoduleKey: string) => allowedKeys.has(`${moduleKey}|${submoduleKey}`);
 
+  /** Access has resolved (a failed lookup counts as resolved, with no access). */
+  const isReady =
+    !companiesLoading &&
+    (superAdminQuery.data !== undefined || superAdminQuery.isError) &&
+    (isSuperAdmin === true || userEffectiveModules !== undefined || effectiveModulesQuery.isError);
+
+  /** A company (or the super-admin "All Companies" view) is selected. */
+  const hasCompanyScope = isViewingAllCompanies || !!selectedCompany;
+
+  /**
+   * True when the user may open this URL. Pages outside the module catalogue
+   * (dashboard, account) are always allowed; administration pages keep their
+   * own admin guards.
+   */
+  const canOpenPath = (path: string) => {
+    const route = resolveModuleRoute(path);
+    if (!route || route.moduleKey === "administration" || isSuperAdmin) return true;
+    return canOpen(route.moduleKey, route.submoduleKey);
+  };
+
   return {
     modules,
     moduleCount: availableModuleKeys.length,
@@ -156,6 +179,9 @@ export function useAccessibleNav() {
     pinTargetCompany,
     isItemPinned,
     canOpen,
+    canOpenPath,
+    isReady,
+    hasCompanyScope,
     isSuperAdmin: !!isSuperAdmin,
     isViewingAllCompanies,
   };

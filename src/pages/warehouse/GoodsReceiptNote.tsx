@@ -22,6 +22,7 @@ import { CreateGrnDialog } from '@/components/warehouse/CreateGrnDialog';
 import { GrnDetailsDialog } from '@/components/warehouse/GrnDetailsDialog';
 import { format } from 'date-fns';
 import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
@@ -43,6 +44,7 @@ const statusLabels: Record<GrnStatus, string> = {
 
 function GoodsReceiptNote() {
   const { selectedCompany } = useCompany();
+  const canOpenReports = useAccessibleNav().canOpenPath("/management/reports");
   const { globalLocationId } = useLocationFilter();
   const { data: grns = [], isLoading } = useGoodsReceiptNotes(selectedCompany?.id, globalLocationId);
   const { data: summary } = useGrnSummary(selectedCompany?.id, globalLocationId);
@@ -79,18 +81,22 @@ function GoodsReceiptNote() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link to="/management/reports?template=WH-GRN-REG-001">
-              <FileBarChart className="mr-2 h-4 w-4" />
-              Generate Report
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/management/reports?template=WH-FRT-SUM-001">
-              <Truck className="mr-2 h-4 w-4" />
-              Freight Report
-            </Link>
-          </Button>
+          {canOpenReports && (
+            <>
+              <Button asChild variant="outline">
+                <Link to="/management/reports?template=WH-GRN-REG-001">
+                  <FileBarChart className="mr-2 h-4 w-4" />
+                  Generate Report
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/management/reports?template=WH-FRT-SUM-001">
+                  <Truck className="mr-2 h-4 w-4" />
+                  Freight Report
+                </Link>
+              </Button>
+            </>
+          )}
           <Button onClick={() => setShowCreateDialog(true)}>
             <PackageCheck className="mr-2 h-4 w-4" />
             Create GRN

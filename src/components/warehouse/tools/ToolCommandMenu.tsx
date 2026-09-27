@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut,
 } from "@/components/ui/command";
@@ -27,6 +28,7 @@ interface Props extends ToolCommandActions {
 /** ⌘K command palette — makes every tool-management function discoverable + searchable. */
 export function ToolCommandMenu({ open, onOpenChange, ...a }: Props) {
   const navigate = useNavigate();
+  const canOpenReports = useAccessibleNav().canOpenPath("/management/reports");
 
   // Global ⌘K / Ctrl+K to open.
   useEffect(() => {
@@ -73,15 +75,15 @@ export function ToolCommandMenu({ open, onOpenChange, ...a }: Props) {
           <CommandItem onSelect={() => run(() => a.onGoTab("due"))}><Gauge className="mr-2 h-4 w-4" /> Due &amp; alerts (calibration / maintenance)</CommandItem>
         </CommandGroup>
 
-        <CommandSeparator />
-        <CommandGroup heading="Reports">
+        {canOpenReports && <CommandSeparator />}
+        {canOpenReports && <CommandGroup heading="Reports">
           <CommandItem onSelect={() => report("WH-TOOL-LED-001")}><FileBarChart className="mr-2 h-4 w-4" /> Tool ledger (issue / return)</CommandItem>
           <CommandItem onSelect={() => report("WH-TOOL-CAL-DUE-001")}><Gauge className="mr-2 h-4 w-4" /> Calibration due</CommandItem>
           <CommandItem onSelect={() => report("WH-TOOL-CAL-HIST-001")}><Gauge className="mr-2 h-4 w-4" /> Calibration history</CommandItem>
           <CommandItem onSelect={() => report("WH-TOOL-MAINT-DUE-001")}><Wrench className="mr-2 h-4 w-4" /> Maintenance due</CommandItem>
           <CommandItem onSelect={() => report("WH-TOOL-MAINT-HIST-001")}><Wrench className="mr-2 h-4 w-4" /> Maintenance history</CommandItem>
           <CommandItem onSelect={() => report("WH-TOOL-COST-001")}><DollarSign className="mr-2 h-4 w-4" /> Tool cost (calibration + maintenance)</CommandItem>
-        </CommandGroup>
+        </CommandGroup>}
       </CommandList>
     </CommandDialog>
   );

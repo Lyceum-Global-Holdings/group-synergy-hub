@@ -19,7 +19,7 @@ import {
   type MfaPolicy,
 } from "@/hooks/useSecuritySettings";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, Bot, KeyRound, History, Loader2, Info } from "lucide-react";
+import { ShieldCheck, Bot, KeyRound, History, Loader2, Info, MapPin } from "lucide-react";
 
 const MFA_POLICIES: { value: MfaPolicy; label: string; help: string }[] = [
   { value: "disabled",        label: "Disabled",                 help: "MFA is hidden. Not recommended for production." },
@@ -49,6 +49,7 @@ export default function SecuritySettings() {
   const { toast } = useToast();
   const [confirmDisableTurnstile, setConfirmDisableTurnstile] = useState(false);
   const [pendingPolicy, setPendingPolicy] = useState<MfaPolicy | null>(null);
+  const [confirmDisableLocation, setConfirmDisableLocation] = useState(false);
   const [grace, setGrace] = useState<string>("");
   const [remember, setRemember] = useState<string>("");
 
@@ -85,7 +86,7 @@ export default function SecuritySettings() {
         <div>
           <h1 className="text-2xl font-bold">Security Settings</h1>
           <p className="text-sm text-muted-foreground">
-            Centrally control bot protection and multi-factor authentication.
+            Centrally control bot protection, multi-factor authentication and location access.
             Aligned with NIST SP 800-63B (AAL2), ISO 27001 A.9.4.2, OWASP ASVS V2/V11, SOC 2 CC6.
           </p>
         </div>
@@ -95,6 +96,7 @@ export default function SecuritySettings() {
         <TabsList>
           <TabsTrigger value="bot"><Bot className="h-4 w-4 mr-2" />Bot Protection</TabsTrigger>
           <TabsTrigger value="mfa"><KeyRound className="h-4 w-4 mr-2" />MFA Policy</TabsTrigger>
+          <TabsTrigger value="location"><MapPin className="h-4 w-4 mr-2" />Location Access</TabsTrigger>
           <TabsTrigger value="audit"><History className="h-4 w-4 mr-2" />Audit Log</TabsTrigger>
         </TabsList>
 
@@ -246,6 +248,48 @@ export default function SecuritySettings() {
           </Card>
         </TabsContent>
 
+        {/* ---------- Location access ---------- */}
+        <TabsContent value="location" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                Location permissions
+                <Badge variant={settings.enforce_location_access !== false ? "default" : "secondary"}>
+                  {settings.enforce_location_access !== false ? "Enforced" : "Screens only"}
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                The locations granted to each user in Users &amp; Roles are enforced by the database, so a user cannot read or change another location's stock, receipts, issues, transfers, assets or tools — not even by calling the API directly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between p-4 border rounded-md bg-muted/30">
+                <div className="pr-4">
+                  <Label className="text-base">Enforce in the database</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Turn off only if location-restricted users are blocked from work they should be able to do. Screens keep filtering by location either way.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.enforce_location_access !== false}
+                  onCheckedChange={(v) => {
+                    if (!v) setConfirmDisableLocation(true);
+                    else apply({ enforce_location_access: true });
+                  }}
+                />
+              </div>
+
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Who is affected</AlertTitle>
+                <AlertDescription>
+                  Only users with specific locations granted. Administrators, users set to “view all locations”, and users with no location grants can use every location of their companies. Granting a location also grants its sub-locations.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* ---------- Audit ---------- */}
         <TabsContent value="audit" className="space-y-4">
           <Card>
@@ -289,6 +333,23 @@ export default function SecuritySettings() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => apply({ turnstile_enabled: false })}>
               Disable
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDisableLocation} onOpenChange={setConfirmDisableLocation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop enforcing location permissions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Location-restricted users will be able to read and change other locations' data through the API. Screens still filter by location. Use this only while you investigate a problem.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => apply({ enforce_location_access: false })}>
+              Stop enforcing
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

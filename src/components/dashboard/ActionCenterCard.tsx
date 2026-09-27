@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { HealthStrip } from "@/hooks/useDashboardPulse";
 import { DashCard, DashCardHeader, HERO_GRADIENT, Skeleton } from "./DashCard";
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 
 interface Props {
   health: HealthStrip | undefined;
@@ -69,7 +70,8 @@ function buildActions(h?: HealthStrip): Action[] {
 }
 
 export function ActionCenterCard({ health, loading, className }: Props) {
-  const actions = buildActions(health);
+  const { canOpenPath } = useAccessibleNav();
+  const actions = buildActions(health).filter((a) => canOpenPath(a.href));
   const [top, ...rest] = actions;
 
   return (

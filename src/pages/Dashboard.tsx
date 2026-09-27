@@ -6,6 +6,7 @@ import { useDashboardLocations } from "@/hooks/useWarehouseLocations";
 import { useDashboardLocationData } from "@/hooks/useDashboardLocationData";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import {
@@ -91,6 +92,7 @@ function Breakdown({ entries }: { entries: Array<[string, number]> }) {
 export default function Dashboard() {
   const { globalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
+  const { canOpenPath } = useAccessibleNav();
   const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
   const { data: profile } = useCurrentUserProfile();
   const { data: locations } = useDashboardLocations(selectedCompany?.id);
@@ -128,12 +130,14 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LivePulseIndicator live={live} />
-          <Button asChild variant="outline" className="h-11 rounded-full px-5">
-            <Link to="/management/reports">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Reports
-            </Link>
-          </Button>
+          {canOpenPath("/management/reports") && (
+            <Button asChild variant="outline" className="h-11 rounded-full px-5">
+              <Link to="/management/reports">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Reports
+              </Link>
+            </Button>
+          )}
           <Button
             asChild
             className={cn(HERO_GRADIENT, "h-11 rounded-full px-5 text-white shadow-lg shadow-primary/25 hover:brightness-110")}

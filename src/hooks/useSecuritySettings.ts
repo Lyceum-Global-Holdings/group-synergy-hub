@@ -17,6 +17,8 @@ export interface SecuritySettings {
   mfa_grace_period_days: number;
   mfa_remember_device_hours: number;
   allowed_mfa_factors: string[];
+  /** Database-level location permissions (migration 20260927120000). Missing = on. */
+  enforce_location_access?: boolean;
   updated_by: string | null;
   updated_at: string;
 }

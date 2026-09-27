@@ -12,8 +12,10 @@ import { MovementAnalysisTab } from '@/components/warehouse/valuation/MovementAn
 import { SnapshotManager } from '@/components/warehouse/valuation/SnapshotManager';
 import { ValuationReportsTab } from '@/components/warehouse/valuation/ValuationReportsTab';
 import { ValuationFilters } from '@/types/inventoryValuation';
+import { useAccessibleNav } from "@/components/layout/useAccessibleNav";
 
 export default function InventoryValuation() {
+  const canOpenReports = useAccessibleNav().canOpenPath("/management/reports");
   const [filters, setFilters] = useState<ValuationFilters>({});
 
   return (
@@ -25,12 +27,14 @@ export default function InventoryValuation() {
               Comprehensive inventory valuation and analysis
             </p>
           </div>
-          <Button asChild variant="outline">
-            <Link to="/management/reports?template=WH-INV-VAL-001">
-              <FileBarChart className="mr-2 h-4 w-4" />
-              Generate Report
-            </Link>
-          </Button>
+          {canOpenReports && (
+            <Button asChild variant="outline">
+              <Link to="/management/reports?template=WH-INV-VAL-001">
+                <FileBarChart className="mr-2 h-4 w-4" />
+                Generate Report
+              </Link>
+            </Button>
+          )}
         </div>
 
 
