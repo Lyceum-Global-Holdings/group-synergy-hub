@@ -63,6 +63,34 @@ export const useSuppliers = () => {
   });
 };
 
+/**
+ * Suppliers that can be put on a new order: the company's approved suppliers
+ * minus blacklisted ones. Watch-listed suppliers stay, flagged, so the buyer
+ * sees the warning. The database refuses blacklisted suppliers on orders too
+ * (migration 20260927180000).
+ */
+export const useOrderableSuppliers = () => {
+  const suppliersQuery = useSuppliers();
+  const blacklistQuery = useQuery({
+    queryKey: ['supplier-blacklist', 'order-status'],
+    queryFn: async (): Promise<Map<string, 'blacklisted' | 'watchlist'>> => {
+      const { data, error } = await supabase
+        .from('supplier_blacklist')
+        .select('supplier_id, status')
+        .in('status', ['blacklisted', 'watchlist']);
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.supplier_id, r.status as 'blacklisted' | 'watchlist']));
+    },
+  });
+
+  const statusBySupplier = blacklistQuery.data;
+  const data = (suppliersQuery.data ?? [])
+    .filter((s) => statusBySupplier?.get(s.id) !== 'blacklisted')
+    .map((s) => ({ ...s, watchlisted: statusBySupplier?.get(s.id) === 'watchlist' }));
+
+  return { ...suppliersQuery, data, isLoading: suppliersQuery.isLoading || blacklistQuery.isLoading };
+};
+
 // Fetch single supplier
 export const useSupplier = (id: string) => {
   return useQuery({

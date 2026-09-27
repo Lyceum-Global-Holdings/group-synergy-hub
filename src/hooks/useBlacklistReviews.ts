@@ -46,8 +46,21 @@ export const useBlacklistReviews = (blacklistId?: string) => {
 
       if (error) throw error;
 
-      // Update blacklist next review date if provided
-      if (reviewData.next_review_date) {
+      if (reviewData.decision === 'clear') {
+        // A "clear" decision lifts the blacklist; the existing trigger then
+        // sets the supplier back to active.
+        const { error: clearError } = await supabase
+          .from('supplier_blacklist')
+          .update({
+            status: 'cleared',
+            cleared_date: new Date().toISOString().split('T')[0],
+            cleared_by: user.id,
+            clearing_reason: reviewData.recommendation || 'Cleared at review',
+          })
+          .eq('id', reviewData.blacklist_id);
+        if (clearError) throw clearError;
+      } else if (reviewData.next_review_date) {
+        // Update blacklist next review date if provided
         await supabase
           .from('supplier_blacklist')
           .update({ next_review_date: reviewData.next_review_date })
@@ -59,6 +72,7 @@ export const useBlacklistReviews = (blacklistId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blacklist-reviews'] });
       queryClient.invalidateQueries({ queryKey: ['supplier-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       toast({
         title: "Review completed",
         description: "The blacklist review has been recorded.",

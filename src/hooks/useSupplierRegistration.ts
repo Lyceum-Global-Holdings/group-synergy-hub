@@ -277,7 +277,10 @@ export function useApproveRegistration() {
           status: 'approved',
           reviewed_by: user?.id,
           reviewed_at: new Date().toISOString(),
-        })
+          // The database allocates this supplier to the registration's company
+          // as approved (migration 20260927180000).
+          supplier_id: supplier.id,
+        } as any)
         .eq('id', id);
       
       if (updateError) throw updateError;

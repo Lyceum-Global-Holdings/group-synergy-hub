@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, X } from "lucide-react";
-import { useSuppliers } from "@/hooks/useSuppliers";
+import { useOrderableSuppliers } from "@/hooks/useSuppliers";
 import { useCreateBlanketPurchaseOrder } from "@/hooks/useBlanketPurchaseOrders";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
@@ -50,7 +50,8 @@ interface CreateBlanketPoDialogProps {
 
 export function CreateBlanketPoDialog({ open, onOpenChange }: CreateBlanketPoDialogProps) {
   const [activeTab, setActiveTab] = useState("header");
-  const { data: suppliers = [] } = useSuppliers();
+  // Blacklisted suppliers are left out; watch-listed ones are flagged.
+  const { data: suppliers = [] } = useOrderableSuppliers();
   const { items: warehouseItems = [] } = useWarehouseItems();
   const createBpo = useCreateBlanketPurchaseOrder();
 
@@ -143,6 +144,7 @@ export function CreateBlanketPoDialog({ open, onOpenChange }: CreateBlanketPoDia
                           {suppliers.map((supplier) => (
                             <SelectItem key={supplier.id} value={supplier.id}>
                               {supplier.name}
+                              {supplier.watchlisted && <span className="ml-1.5 text-xs text-amber-600">· on watchlist</span>}
                             </SelectItem>
                           ))}
                         </SelectContent>

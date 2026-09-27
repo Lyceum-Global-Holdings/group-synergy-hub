@@ -15,7 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCreatePurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { usePurchaseRequisitions } from "@/hooks/usePurchaseRequisitions";
-import { useSuppliers } from "@/hooks/useSuppliers";
+import { useOrderableSuppliers } from "@/hooks/useSuppliers";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CreatePoData } from "@/types/purchaseOrder";
 import { cn } from "@/lib/utils";
@@ -81,7 +81,8 @@ const unitsOfMeasure = [
 export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps) {
   const [selectedPrId, setSelectedPrId] = useState(prId);
   
-  const { data: suppliers = [] } = useSuppliers();
+  // Blacklisted suppliers are left out; watch-listed ones are flagged.
+  const { data: suppliers = [] } = useOrderableSuppliers();
   const { data: purchaseRequisitions = [] } = usePurchaseRequisitions();
   const { selectedCompany } = useCompany();
   const createPoMutation = useCreatePurchaseOrder();
@@ -271,6 +272,7 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
                           {suppliers.map((supplier) => (
                             <SelectItem key={supplier.id} value={supplier.id}>
                               {supplier.name}
+                              {supplier.watchlisted && <span className="ml-1.5 text-xs text-amber-600">· on watchlist</span>}
                             </SelectItem>
                           ))}
                         </SelectContent>

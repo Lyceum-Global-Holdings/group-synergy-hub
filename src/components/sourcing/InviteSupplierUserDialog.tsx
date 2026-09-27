@@ -41,7 +41,8 @@ export const InviteSupplierUserDialog = ({ open, onOpenChange, supplierId, suppl
       return;
     }
     setAcceptUrl((data as any).accept_url ?? null);
-    toast({ title: "Invitation created", description: `Sent to ${email}` });
+    // Nothing is emailed: the admin shares the link below with the supplier.
+    toast({ title: "Invitation link created", description: `Copy the link and send it to ${email}.` });
   };
 
   return (
@@ -63,7 +64,7 @@ export const InviteSupplierUserDialog = ({ open, onOpenChange, supplierId, suppl
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Share this link with the invitee. They must sign in (or create an account) using <strong>{email}</strong>.
+              Share this link with the invitee. On that page they set a password for <strong>{email}</strong>, or sign in if they already have an account.
             </p>
             <DialogFooter>
               <Button onClick={() => { onOpenChange(false); reset(); }}>Done</Button>
