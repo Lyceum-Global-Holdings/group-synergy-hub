@@ -94,6 +94,14 @@ export function BlanketPoDetailsDialog({ bpo, open, onOpenChange }: BlanketPoDet
                   <span className="text-muted-foreground">Activated</span>
                   <p>{bpo.approved_date ? format(new Date(bpo.approved_date), "dd MMM yyyy") : "Not yet"}</p>
                 </div>
+                <div className="col-span-2 md:col-span-3">
+                  <span className="text-muted-foreground">At the end of the term</span>
+                  <p>
+                    {bpo.auto_renew
+                      ? "Renews automatically for another term of the same length; the remaining value carries over."
+                      : "Expires automatically; releases still waiting for approval are cancelled."}
+                  </p>
+                </div>
               </div>
             </Card>
             {bpo.contract_status === "draft" && (

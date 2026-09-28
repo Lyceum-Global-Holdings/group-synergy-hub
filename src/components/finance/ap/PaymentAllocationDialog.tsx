@@ -81,6 +81,7 @@ export function PaymentAllocationDialog({
     // Allocate in order of due date (oldest first)
     for (const invoice of invoices || []) {
       if (remaining <= 0) break;
+      if (invoice.payment_blocked) continue; // can't be paid until its three-way match is accepted
       
       const allocation = Math.min(invoice.outstanding, remaining);
       newAllocations[invoice.id] = allocation;
@@ -187,11 +188,18 @@ export function PaymentAllocationDialog({
                   <TableRow key={invoice.id}>
                     <TableCell>
                       <Checkbox
+                        aria-label={`Pay ${invoice.invoice_number}`}
                         checked={selectedInvoices.has(invoice.id)}
+                        disabled={!!invoice.payment_blocked}
                         onCheckedChange={() => handleToggleInvoice(invoice.id, invoice)}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                    <TableCell className="font-medium">
+                      {invoice.invoice_number}
+                      {invoice.payment_blocked && (
+                        <Badge variant="outline" className="ml-2 text-xs">{invoice.payment_blocked}</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>{format(new Date(invoice.invoice_date), 'dd MMM yyyy')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

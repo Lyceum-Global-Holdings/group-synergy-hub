@@ -12,6 +12,15 @@ export interface OutstandingInvoice {
   amount_paid: number;
   outstanding: number;
   status: string;
+  /** Why it can't be paid yet (a PO invoice whose three-way match isn't accepted), or null. */
+  payment_blocked?: string | null;
+}
+
+// Matches invoice_payment_block_reason in the database, which refuses the allocation anyway.
+export function paymentBlockReason(inv: { po_id?: string | null; three_way_match_status?: string | null }): string | null {
+  if (!inv.po_id) return null;
+  if (inv.three_way_match_status === 'matched' || inv.three_way_match_status === 'auto_matched') return null;
+  return inv.three_way_match_status === 'failed' ? 'Failed three-way match' : 'Waiting for three-way match';
 }
 
 export interface PaymentAllocation {
@@ -33,7 +42,7 @@ export function usePaymentAllocation() {
         
         const { data, error } = await supabase
           .from('supplier_invoices')
-          .select('id, invoice_number, invoice_date, due_date, gross_amount, amount_paid, status')
+          .select('id, invoice_number, invoice_date, due_date, gross_amount, amount_paid, status, po_id, three_way_match_status')
           .eq('company_id', selectedCompany.id)
           .eq('supplier_id', supplierId)
           .in('status', ['draft', 'submitted', 'approved', 'posted', 'partially_paid'])
@@ -44,6 +53,7 @@ export function usePaymentAllocation() {
         return (data || []).map(inv => ({
           ...inv,
           outstanding: inv.gross_amount - (inv.amount_paid || 0),
+          payment_blocked: paymentBlockReason(inv),
         })).filter(inv => inv.outstanding > 0) as OutstandingInvoice[];
       },
       enabled: !!selectedCompany?.id && !!supplierId,
