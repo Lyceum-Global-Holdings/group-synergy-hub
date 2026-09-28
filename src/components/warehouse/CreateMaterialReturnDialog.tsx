@@ -712,6 +712,11 @@ export function CreateMaterialReturnDialog({ open, onOpenChange, referenceId, re
             </div>
           )}
 
+          <p className="text-xs text-muted-foreground">
+            Lines marked damaged or expired go into their bin on hold when the return is approved. They can't be issued
+            or transferred until a warehouse manager releases, scraps or returns them (Held Stock tab).
+          </p>
+
           {/* Supplier return: free-form items (unchanged behaviour) */}
           {returnType === 'supplier' && (
             <div className="space-y-3">

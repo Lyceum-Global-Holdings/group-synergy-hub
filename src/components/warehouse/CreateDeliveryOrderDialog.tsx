@@ -19,18 +19,42 @@ interface CreateDeliveryOrderDialogProps {
   salesOrderId?: string;
 }
 
+// Orders that can be delivered: picked, or packed (fully or partly).
+const DELIVERABLE = ['picked', 'packing', 'packed'];
+
 export function CreateDeliveryOrderDialog({
   open,
   onOpenChange,
-  salesOrderId,
+  salesOrderId: givenSalesOrderId,
 }: CreateDeliveryOrderDialogProps) {
   const { selectedCompany } = useCompany();
   const { createDeliveryOrderWithItems, isCreatingDeliveryOrder } = useDeliveryOrders();
   const { useSalesOrders } = usePickPack();
-  
+
+  // Opened from the Delivery Orders page there's no order yet, so one is picked here.
+  const [pickedOrderId, setPickedOrderId] = useState<string>('');
+  const salesOrderId = givenSalesOrderId || pickedOrderId || undefined;
+  useEffect(() => { if (!open) setPickedOrderId(''); }, [open]);
+
   // Fetch sales order with items
   const { data: salesOrders } = useSalesOrders();
   const salesOrder = salesOrders?.find(so => so.id === salesOrderId);
+  const deliverableOrders = (salesOrders ?? []).filter(so => DELIVERABLE.includes(so.status));
+
+  // The latest package recorded for the order, linked on the delivery order.
+  const { data: latestPackingList } = useQuery({
+    queryKey: ['packing-lists', 'latest', salesOrderId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('packing_lists')
+        .select('id')
+        .eq('sales_order_id', salesOrderId!)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      return data?.[0]?.id ?? null;
+    },
+    enabled: !!salesOrderId,
+  });
   
   // Fetch sales order items separately
   const { data: salesOrderItems } = useQuery({
@@ -96,14 +120,19 @@ export function CreateDeliveryOrderDialog({
       return;
     }
 
-    // Create items from sales order items with picked or issued quantities
+    // Deliver what was packed; for an order that was only picked, what was picked.
+    const anyPacked = (salesOrderItems || []).some(item => (item.quantity_packed || 0) > 0);
     const items: CreateDeliveryOrderItemData[] = (salesOrderItems || [])
-      .filter(item => item.quantity_picked > 0 || item.quantity_issued > 0)
       .map(item => ({
+        item,
+        qty: anyPacked ? (item.quantity_packed || 0) - (item.quantity_dispatched || 0) : (item.quantity_picked || 0) - (item.quantity_dispatched || 0),
+      }))
+      .filter(({ qty }) => qty > 0)
+      .map(({ item, qty }) => ({
         sales_order_item_id: item.id,
         finished_good_id: item.finished_good_id || '',
         quantity_ordered: item.quantity_ordered,
-        quantity_to_deliver: Math.max(item.quantity_picked, item.quantity_issued),
+        quantity_to_deliver: qty,
         item_condition: 'good' as const,
         quality_checked: false,
       }));
@@ -116,7 +145,7 @@ export function CreateDeliveryOrderDialog({
       deliveryOrderData: {
         sales_order_id: salesOrderId,
         customer_id: salesOrder.customer_id,
-        packing_list_id: null,
+        packing_list_id: latestPackingList ?? null,
         finished_goods_issue_id: selectedIssueId,
         delivery_address: deliveryAddress,
         delivery_contact: deliveryContact || undefined,
@@ -172,8 +201,23 @@ export function CreateDeliveryOrderDialog({
             <h3 className="font-semibold">Order Information</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Sales Order</Label>
-                <Input value={salesOrder?.order_number || ''} disabled />
+                <Label htmlFor="do-sales-order">Sales Order</Label>
+                {givenSalesOrderId ? (
+                  <Input id="do-sales-order" value={salesOrder?.order_number || ''} disabled />
+                ) : (
+                  <Select value={pickedOrderId} onValueChange={setPickedOrderId}>
+                    <SelectTrigger id="do-sales-order">
+                      <SelectValue placeholder={deliverableOrders.length ? 'Choose a picked or packed order' : 'No orders are ready to deliver'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deliverableOrders.map(so => (
+                        <SelectItem key={so.id} value={so.id}>
+                          {so.order_number} · {so.customer?.customer_name ?? '—'} · {so.status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Customer</Label>

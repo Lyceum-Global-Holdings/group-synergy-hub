@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useStockTransfer";
+import { useCreateStockTransferWithItems } from "@/hooks/useStockTransfer";
 import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { useWarehouseLocations, useEffectiveLocationsForCompany } from "@/hooks/useWarehouseLocations";
@@ -91,8 +91,7 @@ export function CreateStockTransferDialog({
     },
   });
 
-  const createTransfer = useCreateStockTransfer();
-  const createItem = useCreateStockTransferItem();
+  const createTransfer = useCreateStockTransferWithItems();
   const { bins = [] } = useWarehouseBins();
   const { items: warehouseItems = [] } = useWarehouseItems();
   const { locations = [] } = useWarehouseLocations();
@@ -233,27 +232,20 @@ export function CreateStockTransferDialog({
         return;
       }
 
-      const transferData = {
-        transfer_date: values.transfer_date || new Date().toISOString().split("T")[0],
-        transfer_type: values.transfer_type,
-        priority: values.priority,
-        from_bin_id: values.from_bin_id,
-        to_bin_id: values.to_bin_id,
-        expected_completion_date: values.expected_completion_date,
-        reason: values.reason,
-        notes: values.notes,
-        company_id: resolvedCompanyId,
-        from_location_id: fromBin?.location_id ?? null,
-        to_location_id: toBin?.location_id ?? null,
-        ...(isAdminOrHigher ? { status: 'approved' as const } : {}),
-      };
-
-      const transfer = await createTransfer.mutateAsync(transferData);
-
-      // Create all items
-      for (const item of transferItems) {
-        await createItem.mutateAsync({
-          transfer_id: transfer.id,
+      // One step in the database: the transfer and its lines are saved together,
+      // each line is checked against the stock free in its source bin, and the
+      // stock is held (admins' transfers are approved straight away).
+      await createTransfer.mutateAsync({
+        header: {
+          transfer_date: values.transfer_date || new Date().toISOString().split("T")[0],
+          transfer_type: values.transfer_type,
+          priority: values.priority,
+          expected_completion_date: values.expected_completion_date,
+          reason: values.reason,
+          notes: values.notes,
+          company_id: resolvedCompanyId,
+        },
+        items: transferItems.map((item) => ({
           warehouse_item_id: item.warehouse_item_id,
           item_name: item.item_name,
           quantity_requested: item.quantity_requested,
@@ -261,8 +253,9 @@ export function CreateStockTransferDialog({
           from_bin_id: item.from_bin_id,
           to_bin_id: item.to_bin_id,
           notes: item.notes,
-        });
-      }
+        })),
+        submit: true,
+      });
 
       form.reset();
       setTransferItems([]);
@@ -635,9 +628,9 @@ export function CreateStockTransferDialog({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createTransfer.isPending || createItem.isPending || transferItems.length === 0}
+                  disabled={createTransfer.isPending || transferItems.length === 0}
                 >
-                  {createTransfer.isPending || createItem.isPending
+                  {createTransfer.isPending
                     ? "Creating…"
                     : isAdminOrHigher
                       ? "Create & Approve Transfer"

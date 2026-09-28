@@ -23,6 +23,7 @@ import { CreateMaterialReturnDialog } from "@/components/warehouse/CreateMateria
 import { MaterialReturnDetailsDialog } from "@/components/warehouse/MaterialReturnDetailsDialog";
 import { RepairMaterialReturnDialog } from "@/components/warehouse/RepairMaterialReturnDialog";
 import { BulkRepairMaterialReturnsDialog } from "@/components/warehouse/BulkRepairMaterialReturnsDialog";
+import { QuarantineHoldsPanel } from "@/components/warehouse/QuarantineHoldsPanel";
 import { CreateMaterialRequestDialog } from "@/components/warehouse/CreateMaterialRequestDialog";
 import { MaterialRequestDetailsDialog } from "@/components/warehouse/MaterialRequestDetailsDialog";
 import { format } from "date-fns";
@@ -547,6 +548,7 @@ export default function MaterialIssueReturn() {
           <TabsTrigger value="requests">Material Requests</TabsTrigger>
           <TabsTrigger value="issues">Material Issues</TabsTrigger>
           <TabsTrigger value="returns">Material Returns</TabsTrigger>
+          <TabsTrigger value="held">Held Stock</TabsTrigger>
         </TabsList>
 
         {/* Material Requests Tab */}
@@ -622,6 +624,18 @@ export default function MaterialIssueReturn() {
                 data={materialReturns || []}
                 isLoading={isLoadingReturns}
               />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Damaged and expired returns on hold */}
+        <TabsContent value="held">
+          <Card>
+            <CardHeader>
+              <CardTitle>Held Stock</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <QuarantineHoldsPanel />
             </CardContent>
           </Card>
         </TabsContent>

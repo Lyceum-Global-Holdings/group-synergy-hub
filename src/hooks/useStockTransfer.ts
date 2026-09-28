@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from "@/hooks/use-toast";
+import { untypedRpc } from "@/lib/untypedRpc";
 import type { 
   StockTransferRequest, 
   StockTransferItem,
@@ -190,17 +191,17 @@ export const useUpdateStockTransfer = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stock-transfer-requests"] });
+      invalidateStock(queryClient);
       toast({
         title: "Transfer Updated",
         description: "Stock transfer request updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error("Update transfer error:", error);
       toast({
-        title: "Error",
-        description: "Failed to update transfer request.",
+        title: "Couldn't update the transfer",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -216,13 +217,10 @@ export const useApproveStockTransfer = () => {
       const user = getCachedUser();
       if (!user) throw new Error("User not authenticated");
 
+      // The database checks the approver's rights and records who approved.
       const { error } = await supabase
         .from("stock_transfer_requests")
-        .update({
-          status: 'approved',
-          approved_by: user.id,
-          approved_date: new Date().toISOString(),
-        })
+        .update({ status: 'approved' })
         .eq("id", transferId);
 
       if (error) throw error;
@@ -234,343 +232,119 @@ export const useApproveStockTransfer = () => {
         description: "Stock transfer request has been approved.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error("Approve transfer error:", error);
       toast({
-        title: "Error",
-        description: "Failed to approve transfer request.",
+        title: "Couldn't approve the transfer",
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 };
 
+// Completing moves every line in one database transaction (complete_stock_transfer,
+// migration 20260928170000): the stock held for the transfer is used, each line
+// is checked against what is free in its source bin, and nothing moves unless
+// everything can.
 export const useCompleteStockTransfer = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (transferId: string) => {
-      console.log('[CompleteTransfer] Starting completion for transfer:', transferId);
-      
-      const user = getCachedUser();
-      if (!user) throw new Error("User not authenticated");
-      console.log('[CompleteTransfer] User authenticated:', user.id);
-
-      // Get transfer items
-      console.log('[CompleteTransfer] Fetching transfer items...');
-      const { data: items, error: itemsError } = await supabase
-        .from("stock_transfer_items")
-        .select("*")
-        .eq("transfer_id", transferId);
-
-      if (itemsError) {
-        console.error('[CompleteTransfer] Failed to fetch items:', itemsError);
-        throw itemsError;
-      }
-      if (!items || items.length === 0) throw new Error("No items in transfer");
-      console.log('[CompleteTransfer] Found items:', items.length);
-
-      // Get transfer details
-      console.log('[CompleteTransfer] Fetching transfer details...');
-      const { data: transfer, error: transferError } = await supabase
-        .from("stock_transfer_requests")
-        .select("*")
-        .eq("id", transferId)
-        .single();
-
-      if (transferError) {
-        console.error('[CompleteTransfer] Failed to fetch transfer:', transferError);
-        throw transferError;
-      }
-
-      // Process each item - using bin IDs directly from each item
-      for (const item of items) {
-        console.log('[CompleteTransfer] Processing item:', item.item_name, 'quantity:', item.quantity_requested);
-        
-        // Skip already completed items (for retry scenarios)
-        if (item.status === 'completed') {
-          console.log('[CompleteTransfer] Item already completed, skipping:', item.id);
-          continue;
-        }
-
-        const fromBinId = item.from_bin_id;
-        const toBinId = item.to_bin_id;
-        const sourceLocationId = transfer.from_department_id || transfer.from_sublocation_id || transfer.from_location_id || null;
-        const destinationLocationId = transfer.to_department_id || transfer.to_sublocation_id || transfer.to_location_id || null;
-
-        if (!fromBinId || !toBinId) {
-          console.error('[CompleteTransfer] Missing bin IDs for item:', item.id);
-          throw new Error(`Missing bin information for item: ${item.item_name}`);
-        }
-
-        console.log('[CompleteTransfer] Bin transfer:', { fromBinId, toBinId });
-
-        // Get current stock and company_id for transaction records
-        const { data: warehouseItem } = await supabase
-          .from("warehouse_items_full")
-          .select("current_stock, company_id")
-          .eq("id", item.warehouse_item_id)
-          .single();
-
-        const currentStock = warehouseItem?.current_stock || 0;
-        const companyId = transfer.company_id || warehouseItem?.company_id;
-        console.log('[CompleteTransfer] Current stock for item:', currentStock);
-
-        // Check if transactions already exist (for retry scenarios)
-        const { data: existingTransactions } = await supabase
-          .from("stock_transactions")
-          .select("id")
-          .eq("reference_id", transferId)
-          .eq("item_id", item.warehouse_item_id)
-          .limit(1);
-
-        if (!existingTransactions || existingTransactions.length === 0) {
-          // Create transfer out transaction
-          console.log('[CompleteTransfer] Creating transfer OUT transaction...');
-          const { error: transOutError } = await supabase.from("stock_transactions").insert({
-            item_id: item.warehouse_item_id,
-            transaction_type: 'transfer_out',
-            reference_type: 'transfer',
-            reference_id: transferId,
-            quantity_change: -item.quantity_requested,
-            quantity_before: currentStock,
-            quantity_after: currentStock - item.quantity_requested,
-            notes: `Transfer ${transfer.transfer_number} - Out from bin ${fromBinId}`,
-            bin_id: fromBinId,
-            location_id: sourceLocationId,
-            created_by: user.id,
-          });
-          if (transOutError) {
-            console.error('[CompleteTransfer] Failed to create transfer OUT transaction:', transOutError);
-            throw transOutError;
-          }
-
-          // Create transfer in transaction
-          console.log('[CompleteTransfer] Creating transfer IN transaction...');
-          const { error: transInError } = await supabase.from("stock_transactions").insert({
-            item_id: item.warehouse_item_id,
-            transaction_type: 'transfer_in',
-            reference_type: 'transfer',
-            reference_id: transferId,
-            quantity_change: item.quantity_requested,
-            quantity_before: currentStock - item.quantity_requested,
-            quantity_after: currentStock,
-            notes: `Transfer ${transfer.transfer_number} - In to bin ${toBinId}`,
-            bin_id: toBinId,
-            location_id: destinationLocationId,
-            created_by: user.id,
-          });
-          if (transInError) {
-            console.error('[CompleteTransfer] Failed to create transfer IN transaction:', transInError);
-            throw transInError;
-          }
-        } else {
-          console.log('[CompleteTransfer] Transactions already exist for this item, skipping creation');
-        }
-
-        // ===== UPDATE SOURCE BIN ALLOCATION (decrease stock) =====
-        console.log('[CompleteTransfer] Updating source bin allocation for bin:', fromBinId);
-        
-        let sourceAllocationQuery = supabase
-          .from('warehouse_bin_allocations')
-          .select('*')
-          .eq('warehouse_item_id', item.warehouse_item_id)
-          .eq('bin_id', fromBinId);
-        if (sourceLocationId) sourceAllocationQuery = sourceAllocationQuery.eq('location_id', sourceLocationId);
-        const { data: sourceAllocation, error: sourceAllocError } = await sourceAllocationQuery.maybeSingle();
-
-        if (sourceAllocError) {
-          console.error('Failed to get source allocation:', sourceAllocError);
-          throw sourceAllocError;
-        }
-
-        if (sourceAllocation) {
-          const newAllocated = Math.max(0, (sourceAllocation.allocated_quantity || 0) - item.quantity_requested);
-
-          console.log('Updating source allocation:', {
-            id: sourceAllocation.id,
-            oldAllocated: sourceAllocation.allocated_quantity,
-            newAllocated,
-            quantityTransferred: item.quantity_requested,
-          });
-
-          const { error: updateSourceError } = await supabase
-            .from('warehouse_bin_allocations')
-            .update({
-              allocated_quantity: newAllocated,
-            })
-            .eq('id', sourceAllocation.id);
-
-          if (updateSourceError) {
-            console.error('[CompleteTransfer] FAILED to update source allocation:', updateSourceError);
-            throw updateSourceError;
-          }
-          console.log('[CompleteTransfer] Source allocation updated successfully');
-        } else {
-          console.warn('[CompleteTransfer] No source allocation found for item at bin:', fromBinId);
-        }
-
-        // Update source bin's current_quantity
-        const { data: sourceBinData, error: sourceBinFetchError } = await supabase
-          .from("warehouse_bins")
-          .select("current_quantity")
-          .eq("id", fromBinId)
-          .single();
-
-        if (sourceBinFetchError) {
-          console.error('Failed to get source bin data:', sourceBinFetchError);
-        } else if (sourceBinData) {
-          const { error: updateSourceBinError } = await supabase
-            .from("warehouse_bins")
-            .update({
-              current_quantity: Math.max(0, (sourceBinData.current_quantity || 0) - item.quantity_requested),
-            })
-            .eq("id", fromBinId);
-
-          if (updateSourceBinError) {
-            console.error('Failed to update source bin quantity:', updateSourceBinError);
-          }
-        }
-
-        // ===== CREATE OR UPDATE DESTINATION BIN ALLOCATION (increase stock) =====
-        console.log('[CompleteTransfer] Updating destination bin allocation for bin:', toBinId);
-
-        let destAllocationQuery = supabase
-          .from('warehouse_bin_allocations')
-          .select('*')
-          .eq('warehouse_item_id', item.warehouse_item_id)
-          .eq('bin_id', toBinId);
-        if (destinationLocationId) destAllocationQuery = destAllocationQuery.eq('location_id', destinationLocationId);
-        const { data: destAllocation, error: destAllocError } = await destAllocationQuery.maybeSingle();
-
-        if (destAllocError) {
-          console.error('Failed to check destination allocation:', destAllocError);
-          throw destAllocError;
-        }
-
-        if (destAllocation) {
-          // Update existing allocation
-          const newAllocated = (destAllocation.allocated_quantity || 0) + item.quantity_requested;
-
-          console.log('Updating destination allocation:', {
-            id: destAllocation.id,
-            oldAllocated: destAllocation.allocated_quantity,
-            newAllocated,
-          });
-
-          const { error: updateDestError } = await supabase
-            .from('warehouse_bin_allocations')
-            .update({
-              allocated_quantity: newAllocated,
-            })
-            .eq('id', destAllocation.id);
-
-          if (updateDestError) {
-            console.error('[CompleteTransfer] FAILED to update destination allocation:', updateDestError);
-            throw updateDestError;
-          }
-          console.log('[CompleteTransfer] Destination allocation updated successfully');
-        } else {
-          // Create new allocation at destination
-          console.log('Creating new destination allocation:', {
-            warehouse_item_id: item.warehouse_item_id,
-            bin_id: toBinId,
-            quantity: item.quantity_requested,
-          });
-
-          const { error: insertDestError } = await supabase
-            .from('warehouse_bin_allocations')
-            .insert({
-              warehouse_item_id: item.warehouse_item_id,
-              bin_id: toBinId,
-              allocated_quantity: item.quantity_requested,
-              reserved_quantity: 0,
-              company_id: companyId,
-              location_id: destinationLocationId,
-              created_by: user.id,
-            });
-
-          if (insertDestError) {
-            console.error('[CompleteTransfer] FAILED to create destination allocation:', insertDestError);
-            throw insertDestError;
-          }
-          console.log('[CompleteTransfer] Destination allocation created successfully');
-        }
-
-        // Update destination bin's current_quantity
-        const { data: destBinData, error: destBinFetchError } = await supabase
-          .from("warehouse_bins")
-          .select("current_quantity")
-          .eq("id", toBinId)
-          .single();
-
-        if (destBinFetchError) {
-          console.error('Failed to get destination bin data:', destBinFetchError);
-        } else if (destBinData) {
-          const { error: updateDestBinError } = await supabase
-            .from("warehouse_bins")
-            .update({
-              current_quantity: (destBinData.current_quantity || 0) + item.quantity_requested,
-            })
-            .eq("id", toBinId);
-
-          if (updateDestBinError) {
-            console.error('Failed to update destination bin quantity:', updateDestBinError);
-          }
-        }
-
-        // Update item status to completed AFTER all allocations are done
-        console.log('[CompleteTransfer] Updating transfer item status to completed...');
-        const { error: itemStatusError } = await supabase
-          .from("stock_transfer_items")
-          .update({
-            status: 'completed',
-            quantity_transferred: item.quantity_requested,
-          })
-          .eq("id", item.id);
-        if (itemStatusError) {
-          console.error('[CompleteTransfer] Failed to update item status:', itemStatusError);
-          throw itemStatusError;
-        }
-        console.log('[CompleteTransfer] Item completed successfully:', item.id);
-      }
-
-      // Update transfer status
-      const { error: updateError } = await supabase
-        .from("stock_transfer_requests")
-        .update({
-          status: 'completed',
-          completed_by: user.id,
-          completed_date: new Date().toISOString(),
-        })
-        .eq("id", transferId);
-
-      if (updateError) throw updateError;
-    },
+    mutationFn: (transferId: string) => untypedRpc<null>("complete_stock_transfer", { p_transfer_id: transferId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stock-transfer-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-transfer-items"] });
-      queryClient.invalidateQueries({ queryKey: ["warehouse-items"] });
-      queryClient.invalidateQueries({ queryKey: ["warehouse-bins"] });
-      queryClient.invalidateQueries({ queryKey: ["all-items-location-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["item-bin-allocations-for-transfer"] });
-      queryClient.invalidateQueries({ queryKey: ["warehouse-bin-allocations"] });
+      invalidateStock(queryClient);
       toast({
         title: "Transfer Completed",
         description: "Stock transfer has been completed successfully.",
       });
     },
-    onError: (error) => {
-      console.error("Complete transfer error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to complete transfer.",
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      toast({ title: "Couldn't complete the transfer", description: error.message, variant: "destructive" });
     },
   });
 };
+
+/** Why the signed-in user can't approve this transfer, or null if they can. */
+export const useStockTransferBlockReason = (transferId: string | undefined, status: string | undefined) =>
+  useQuery({
+    queryKey: ["stock-transfer-block-reason", transferId, status],
+    queryFn: () => untypedRpc<string | null>("stock_transfer_block_reason", { p_transfer_id: transferId }),
+    enabled: !!transferId && status === "pending_approval",
+    staleTime: 30_000,
+  });
+
+export interface NewTransferLine {
+  warehouse_item_id: string;
+  item_code?: string;
+  item_name?: string;
+  quantity_requested: number;
+  unit_of_measure?: string;
+  from_bin_id: string;
+  to_bin_id: string;
+  notes?: string;
+}
+
+/**
+ * Create a transfer with its lines in one step. The database checks each line
+ * against the stock free in its source bin; admins' transfers are approved
+ * straight away (and hold the stock), others are saved as a draft or submitted.
+ */
+export const useCreateStockTransferWithItems = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: ({ header, items, submit = false }: {
+      header: Pick<CreateStockTransferData, "transfer_date" | "transfer_type" | "priority" | "expected_completion_date" | "reason" | "notes"> & { company_id: string };
+      items: NewTransferLine[];
+      submit?: boolean;
+    }) => untypedRpc<{ id: string; transfer_number: string; status: TransferStatus }>("create_stock_transfer", {
+      p_header: header,
+      p_items: items,
+      p_submit: submit,
+    }),
+    onSuccess: (result) => {
+      invalidateStock(queryClient);
+      toast({
+        title: "Transfer Created",
+        description: result.status === "approved"
+          ? `${result.transfer_number} is approved and its stock is held.`
+          : result.status === "pending_approval"
+            ? `${result.transfer_number} is waiting for approval; its stock is held.`
+            : `${result.transfer_number} is saved as a draft.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Couldn't create the transfer", description: error.message, variant: "destructive" });
+    },
+  });
+};
+
+/** A storekeeper's immediate bin-to-bin move, checked and recorded as a completed transfer. */
+export const useMoveStockNow = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { itemId: string; fromBinId: string; toBinId: string; quantity: number; reason?: string; notes?: string; transferDate?: string }) =>
+      untypedRpc<{ id: string; transfer_number: string }>("move_stock_now", {
+        p_item_id: input.itemId,
+        p_from_bin_id: input.fromBinId,
+        p_to_bin_id: input.toBinId,
+        p_quantity: input.quantity,
+        p_reason: input.reason || null,
+        p_notes: input.notes || null,
+        p_transfer_date: input.transferDate || null,
+      }),
+    onSuccess: () => invalidateStock(queryClient),
+  });
+};
+
+function invalidateStock(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const key of ["stock-transfer-requests", "stock-transfer-items", "stock-transfer-block-reason", "warehouse-items", "warehouse-bins",
+    "all-items-location-stock", "item-bin-allocations-for-transfer", "warehouse-bin-allocations"]) {
+    queryClient.invalidateQueries({ queryKey: [key] });
+  }
+}
 
 export const useDeleteStockTransfer = () => {
   const queryClient = useQueryClient();

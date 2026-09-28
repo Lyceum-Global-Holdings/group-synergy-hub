@@ -13,6 +13,8 @@ import { CreateSalesOrderDialog } from './CreateSalesOrderDialog';
 import { CreatePickListDialog } from './CreatePickListDialog';
 import { CreateDeliveryOrderDialog } from './CreateDeliveryOrderDialog';
 import { DeliveryOrderDetailsDialog } from './DeliveryOrderDetailsDialog';
+import { PickListWorkDialog } from './PickListWorkDialog';
+import { PackOrderDialog } from './PackOrderDialog';
 import { SalesOrderDetailsDialog } from './SalesOrderDetailsDialog';
 import { SalesOrderItemsView } from './SalesOrderItemsView';
 import { FinishedGoodsIssueDetailsDialog } from './FinishedGoodsIssueDetailsDialog';
@@ -44,6 +46,8 @@ export function SalesOrderFulfillmentTab() {
   const [selectedCPO, setSelectedCPO] = useState<any>(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
   const [selectedDeliveryOrder, setSelectedDeliveryOrder] = useState<string | null>(null);
+  const [workPickListId, setWorkPickListId] = useState<string | null>(null);
+  const [packOrder, setPackOrder] = useState<{ id: string; order_number: string } | null>(null);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState<string | null>(null);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [viewItemsForOrder, setViewItemsForOrder] = useState<string | null>(null);
@@ -249,13 +253,23 @@ export function SalesOrderFulfillmentTab() {
                             <List className="w-4 h-4 mr-1" />
                             Items
                           </Button>
-                          {order.status === 'confirmed' && (
+                          {(order.status === 'confirmed' || order.status === 'picking') && (
                             <Button 
                               size="sm"
                               onClick={() => handleCreatePickList(order)}
                             >
                               <Package className="h-4 w-4 mr-1" />
                               Pick List
+                            </Button>
+                          )}
+                          {['picking', 'picked', 'packing'].includes(order.status) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPackOrder({ id: order.id, order_number: order.order_number })}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Pack
                             </Button>
                           )}
                           {(order.status === 'picked' || order.status === 'packed') && order.picked_items > 0 && (
@@ -299,6 +313,7 @@ export function SalesOrderFulfillmentTab() {
                       <TableHead>Status</TableHead>
                       <TableHead>Progress</TableHead>
                       <TableHead>Zone</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -324,6 +339,15 @@ export function SalesOrderFulfillmentTab() {
                             <MapPin className="h-4 w-4" />
                             {pickList.pick_zone || 'Not specified'}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant={pickList.status === 'completed' || pickList.status === 'cancelled' ? 'outline' : 'default'}
+                            onClick={() => setWorkPickListId(pickList.id)}
+                          >
+                            {pickList.status === 'completed' || pickList.status === 'cancelled' ? 'View' : pickList.status === 'in_progress' ? 'Continue' : 'Pick'}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -535,6 +559,13 @@ export function SalesOrderFulfillmentTab() {
         cpoId={selectedCPO?.id}
         customerId={selectedCPO?.customer_id}
       />
+
+      {/* Read from the live list so the status updates as soon as picking starts. */}
+      <PickListWorkDialog
+        pickList={pickLists?.find((p) => p.id === workPickListId) ?? null}
+        onOpenChange={(o) => !o && setWorkPickListId(null)}
+      />
+      <PackOrderDialog salesOrder={packOrder} onOpenChange={(o) => !o && setPackOrder(null)} />
 
       <CreatePickListDialog
         open={showCreatePickList}

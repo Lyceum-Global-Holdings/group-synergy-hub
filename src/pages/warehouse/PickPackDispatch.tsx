@@ -6,6 +6,9 @@ import { Package, ArrowLeft, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { usePickPack } from "@/hooks/usePickPack";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useResetFulfilment } from "@/hooks/usePickPackWork";
 
 export default function PickPackDispatch() {
   const navigate = useNavigate();
@@ -22,9 +25,11 @@ export default function PickPackDispatch() {
     useSalesOrders,
     usePickLists,
     useFinishedGoodsIssues,
-    resetSalesOrdersModule, 
-    isResettingModule 
   } = usePickPack();
+  // Reset deletes one company's fulfilment records (super admins only, checked in the database).
+  const { selectedCompany } = useCompany();
+  const { data: isSuperAdmin = false } = useSuperAdmin();
+  const resetFulfilment = useResetFulfilment();
 
   const { data: salesOrders } = useSalesOrders();
   const { data: pickLists } = usePickLists();
@@ -32,19 +37,24 @@ export default function PickPackDispatch() {
 
   // Calculate counts when opening dialog
   const handleOpenResetDialog = async () => {
+    // Counts for the selected company only, which is all the reset touches.
+    const companyId = selectedCompany?.id;
+    const companyOrders = (salesOrders ?? []).filter((o: any) => o.company_id === companyId);
+    const orderIds = new Set(companyOrders.map((o: any) => o.id));
     const { count: soItemsCount } = await supabase
       .from('sales_order_items')
-      .select('*', { count: 'exact', head: true });
-    
+      .select('*', { count: 'exact', head: true })
+      .in('sales_order_id', [...orderIds]);
     const { count: deliveryOrdersCount } = await supabase
       .from('delivery_orders')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('company_id', companyId!);
 
     setResetCounts({
-      salesOrders: salesOrders?.length || 0,
+      salesOrders: companyOrders.length,
       salesOrderItems: soItemsCount || 0,
-      finishedGoodsIssues: finishedGoodsIssues?.length || 0,
-      pickLists: pickLists?.length || 0,
+      finishedGoodsIssues: (finishedGoodsIssues ?? []).filter((i: any) => i.company_id === companyId).length,
+      pickLists: (pickLists ?? []).filter((p: any) => orderIds.has(p.sales_order_id)).length,
       deliveryOrders: deliveryOrdersCount || 0,
     });
     setShowResetDialog(true);
@@ -60,14 +70,16 @@ export default function PickPackDispatch() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={handleOpenResetDialog} 
-            variant="destructive"
-            size="sm"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset Module
-          </Button>
+          {isSuperAdmin && selectedCompany && (
+            <Button
+              onClick={handleOpenResetDialog}
+              variant="destructive"
+              size="sm"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset {selectedCompany.name ?? "Company"}
+            </Button>
+          )}
           <Button onClick={() => navigate('/tuh-modules/finished-goods')} variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Manage Inventory
@@ -82,10 +94,10 @@ export default function PickPackDispatch() {
         open={showResetDialog}
         onOpenChange={setShowResetDialog}
         onConfirm={() => {
-          resetSalesOrdersModule();
+          if (selectedCompany) resetFulfilment.mutate(selectedCompany.id);
           setShowResetDialog(false);
         }}
-        isResetting={isResettingModule}
+        isResetting={resetFulfilment.isPending}
         counts={resetCounts}
       />
     </div>

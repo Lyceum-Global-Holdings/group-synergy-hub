@@ -24,15 +24,10 @@ import { ArrowRightLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useInvalidateWarehouseStock } from '@/hooks/useInvalidateWarehouseStock';
-import { supabase } from '@/integrations/supabase/client';
-import { getCachedUser } from "@/lib/currentUser";
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
-import {
-  useCreateStockTransfer,
-  useCreateStockTransferItem,
-} from '@/hooks/useStockTransfer';
+import { useMoveStockNow } from '@/hooks/useStockTransfer';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
 interface MoveBinAllocationDialogProps {
@@ -51,8 +46,7 @@ export function MoveBinAllocationDialog({
   const { bins = [] } = useWarehouseBins({ skipLocationFilter: true });
   const { locations = [] } = useWarehouseLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();
-  const createTransfer = useCreateStockTransfer();
-  const createItem = useCreateStockTransferItem();
+  const moveNow = useMoveStockNow();
 
   const [toBinId, setToBinId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -137,64 +131,19 @@ export function MoveBinAllocationDialog({
 
     setIsSubmitting(true);
     try {
-      const user = getCachedUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // 1. Create completed transfer header
-      const transfer = await createTransfer.mutateAsync({
-        transfer_date: new Date().toISOString().split('T')[0],
-        transfer_type: 'location',
-        priority: 'normal',
-        from_bin_id: allocation.bin_id,
-        to_bin_id: toBinId,
+      // One database step: checks the stock free in the source bin and the
+      // user's access to both locations, moves it (with its batches) and records
+      // a completed transfer.
+      const result = await moveNow.mutateAsync({
+        itemId: allocation.warehouse_item_id,
+        fromBinId: allocation.bin_id,
+        toBinId,
+        quantity: qty,
         reason: reason || undefined,
         notes: notes || undefined,
-        status: 'approved',
-        company_id: allocation.company_id,
       });
 
-      // 2. Create transfer item line
-      await createItem.mutateAsync({
-        transfer_id: transfer.id,
-        warehouse_item_id: allocation.warehouse_item_id,
-        item_name: allocation.warehouse_item?.name ?? '',
-        item_code: allocation.warehouse_item?.item_code,
-        quantity_requested: qty,
-        unit_of_measure: 'pcs',
-        from_bin_id: allocation.bin_id,
-        to_bin_id: toBinId,
-        notes: notes || undefined,
-      });
-
-      // 3. Execute the FIFO physical move
-      const { error: rpcError } = await supabase.rpc('transfer_stock_fifo', {
-        p_item_id: allocation.warehouse_item_id,
-        p_from_bin_id: allocation.bin_id,
-        p_to_bin_id: toBinId,
-        p_quantity: qty,
-        p_company_id: allocation.company_id,
-        p_user_id: user.id,
-        p_transfer_number: transfer.transfer_number,
-        p_transfer_id: transfer.id,
-      });
-      if (rpcError) throw rpcError;
-
-      // 4. Mark transfer as completed
-      await supabase
-        .from('stock_transfer_requests')
-        .update({
-          status: 'completed',
-          completed_by: user.id,
-          completed_date: new Date().toISOString(),
-        })
-        .eq('id', transfer.id);
-
-      await supabase
-        .from('stock_transfer_items')
-        .update({ status: 'completed', quantity_transferred: qty })
-        .eq('transfer_id', transfer.id);
-
-      toast.success(`Moved ${qty} units to destination bin`);
+      toast.success(`Moved ${qty} units to destination bin (${result.transfer_number})`);
       invalidateWarehouseStock();
       onOpenChange(false);
     } catch (err: any) {

@@ -56,7 +56,8 @@ export function ResetSalesOrdersDialog({
             Reset Sales Orders Module
           </DialogTitle>
           <DialogDescription>
-            This action cannot be undone. This will permanently delete all sales order related data.
+            This action cannot be undone. It permanently deletes the selected company's sales order, picking, packing and
+            delivery records, and gives back finished-goods stock taken by posted issues. Other companies are not affected.
           </DialogDescription>
         </DialogHeader>
 

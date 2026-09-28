@@ -40,14 +40,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useStockTransfer";
+import { useMoveStockNow } from "@/hooks/useStockTransfer";
 import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { WarehouseItem } from "@/types/itemBin";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { supabase } from "@/integrations/supabase/client";
-import { getCachedUser } from "@/lib/currentUser";
-import { StockTransferRequest } from "@/types/stockTransfer";
+import { toast } from "sonner";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -87,8 +86,7 @@ export function ItemTransferDialog({
     },
   });
 
-  const createTransfer = useCreateStockTransfer();
-  const createItem = useCreateStockTransferItem();
+  const moveNow = useMoveStockNow();
   const { bins = [] } = useWarehouseBins({ skipLocationFilter: true });
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
@@ -96,8 +94,8 @@ export function ItemTransferDialog({
 
   // State for verification dialog
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
+  // Nothing is saved until the user confirms; then the move happens in one step.
   const [pendingTransferData, setPendingTransferData] = useState<{
-    transfer: StockTransferRequest;
     values: z.infer<typeof formSchema>;
   } | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -195,80 +193,29 @@ export function ItemTransferDialog({
       return;
     }
 
-    try {
-      const transferData = {
-        transfer_date: values.transfer_date,
-        transfer_type: "location" as const,
-        priority: values.priority,
-        from_bin_id: values.from_bin_id,
-        to_bin_id: values.to_bin_id,
-        reason: values.reason || undefined,
-        notes: values.notes || undefined,
-        status: 'approved' as const, // Auto-approve transfers from Item Master
-        company_id: item.company_id,
-      };
-
-      const transfer = await createTransfer.mutateAsync(transferData);
-
-      // Create the transfer item with bin IDs
-      await createItem.mutateAsync({
-        transfer_id: transfer.id,
-        warehouse_item_id: item.id,
-        item_name: item.name,
-        quantity_requested: values.quantity,
-        unit_of_measure: unitName,
-        from_bin_id: values.from_bin_id,
-        to_bin_id: values.to_bin_id,
-      });
-
-      // Show verification dialog instead of closing
-      setPendingTransferData({ transfer, values });
-      setShowVerificationDialog(true);
-    } catch (error) {
-      console.error("Error creating transfer:", error);
-    }
+    setPendingTransferData({ values });
+    setShowVerificationDialog(true);
   };
 
   const handleConfirmTransfer = async () => {
     if (!pendingTransferData || !item) return;
-    
+
     setIsCompleting(true);
     try {
-      const user = getCachedUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Call the FIFO transfer RPC
-      const { data: result, error: rpcError } = await supabase.rpc('transfer_stock_fifo', {
-        p_item_id: item.id,
-        p_from_bin_id: pendingTransferData.values.from_bin_id,
-        p_to_bin_id: pendingTransferData.values.to_bin_id,
-        p_quantity: pendingTransferData.values.quantity,
-        p_company_id: item.company_id,
-        p_user_id: user.id,
-        p_transfer_number: pendingTransferData.transfer.transfer_number,
-        p_transfer_id: pendingTransferData.transfer.id,
+      // One database step: checks the stock free in the source bin and the
+      // user's access to both locations, moves it (with its batches) and records
+      // a completed transfer.
+      const { values } = pendingTransferData;
+      const result = await moveNow.mutateAsync({
+        itemId: item.id,
+        fromBinId: values.from_bin_id,
+        toBinId: values.to_bin_id,
+        quantity: values.quantity,
+        reason: values.reason || undefined,
+        notes: values.notes || undefined,
+        transferDate: values.transfer_date,
       });
-
-      if (rpcError) throw rpcError;
-
-      // Mark transfer as completed
-      await supabase
-        .from('stock_transfer_requests')
-        .update({
-          status: 'completed',
-          completed_by: user.id,
-          completed_date: new Date().toISOString(),
-        })
-        .eq('id', pendingTransferData.transfer.id);
-
-      // Mark transfer items as completed
-      await supabase
-        .from('stock_transfer_items')
-        .update({
-          status: 'completed',
-          quantity_transferred: pendingTransferData.values.quantity,
-        })
-        .eq('transfer_id', pendingTransferData.transfer.id);
+      toast.success(`Moved ${values.quantity} ${unitName} (${result.transfer_number})`);
 
       // Invalidate caches so Inventory / Bin Allocations / ledger views refresh
       invalidateWarehouseStock();
@@ -280,13 +227,14 @@ export function ItemTransferDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Error completing transfer:", error);
+      toast.error(error instanceof Error ? error.message : "Couldn't move the stock");
     } finally {
       setIsCompleting(false);
     }
   };
 
   const handleCancelVerification = () => {
-    // Keep the transfer as approved but don't complete it
+    // Nothing was saved, so there is nothing to undo.
     setShowVerificationDialog(false);
     setPendingTransferData(null);
     form.reset();
@@ -525,9 +473,9 @@ export function ItemTransferDialog({
               </Button>
               <Button 
                 type="submit" 
-                disabled={createTransfer.isPending || createItem.isPending || !hasBinsWithStock}
+                disabled={!hasBinsWithStock}
               >
-                {createTransfer.isPending ? "Creating Transfer..." : "Create Transfer"}
+                Review Transfer
               </Button>
             </div>
           </form>

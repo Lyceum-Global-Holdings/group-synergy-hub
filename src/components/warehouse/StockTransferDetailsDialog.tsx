@@ -22,6 +22,7 @@ import {
   useApproveStockTransfer,
   useCompleteStockTransfer,
   useDeleteStockTransfer,
+  useStockTransferBlockReason,
 } from "@/hooks/useStockTransfer";
 import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import type { StockTransferRequest, StockTransferItem } from "@/types/stockTransfer";
@@ -63,6 +64,9 @@ export function StockTransferDetailsDialog({
   const approveTransfer = useApproveStockTransfer();
   const completeTransfer = useCompleteStockTransfer();
   const deleteTransfer = useDeleteStockTransfer();
+  // The database decides who may approve (a warehouse manager or admin, not the requester).
+  const { data: approveBlock, isSuccess: rightsKnown } = useStockTransferBlockReason(transfer.id, transfer.status);
+  const canApprove = rightsKnown && !approveBlock;
 
   // Get bin names for display
   const getBinName = (binId: string | null) => {
@@ -254,7 +258,7 @@ export function StockTransferDetailsDialog({
                   </>
                 )}
 
-                {transfer.status === "pending_approval" && (
+                {transfer.status === "pending_approval" && canApprove && (
                   <>
                     <Button
                       onClick={handleApprove}
@@ -269,6 +273,17 @@ export function StockTransferDetailsDialog({
                     >
                       <XCircle className="h-4 w-4 mr-2" />
                       Reject
+                    </Button>
+                  </>
+                )}
+                {transfer.status === "pending_approval" && rightsKnown && approveBlock && (
+                  <>
+                    <p className="self-center text-sm text-muted-foreground">
+                      Waiting for approval. {approveBlock}. The stock is held until then.
+                    </p>
+                    <Button variant="outline" onClick={handleCancel} disabled={updateTransfer.isPending}>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Cancel request
                     </Button>
                   </>
                 )}
