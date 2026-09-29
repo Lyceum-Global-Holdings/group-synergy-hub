@@ -368,7 +368,7 @@ export const WORK_ORDER_TYPES: { value: WorkOrderType; label: string }[] = [
 // DAILY SITE REPORTS
 // =====================================================
 
-export type DailyReportStatus = 'draft' | 'submitted' | 'approved';
+export type DailyReportStatus = 'draft' | 'submitted' | 'approved' | 'returned';
 
 export interface DailySiteReport {
   id: string;
@@ -394,6 +394,11 @@ export interface DailySiteReport {
   submitted_by: string | null;
   approved_by: string | null;
   status: DailyReportStatus;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
   created_at: string;
   updated_at: string;
   // Joined fields
@@ -437,6 +442,7 @@ export const DAILY_REPORT_STATUSES: { value: DailyReportStatus; label: string; c
   { value: 'draft', label: 'Draft', color: 'bg-muted text-muted-foreground' },
   { value: 'submitted', label: 'Submitted', color: 'bg-blue-100 text-blue-800' },
   { value: 'approved', label: 'Approved', color: 'bg-green-100 text-green-800' },
+  { value: 'returned', label: 'Returned', color: 'bg-amber-100 text-amber-800' },
 ];
 
 export const WEATHER_CONDITIONS = [
@@ -536,6 +542,7 @@ export interface QualityInspection {
   corrective_actions: string | null;
   follow_up_date: string | null;
   photos_url: string[] | null;
+  reinspection_of?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

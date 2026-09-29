@@ -189,6 +189,14 @@ export interface RentalOrder {
   damage_fee: number;
   deposit_refund: number;
   total_amount: number;
+  /** Customer invoice raised on check-out, and the one for late / damage fees. */
+  invoice_id?: string | null;
+  charges_invoice_id?: string | null;
+  /** Deposit actually taken, paid to invoices, and refunded. */
+  deposit_received?: number;
+  deposit_applied?: number;
+  deposit_refunded?: number;
+  deposit_settled_at?: string | null;
   pending_approval: boolean;
   approved_by: string | null;
   approved_date: string | null;

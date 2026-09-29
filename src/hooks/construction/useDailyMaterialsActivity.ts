@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { flattenCatalog } from '@/lib/flattenWarehouseItem';
+import { untypedRpc } from "@/lib/untypedRpc";
 
 export interface DailyMaterialIssue {
   min_number: string;
@@ -50,9 +51,27 @@ export interface CurrentStockBalance {
   warehouse_name: string | null;
 }
 
-export function useDailyMaterialsActivity(startDate: string | null, endDate?: string | null) {
+/**
+ * Stock activity for a site report's period. With a project, only the
+ * project's warehouses (and issues made for the project) are included;
+ * without one, the whole company.
+ */
+export function useDailyMaterialsActivity(startDate: string | null, endDate?: string | null, projectId?: string | null) {
   const { selectedCompany } = useCompany();
   const effectiveEndDate = endDate || startDate;
+
+  // The project's warehouses and their sub-locations.
+  const locationsQuery = useQuery({
+    queryKey: ["project-location-ids", projectId],
+    queryFn: async () => {
+      const rows = await untypedRpc<unknown[]>("project_location_ids", { p_project_id: projectId });
+      return (rows ?? []).map((r) => (typeof r === "string" ? r : (Object.values(r as Record<string, string>)[0] ?? ""))).filter(Boolean);
+    },
+    enabled: !!projectId,
+  });
+  const locs = projectId ? locationsQuery.data : undefined;
+  const scopeReady = !projectId || locationsQuery.isSuccess;
+  const scopeKey = projectId ? `${projectId}:${(locs ?? []).length}` : "company";
 
   // Helper: resolve item master fields (item_code, name, notes, supplier) for a set of warehouse_item IDs.
   // Reads from warehouse_items_full (catalog source of truth) plus suppliers for supplier metadata.
@@ -109,11 +128,11 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
   };
 
   const issuesQuery = useQuery({
-    queryKey: ["daily-material-issues", selectedCompany?.id, startDate, effectiveEndDate],
+    queryKey: ["daily-material-issues", selectedCompany?.id, startDate, effectiveEndDate, scopeKey],
     queryFn: async (): Promise<DailyMaterialIssue[]> => {
       if (!selectedCompany?.id || !startDate) return [];
 
-      const { data, error } = await supabase
+      let issueQuery = supabase
         .from("material_issue_notes")
         .select(`
           min_number,
@@ -128,6 +147,12 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
         .eq("company_id", selectedCompany.id)
         .gte("issue_date", startDate)
         .lte("issue_date", effectiveEndDate!);
+      if (projectId) {
+        issueQuery = locs && locs.length
+          ? issueQuery.or(`project_id.eq.${projectId},location_id.in.(${locs.join(",")})`)
+          : (issueQuery as any).eq("project_id", projectId);
+      }
+      const { data, error } = await issueQuery;
 
       if (error) throw error;
 
@@ -163,16 +188,17 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
 
       return issues;
     },
-    enabled: !!selectedCompany?.id && !!startDate,
+    enabled: !!selectedCompany?.id && !!startDate && scopeReady,
     staleTime: 0,
   });
 
   const returnsQuery = useQuery({
-    queryKey: ["daily-material-returns", selectedCompany?.id, startDate, effectiveEndDate],
+    queryKey: ["daily-material-returns", selectedCompany?.id, startDate, effectiveEndDate, scopeKey],
     queryFn: async (): Promise<DailyMaterialReturn[]> => {
       if (!selectedCompany?.id || !startDate) return [];
+      if (projectId && !(locs && locs.length)) return [];
 
-      const { data, error } = await supabase
+      let returnQuery = supabase
         .from("material_return_notes")
         .select(`
           mrn_number,
@@ -187,6 +213,8 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
         .eq("company_id", selectedCompany.id)
         .gte("return_date", startDate)
         .lte("return_date", effectiveEndDate!);
+      if (projectId && locs) returnQuery = (returnQuery as any).in("location_id", locs);
+      const { data, error } = await returnQuery;
 
       if (error) throw error;
 
@@ -217,19 +245,20 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
 
       return returns;
     },
-    enabled: !!selectedCompany?.id && !!startDate,
+    enabled: !!selectedCompany?.id && !!startDate && scopeReady,
     staleTime: 0,
   });
 
   const adjustmentsQuery = useQuery({
-    queryKey: ["daily-stock-adjustments", selectedCompany?.id, startDate, effectiveEndDate],
+    queryKey: ["daily-stock-adjustments", selectedCompany?.id, startDate, effectiveEndDate, scopeKey],
     queryFn: async (): Promise<DailyStockAdjustment[]> => {
       if (!selectedCompany?.id || !startDate) return [];
+      if (projectId && !(locs && locs.length)) return [];
 
       // Pull ALL stock_transactions for the period (company-scoped). The Daily Site Report
       // needs to surface every stock movement that touched the company on that day —
       // goods receipts, material issues/returns, adjustments, transfers, project moves.
-      const { data, error } = await supabase
+      let txQuery = supabase
         .from("stock_transactions")
         .select(`
           transaction_type,
@@ -246,6 +275,8 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
         .gte("created_at", `${startDate}T00:00:00`)
         .lt("created_at", `${effectiveEndDate}T23:59:59.999`)
         .order("created_at", { ascending: false });
+      if (projectId && locs) txQuery = (txQuery as any).in("location_id", locs);
+      const { data, error } = await txQuery;
 
       if (error) throw error;
 
@@ -292,14 +323,14 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
         };
       });
     },
-    enabled: !!selectedCompany?.id && !!startDate,
+    enabled: !!selectedCompany?.id && !!startDate && scopeReady,
     staleTime: 0,
   });
 
   // Current stock balances from bin allocations (per company + warehouse location).
   // Item master fields are resolved via warehouse_items_full.
   const stockBalanceQuery = useQuery({
-    queryKey: ["current-stock-balance", selectedCompany?.id],
+    queryKey: ["current-stock-balance", selectedCompany?.id, scopeKey],
     queryFn: async (): Promise<CurrentStockBalance[]> => {
       if (!selectedCompany?.id) return [];
 
@@ -318,7 +349,8 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
 
       if (error) throw error;
 
-      const rows = (data ?? []) as any[];
+      const inScope = projectId ? new Set(locs ?? []) : null;
+      const rows = ((data ?? []) as any[]).filter((r) => !inScope || inScope.has(r.warehouse_bins?.location_id));
       const itemIds = [...new Set(rows.map((r) => r.warehouse_item_id).filter(Boolean))] as string[];
       const itemMap = await resolveItemMaster(itemIds);
 
@@ -343,7 +375,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
 
       return Array.from(stockMap.values());
     },
-    enabled: !!selectedCompany?.id,
+    enabled: !!selectedCompany?.id && scopeReady,
     staleTime: 0,
   });
 

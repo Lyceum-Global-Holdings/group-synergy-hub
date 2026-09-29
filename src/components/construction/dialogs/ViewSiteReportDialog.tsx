@@ -118,7 +118,7 @@ export function ViewSiteReportDialog({
     issues,
     stockBalances,
     isLoading
-  } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
+  } = useDailyMaterialsActivity(periodStartDate, periodEndDate, displayReport?.project_id);
 
   // Fetch labour attendance for this report
   const reportIdForAttendance = displayReport?.id ?? report?.id ?? null;
@@ -344,6 +344,12 @@ export function ViewSiteReportDialog({
               <p className="text-xs text-muted-foreground">
                 Created: {format(new Date(displayReport.created_at), "MMM d, yyyy 'at' h:mm a")}
               </p>
+              {displayReport.review_note && (
+                <p className="text-xs">
+                  {displayReport.status === "returned" ? "Returned: " : "Reviewer: "}
+                  {displayReport.review_note}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className={typeConfig.color}>

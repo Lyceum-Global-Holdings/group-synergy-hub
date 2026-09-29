@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useCreateQualityInspection, useUpdateQualityInspection } from "@/hooks/construction/useQualityInspections";
-import { QualityInspection, QUALITY_INSPECTION_TYPES, QUALITY_INSPECTION_STATUSES, INSPECTION_RESULTS } from "@/types/construction";
+import { QualityInspection, QUALITY_INSPECTION_TYPES } from "@/types/construction";
 import { useEffect } from "react";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -39,11 +39,6 @@ const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   inspection_date: z.string().min(1, "Inspection date is required"),
-  status: z.string().optional(),
-  overall_result: z.string().optional(),
-  findings: z.string().optional(),
-  corrective_actions: z.string().optional(),
-  follow_up_date: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -68,11 +63,6 @@ export function QualityInspectionDialog({ open, onOpenChange, inspection }: Qual
       title: "",
       description: "",
       inspection_date: format(new Date(), "yyyy-MM-dd"),
-      status: "scheduled",
-      overall_result: "",
-      findings: "",
-      corrective_actions: "",
-      follow_up_date: "",
     },
   });
 
@@ -84,11 +74,6 @@ export function QualityInspectionDialog({ open, onOpenChange, inspection }: Qual
         title: inspection.title,
         description: inspection.description || "",
         inspection_date: inspection.inspection_date,
-        status: inspection.status,
-        overall_result: inspection.overall_result || "",
-        findings: inspection.findings || "",
-        corrective_actions: inspection.corrective_actions || "",
-        follow_up_date: inspection.follow_up_date || "",
       });
     } else {
       form.reset({
@@ -97,11 +82,6 @@ export function QualityInspectionDialog({ open, onOpenChange, inspection }: Qual
         title: "",
         description: "",
         inspection_date: format(new Date(), "yyyy-MM-dd"),
-        status: "scheduled",
-        overall_result: "",
-        findings: "",
-        corrective_actions: "",
-        follow_up_date: "",
       });
     }
   }, [inspection, form]);
@@ -119,11 +99,6 @@ export function QualityInspectionDialog({ open, onOpenChange, inspection }: Qual
         inspection_date: data.inspection_date,
         inspection_type: data.inspection_type as any,
         description: data.description || undefined,
-        status: data.status as any || undefined,
-        overall_result: data.overall_result as any || undefined,
-        findings: data.findings || undefined,
-        corrective_actions: data.corrective_actions || undefined,
-        follow_up_date: data.follow_up_date || null,
       };
       
       if (inspection) {
@@ -245,98 +220,7 @@ export function QualityInspectionDialog({ open, onOpenChange, inspection }: Qual
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {QUALITY_INSPECTION_STATUSES.map((s) => (
-                          <SelectItem key={s.value} value={s.value}>
-                            {s.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="overall_result"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Result</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select result" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {INSPECTION_RESULTS.map((r) => (
-                          <SelectItem key={r.value} value={r.value}>
-                            {r.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
-
-            <FormField
-              control={form.control}
-              name="findings"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Findings</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Inspection findings" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="corrective_actions"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Corrective Actions</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Required corrective actions" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="follow_up_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Follow-up Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

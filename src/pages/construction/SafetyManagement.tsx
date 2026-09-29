@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, ShieldAlert, AlertTriangle, ClipboardCheck, FileWarning, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, ShieldAlert, AlertTriangle, ClipboardCheck, FileWarning, Pencil, Trash2, ListChecks, Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +33,12 @@ import {
 import { INCIDENT_STATUSES, INCIDENT_SEVERITIES, SAFETY_INSPECTION_STATUSES, SafetyIncident, SafetyInspection } from "@/types/construction";
 import { format } from "date-fns";
 import { SafetyIncidentDialog, SafetyInspectionDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
+import { CloseIncidentDialog, CompleteSafetyInspectionDialog } from "@/components/construction/qhse/QhseDialogs";
+import { CorrectiveActionsDialog } from "@/components/construction/qhse/CorrectiveActionsDialog";
+import { useQhseStep } from "@/hooks/construction/useQhseWorkflow";
+
+const isSerious = (i: { severity: string; incident_type: string }) =>
+  ["high", "critical"].includes(i.severity) || ["lost_time", "fatality"].includes(i.incident_type);
 
 export default function SafetyManagement() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,6 +54,14 @@ export default function SafetyManagement() {
   const [inspectionDialogOpen, setInspectionDialogOpen] = useState(false);
   const [editingInspection, setEditingInspection] = useState<SafetyInspection | null>(null);
   const [deletingInspection, setDeletingInspection] = useState<SafetyInspection | null>(null);
+
+  // Workflow
+  const step = useQhseStep();
+  const [closingIncident, setClosingIncident] = useState<SafetyIncident | null>(null);
+  const [completingInspection, setCompletingInspection] = useState<SafetyInspection | null>(null);
+  const [actionsFor, setActionsFor] = useState<
+    { type: "safety_incident" | "safety_inspection"; id: string; number: string; title?: string | null; canAdd: boolean } | null
+  >(null);
   
   const { data: incidents, isLoading: incidentsLoading } = useSafetyIncidents();
   const { data: inspections, isLoading: inspectionsLoading } = useSafetyInspections();
@@ -270,23 +284,38 @@ export default function SafetyManagement() {
                           <TableCell>
                             {format(new Date(incident.incident_date), "MMM d, yyyy")}
                           </TableCell>
-                          <TableCell>{getIncidentStatusBadge(incident.status)}</TableCell>
+                          <TableCell>
+                            {getIncidentStatusBadge(incident.status)}
+                            {isSerious(incident) && incident.status !== "closed" && (
+                              <div className="text-xs text-orange-700">Serious: a manager closes it</div>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditIncident(incident as SafetyIncident)}
-                              >
-                                <Pencil className="h-4 w-4" />
+                            <div className="flex justify-end gap-1">
+                              {incident.status === "reported" && (
+                                <Button variant="outline" size="sm" disabled={step.isPending}
+                                  onClick={() => step.mutate({ fn: "start_incident_investigation", args: { p_id: incident.id }, done: "Investigation started" })}>
+                                  <SearchIcon className="mr-1 h-3 w-3" /> Investigate
+                                </Button>
+                              )}
+                              {incident.status === "investigating" && (
+                                <Button size="sm" onClick={() => setClosingIncident(incident as SafetyIncident)}>Close</Button>
+                              )}
+                              <Button variant="ghost" size="icon" aria-label="Corrective actions"
+                                onClick={() => setActionsFor({ type: "safety_incident", id: incident.id, number: incident.incident_number,
+                                  title: incident.title, canAdd: incident.status !== "closed" })}>
+                                <ListChecks className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingIncident(incident as SafetyIncident)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                              {incident.status !== "closed" && (
+                                <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => handleEditIncident(incident as SafetyIncident)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {incident.status === "reported" && (
+                                <Button variant="ghost" size="icon" aria-label="Delete" onClick={() => setDeletingIncident(incident as SafetyIncident)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -372,7 +401,7 @@ export default function SafetyManagement() {
                           <TableCell>
                             {inspection.follow_up_required ? (
                               <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-                                Required
+                                {inspection.follow_up_date ? `By ${format(new Date(inspection.follow_up_date), "d MMM")}` : "Required"}
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground">No</span>
@@ -380,21 +409,24 @@ export default function SafetyManagement() {
                           </TableCell>
                           <TableCell>{getInspectionStatusBadge(inspection.status)}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditInspection(inspection as SafetyInspection)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingInspection(inspection as SafetyInspection)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                            <div className="flex justify-end gap-1">
+                              {inspection.status === "scheduled" ? (
+                                <>
+                                  <Button size="sm" onClick={() => setCompletingInspection(inspection as SafetyInspection)}>Complete</Button>
+                                  <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => handleEditInspection(inspection as SafetyInspection)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" aria-label="Delete" onClick={() => setDeletingInspection(inspection as SafetyInspection)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button variant="ghost" size="icon" aria-label="Corrective actions"
+                                  onClick={() => setActionsFor({ type: "safety_inspection", id: inspection.id, number: inspection.inspection_number,
+                                    title: inspection.hazards_identified, canAdd: true })}>
+                                  <ListChecks className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -422,6 +454,16 @@ export default function SafetyManagement() {
         title="Delete Incident"
         description={`Are you sure you want to delete incident "${deletingIncident?.incident_number}"? This action cannot be undone.`}
         isDeleting={deleteIncidentMutation.isPending}
+      />
+
+      <CloseIncidentDialog open={!!closingIncident} onOpenChange={(o) => !o && setClosingIncident(null)} incident={closingIncident} />
+      <CompleteSafetyInspectionDialog open={!!completingInspection} onOpenChange={(o) => !o && setCompletingInspection(null)} inspection={completingInspection} />
+      <CorrectiveActionsDialog
+        open={!!actionsFor}
+        onOpenChange={(o) => !o && setActionsFor(null)}
+        sourceType={actionsFor?.type ?? "safety_incident"}
+        source={actionsFor ? { id: actionsFor.id, number: actionsFor.number, title: actionsFor.title } : null}
+        canAdd={!!actionsFor?.canAdd}
       />
 
       {/* Inspection Dialogs */}

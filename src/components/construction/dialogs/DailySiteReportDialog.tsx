@@ -119,7 +119,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
   }, [form]);
 
   const watchedDate = form.watch("report_date");
-  const { issues, returns, adjustments, isLoading: materialsLoading } = useDailyMaterialsActivity(watchedDate);
+  const watchedProject = form.watch("project_id");
+  const { issues, returns, adjustments, isLoading: materialsLoading } = useDailyMaterialsActivity(watchedDate, undefined, watchedProject || null);
 
   useEffect(() => {
     if (report) {

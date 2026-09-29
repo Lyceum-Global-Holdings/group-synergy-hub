@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRentalOrders } from "@/hooks/useRentalOrders";
+import { useCustomers } from "@/hooks/useCustomers";
 import type { RentalOrder, RentalOrderItem, CostumeUnit, UnitCondition } from "@/types/costumeRental";
 
 interface Props {
@@ -25,6 +26,10 @@ const CONDITIONS: UnitCondition[] = ["new", "good", "fair", "needs_repair"];
 
 export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) {
   const { checkoutOrder, isMutating } = useRentalOrders(companyId);
+  const { customers = [] } = useCustomers(companyId);
+  // The rental is invoiced to its customer on check-out, so one is needed.
+  const [customerId, setCustomerId] = useState<string>("");
+  useEffect(() => { if (open) setCustomerId(order.customer_id ?? ""); }, [open, order.customer_id]);
   const items = order.items ?? [];
   const costumeIds = useMemo(() => Array.from(new Set(items.map((i) => i.costume_id))), [items]);
 
@@ -85,7 +90,12 @@ export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) 
 
   const confirm = async () => {
     if (slots.some((s) => !s.unit_id)) { toast.error("Assign a unit to every slot"); return; }
+    if (!customerId) { toast.error("Choose the customer the rental is invoiced to"); return; }
     try {
+      if (customerId !== order.customer_id) {
+        const { error } = await (supabase as any).from("rental_orders").update({ customer_id: customerId }).eq("id", order.id);
+        if (error) { toast.error(error.message); return; }
+      }
       await checkoutOrder(order.id, slots);
       onOpenChange(false);
     } catch { /* toast in hook */ }
@@ -96,7 +106,20 @@ export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Check out — {order.rental_number}</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground">Assign a physical unit to each booked item and record its condition.</p>
+        <p className="text-sm text-muted-foreground">
+          Assign a physical unit to each booked item and record its condition. Checking out invoices the rental to the customer.
+        </p>
+        <div className="space-y-1">
+          <Label>Customer (invoiced) *</Label>
+          <Select value={customerId} onValueChange={setCustomerId} disabled={!!order.customer_id}>
+            <SelectTrigger aria-label="Customer"><SelectValue placeholder="Choose the customer" /></SelectTrigger>
+            <SelectContent>
+              {(customers as { id: string; customer_name: string; customer_code?: string }[]).map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.customer_code ? `${c.customer_code} · ` : ""}{c.customer_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="space-y-4">
           {items.map((it: RentalOrderItem) => (
@@ -139,7 +162,7 @@ export function CheckoutDialog({ open, onOpenChange, order, companyId }: Props) 
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={confirm} disabled={isMutating}>{isMutating ? "Checking out…" : "Confirm checkout"}</Button>
+          <Button onClick={confirm} disabled={isMutating || !customerId}>{isMutating ? "Checking out…" : "Confirm checkout"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

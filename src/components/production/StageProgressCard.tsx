@@ -72,7 +72,7 @@ export default function StageProgressCard({ stage, targetQty = 0, defaultOpen, c
                   <CheckCircle2 className="mr-1 h-3 w-3" /> Complete Stage
                 </Button>
               )}
-              {pendingMaterials > 0 && (
+              {pendingMaterials > 0 && stage.status !== "completed" && (
                 <Button size="sm" variant="outline" onClick={() => setIssueOpen(true)}>
                   <PackageMinus className="mr-1 h-3 w-3" /> Issue materials ({pendingMaterials})
                 </Button>

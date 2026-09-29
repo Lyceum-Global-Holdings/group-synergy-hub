@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, X, Send, Ban, PackageCheck, Undo2, CheckCircle2 } from "lucide-react";
 import { CheckoutDialog } from "@/components/tuh-modules/costume-rental/CheckoutDialog";
 import { ReturnDialog } from "@/components/tuh-modules/costume-rental/ReturnDialog";
+import { RentalBillingCard } from "@/components/tuh-modules/costume-rental/RentalBillingCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ export default function CostumeRentalView() {
   if (!order) return <div className="p-6 text-sm text-muted-foreground">Rental order not found.</div>;
 
   const s = order.status;
+  const depositHeld = Number(order.deposit_received ?? 0) - Number(order.deposit_applied ?? 0) - Number(order.deposit_refunded ?? 0);
 
   const ACTION_META = {
     approve: { title: "Approve rental", label: "Comment (optional)", required: false, btn: "Approve", variant: "default" as const },
@@ -101,7 +103,8 @@ export default function CostumeRentalView() {
           </Button>
         )}
         {s === "returned" && (
-          <Button onClick={() => completeOrder(order.id)} disabled={isMutating}>
+          <Button onClick={() => completeOrder(order.id)} disabled={isMutating || depositHeld > 0}
+            title={depositHeld > 0 ? "Settle the deposit first" : undefined}>
             <CheckCircle2 className="h-4 w-4 mr-2" /> Complete
           </Button>
         )}
@@ -181,10 +184,12 @@ export default function CostumeRentalView() {
           <>
             <div className="flex justify-between text-muted-foreground"><span>Late fee</span><span>−{formatCurrency(order.late_fee)}</span></div>
             <div className="flex justify-between text-muted-foreground"><span>Damage fee</span><span>−{formatCurrency(order.damage_fee)}</span></div>
-            <div className="flex justify-between font-medium border-t pt-1"><span>Deposit refund</span><span>{formatCurrency(order.deposit_refund)}</span></div>
+            <div className="flex justify-between font-medium border-t pt-1"><span>{order.deposit_settled_at ? "Deposit refunded" : "Deposit refund due"}</span><span>{formatCurrency(order.deposit_refund)}</span></div>
           </>
         )}
       </div>
+
+      <RentalBillingCard order={order} />
 
       <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} order={order} companyId={selectedCompany?.id} />
       <ReturnDialog open={returnOpen} onOpenChange={setReturnOpen} order={order} companyId={selectedCompany?.id} />

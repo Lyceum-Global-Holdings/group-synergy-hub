@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, ClipboardCheck, CheckCircle, XCircle, AlertCircle, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, ClipboardCheck, CheckCircle, XCircle, AlertCircle, Pencil, Trash2, Play, ListChecks, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,9 @@ import { useQualityInspections, useCreateQualityInspection, useUpdateQualityInsp
 import { QUALITY_INSPECTION_STATUSES, INSPECTION_RESULTS, QualityInspection } from "@/types/construction";
 import { format } from "date-fns";
 import { QualityInspectionDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
+import { RecordQualityResultDialog, ReinspectDialog } from "@/components/construction/qhse/QhseDialogs";
+import { CorrectiveActionsDialog } from "@/components/construction/qhse/CorrectiveActionsDialog";
+import { useOpenActionCounts, useQhseStep } from "@/hooks/construction/useQhseWorkflow";
 
 export default function QualityControl() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -30,6 +33,11 @@ export default function QualityControl() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<QualityInspection | null>(null);
   const [deletingItem, setDeletingItem] = useState<QualityInspection | null>(null);
+  const [resultFor, setResultFor] = useState<QualityInspection | null>(null);
+  const [reinspectFor, setReinspectFor] = useState<QualityInspection | null>(null);
+  const [actionsFor, setActionsFor] = useState<QualityInspection | null>(null);
+  const step = useQhseStep();
+  const { data: actionCounts } = useOpenActionCounts();
 
   const { data: inspections, isLoading } = useQualityInspections();
   const createMutation = useCreateQualityInspection();
@@ -86,8 +94,14 @@ export default function QualityControl() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Quality Control</h1>
           <p className="text-muted-foreground">
-            Manage quality inspections and track compliance
+            Schedule, run and record inspections; failures raise corrective actions and a re-inspection.
           </p>
+          {actionCounts && (actionCounts.open > 0 || actionCounts.toVerify > 0) && (
+            <p className="text-sm text-muted-foreground">
+              Corrective actions across quality and safety: {actionCounts.open} open{actionCounts.overdue ? ` (${actionCounts.overdue} overdue)` : ""},{" "}
+              {actionCounts.toVerify} waiting for verification.
+            </p>
+          )}
         </div>
         <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
@@ -204,23 +218,43 @@ export default function QualityControl() {
                         {format(new Date(inspection.inspection_date), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell>{getStatusBadge(inspection.status)}</TableCell>
-                      <TableCell>{getResultBadge(inspection.overall_result)}</TableCell>
+                      <TableCell>
+                        {getResultBadge(inspection.overall_result)}
+                        {inspection.follow_up_date && (
+                          <div className="text-xs text-muted-foreground">Follow up by {format(new Date(inspection.follow_up_date), "d MMM")}</div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(inspection as QualityInspection)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingItem(inspection as QualityInspection)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                        <div className="flex justify-end gap-1">
+                          {inspection.status === "scheduled" && (
+                            <Button variant="outline" size="sm" disabled={step.isPending}
+                              onClick={() => step.mutate({ fn: "start_quality_inspection", args: { p_id: inspection.id }, done: "Inspection started" })}>
+                              <Play className="mr-1 h-3 w-3" /> Start
+                            </Button>
+                          )}
+                          {(inspection.status === "scheduled" || inspection.status === "in_progress") && (
+                            <Button size="sm" onClick={() => setResultFor(inspection as QualityInspection)}>Record result</Button>
+                          )}
+                          {inspection.status === "failed" && (
+                            <Button variant="outline" size="sm" onClick={() => setReinspectFor(inspection as QualityInspection)}>
+                              <RotateCcw className="mr-1 h-3 w-3" /> Re-inspect
+                            </Button>
+                          )}
+                          {inspection.status !== "scheduled" && (
+                            <Button variant="ghost" size="icon" aria-label="Corrective actions" onClick={() => setActionsFor(inspection as QualityInspection)}>
+                              <ListChecks className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(inspection.status === "scheduled" || inspection.status === "in_progress") && (
+                            <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => handleEdit(inspection as QualityInspection)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {inspection.status === "scheduled" && (
+                            <Button variant="ghost" size="icon" aria-label="Delete" onClick={() => setDeletingItem(inspection as QualityInspection)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -236,6 +270,16 @@ export default function QualityControl() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         inspection={editingItem}
+      />
+
+      <RecordQualityResultDialog open={!!resultFor} onOpenChange={(o) => !o && setResultFor(null)} inspection={resultFor} />
+      <ReinspectDialog open={!!reinspectFor} onOpenChange={(o) => !o && setReinspectFor(null)} inspection={reinspectFor} />
+      <CorrectiveActionsDialog
+        open={!!actionsFor}
+        onOpenChange={(o) => !o && setActionsFor(null)}
+        sourceType="quality_inspection"
+        source={actionsFor ? { id: actionsFor.id, number: actionsFor.inspection_number, title: actionsFor.title } : null}
+        canAdd={!!actionsFor && actionsFor.status !== "scheduled"}
       />
 
       <DeleteConfirmDialog

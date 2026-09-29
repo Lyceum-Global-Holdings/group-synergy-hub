@@ -12,7 +12,9 @@ export type ApprovalItemType =
   | "stock_transfer"
   | "customer_po"
   | "social_media_access"
-  | "production_receipt";
+  | "production_receipt"
+  | "site_report"
+  | "corrective_action";
 
 export const APPROVAL_TYPE_LABEL: Record<ApprovalItemType, string> = {
   po: "Purchase order",
@@ -25,6 +27,8 @@ export const APPROVAL_TYPE_LABEL: Record<ApprovalItemType, string> = {
   customer_po: "Customer PO",
   social_media_access: "Social media access",
   production_receipt: "Production receipt",
+  site_report: "Site report",
+  corrective_action: "Corrective action",
 };
 
 export interface ApprovalQueueItem {

@@ -52,7 +52,7 @@ export default function StageCostBreakdown({ stageId, costs }: Props) {
                 <TableHead>Item</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead className="text-right">Unit Cost</TableHead>
-                <TableHead className="text-right">Qty Used</TableHead>
+                <TableHead className="text-right">Qty for order</TableHead>
                 <TableHead>UOM</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="w-[40px]"></TableHead>
@@ -68,7 +68,15 @@ export default function StageCostBreakdown({ stageId, costs }: Props) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">{Number(c.unit_cost).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{Number(c.quantity_used).toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    {Number(c.quantity_used).toFixed(2)}
+                    {c.per_unit_qty != null && (
+                      <span className="block text-xs text-muted-foreground">{Number(c.per_unit_qty)} per piece</span>
+                    )}
+                    {Number(c.consumed_qty) > 0 && (
+                      <span className="block text-xs text-muted-foreground">{Number(c.consumed_qty)} issued</span>
+                    )}
+                  </TableCell>
                   <TableCell>{c.unit_of_measure}</TableCell>
                   <TableCell className="text-right font-medium">{Number(c.total_cost).toFixed(2)}</TableCell>
                   <TableCell>

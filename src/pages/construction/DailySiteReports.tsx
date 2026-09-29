@@ -1,6 +1,6 @@
 // Force rebuild - cache refresh v2
 import { useState } from "react";
-import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Sparkles, BarChart3, Eye, Settings } from "lucide-react";
+import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Sparkles, BarChart3, Eye, Settings, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,13 @@ import { GenerateReportDialog } from "@/components/construction/dialogs/Generate
 import { SiteReportAnalytics } from "@/components/construction/reports/SiteReportAnalytics";
 import { TelegramSettingsTab } from "@/components/construction/TelegramSettingsTab";
 import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useQhseStep } from "@/hooks/construction/useQhseWorkflow";
+import { useApprovalQueue } from "@/hooks/useApprovalConsole";
+
+const editable = (status: string) => status === "draft" || status === "returned";
 
 const REPORT_TYPE_CONFIG = {
   daily: { label: "Daily", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" },
@@ -45,6 +52,12 @@ export default function DailySiteReports() {
   const [editingItem, setEditingItem] = useState<DailySiteReport | null>(null);
   const [deletingItem, setDeletingItem] = useState<DailySiteReport | null>(null);
   const [viewingItem, setViewingItem] = useState<DailySiteReport | null>(null);
+  const [reviewing, setReviewing] = useState<{ report: DailySiteReport; approve: boolean } | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const step = useQhseStep();
+  // The reports this user may approve (the project's manager, construction managers, admins).
+  const { data: toDecide = [] } = useApprovalQueue("to_decide");
+  const canDecide = new Set(toDecide.filter((i) => i.item_type === "site_report").map((i) => i.item_id));
 
   const { data: reports, isLoading } = useDailySiteReports(
     undefined,
@@ -271,10 +284,27 @@ export default function DailySiteReports() {
                           <TableCell>{report.project?.project_name || "-"}</TableCell>
                           <TableCell>{formatPeriod(report)}</TableCell>
                           <TableCell>{report.weather_conditions || "-"}</TableCell>
-                          <TableCell>{report.labor_count || 0}</TableCell>
-                          <TableCell>{getStatusBadge(report.status)}</TableCell>
+                          <TableCell>{(report.skilled_labor_count ?? 0) + (report.unskilled_labor_count ?? 0) || report.labor_count || 0}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(report.status)}
+                            {report.status === "returned" && report.review_note && (
+                              <span className="block max-w-[220px] text-xs text-muted-foreground">To change: {report.review_note}</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
+                              {editable(report.status) && (
+                                <Button variant="outline" size="sm" disabled={step.isPending}
+                                  onClick={() => step.mutate({ fn: "submit_site_report", args: { p_report_id: report.id }, done: `${report.report_number} submitted for approval` })}>
+                                  <Send className="mr-1 h-3 w-3" /> Submit
+                                </Button>
+                              )}
+                              {report.status === "submitted" && canDecide.has(report.id) && (
+                                <>
+                                  <Button size="sm" onClick={() => { setReviewNote(""); setReviewing({ report: report as DailySiteReport, approve: true }); }}>Approve</Button>
+                                  <Button size="sm" variant="outline" onClick={() => { setReviewNote(""); setReviewing({ report: report as DailySiteReport, approve: false }); }}>Return</Button>
+                                </>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -283,22 +313,16 @@ export default function DailySiteReports() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(report as DailySiteReport)}
-                                title="Edit Report"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingItem(report as DailySiteReport)}
-                                title="Delete Report"
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                              {editable(report.status) && (
+                                <>
+                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(report as DailySiteReport)} title="Edit Report">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => setDeletingItem(report as DailySiteReport)} title="Delete Report">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -336,6 +360,33 @@ export default function DailySiteReports() {
         onOpenChange={(open) => !open && setViewingItem(null)}
         report={viewingItem}
       />
+
+      <Dialog open={!!reviewing} onOpenChange={(o) => !o && setReviewing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{reviewing?.approve ? "Approve" : "Return"} {reviewing?.report.report_number}</DialogTitle>
+            <DialogDescription>
+              {reviewing?.approve
+                ? "Approving locks the report."
+                : "The report goes back to its author to change and submit again."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="review-note">{reviewing?.approve ? "Comment" : "What needs changing *"}</Label>
+            <Textarea id="review-note" rows={3} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewing(null)}>Cancel</Button>
+            <Button disabled={(!reviewing?.approve && !reviewNote.trim()) || step.isPending}
+              onClick={() => reviewing && step.mutate(
+                { fn: "decide_site_report", args: { p_report_id: reviewing.report.id, p_approve: reviewing.approve, p_note: reviewNote },
+                  done: reviewing.approve ? "Report approved" : "Report returned" },
+                { onSuccess: () => setReviewing(null) })}>
+              {reviewing?.approve ? "Approve" : "Return"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <DeleteConfirmDialog
         open={!!deletingItem}

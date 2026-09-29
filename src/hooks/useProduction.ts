@@ -187,6 +187,7 @@ export function useCreateProductionOrder() {
               if (Array.isArray(cats) && cats.length > 0) {
                 const matchingItems = bomItems.filter((bi) => cats.includes(bi.category));
                 for (const bi of matchingItems) {
+                  // The database scales BOM lines to the order: per-piece consumption × target quantity.
                   costInserts.push({
                     stage_id: stage.id,
                     item_name: bi.item_name,
@@ -294,6 +295,7 @@ export function useCreateBatchProductionOrders() {
                 if (Array.isArray(cats) && cats.length > 0) {
                   const matchingItems = bomItems.filter((bi) => cats.includes(bi.category));
                   for (const bi of matchingItems) {
+                    // The database scales BOM lines to the order: per-piece consumption × target quantity.
                     costInserts.push({
                       stage_id: stage.id,
                       item_name: bi.item_name,
