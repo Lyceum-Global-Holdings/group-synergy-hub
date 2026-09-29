@@ -19,6 +19,7 @@ import { useRoomMaterialsSummary } from "@/hooks/construction/useRoomMaterials";
 import { Floor2DRoomOverlay } from "./Floor2DRoomOverlay";
 import { AddManualRoomDialog } from "./AddManualRoomDialog";
 import { RoomStagesDialog } from "./RoomStagesDialog";
+import { roomProgress } from '@/lib/roomProgress';
 import { RoomMaterialsDialog } from "./RoomMaterialsDialog";
 
 interface RoomDetectionDialogProps {
@@ -309,7 +310,7 @@ function RoomListItem({
   const { data: materialsSummary } = useRoomMaterialsSummary(room.id);
   const completedStages = stages.filter(s => s.status === 'completed').length;
   const totalStages = stages.length;
-  const progress = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
+  const progress = roomProgress(stages);
 
   return (
     <div

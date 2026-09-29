@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useGLSettings } from "@/hooks/useGLSettings";
+import { PostingAccountsCard } from "@/components/finance/PostingAccountsCard";
 import { Loader2 } from "lucide-react";
 import { CURRENCY_CONFIG } from "@/lib/utils";
 
@@ -159,6 +160,8 @@ export function GLSettingsTab() {
           </Button>
         </div>
       </Card>
+
+      <PostingAccountsCard />
     </div>
   );
 }

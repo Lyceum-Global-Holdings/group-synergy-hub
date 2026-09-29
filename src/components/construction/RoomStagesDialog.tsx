@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Trash2, ListChecks, Circle, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { FloorDrawingRoom, FloorRoomStage, RoomStageStatus, ROOM_STAGE_STATUSES } from '@/types/construction';
+import { roomProgress } from '@/lib/roomProgress';
 import { useRoomStages, useCreateRoomStage, useUpdateRoomStage, useDeleteRoomStage, useAddDefaultStages } from '@/hooks/construction/useRoomStages';
 
 interface RoomStagesDialogProps {
@@ -30,9 +31,7 @@ export function RoomStagesDialog({ room, open, onOpenChange }: RoomStagesDialogP
 
   const completedStages = stages.filter(s => s.status === 'completed').length;
   const totalStages = stages.length;
-  const overallProgress = totalStages > 0 
-    ? Math.round(stages.reduce((sum, s) => sum + (s.completion_percentage || 0), 0) / totalStages)
-    : 0;
+  const overallProgress = roomProgress(stages);
 
   const handleAddStage = () => {
     if (!room || !newStageName.trim()) return;

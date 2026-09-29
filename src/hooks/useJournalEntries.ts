@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
+import { getCachedUserId } from "@/lib/currentUser";
 import type { JournalEntry, CreateJournalEntryData, JournalStatus } from "@/types/generalLedger";
 
 export const useJournalEntries = (filters?: { status?: JournalStatus; startDate?: string; endDate?: string }) => {
@@ -56,6 +57,8 @@ export const useJournalEntries = (filters?: { status?: JournalStatus; startDate?
           description: entryData.description,
           tags: entryData.tags,
           company_id: selectedCompany?.id,
+          // Lines can only be added to journals the user created (RLS), so the author must be set.
+          created_by: getCachedUserId(),
           status: 'draft' as const,
           fiscal_year: new Date(entryData.journal_date).getFullYear(),
           period_month: new Date(entryData.journal_date).getMonth() + 1,

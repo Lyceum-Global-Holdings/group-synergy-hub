@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getCachedUser } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
+import { untypedRpc } from '@/lib/untypedRpc';
 import { 
   DeliveryOrder, 
   DeliveryOrderWithDetails,
@@ -249,7 +250,8 @@ export const useDeliveryOrders = () => {
         updated_at: new Date().toISOString() 
       };
       
-      if (notes) updateData.notes = notes;
+      // delivery_orders has no "notes" column; the reason goes with the internal notes.
+      if (notes) updateData.internal_notes = notes;
 
       const { data, error } = await supabase
         .from('delivery_orders')
@@ -304,8 +306,45 @@ export const useDeliveryOrders = () => {
     },
   });
 
+  const refreshAfterDelivery = () => {
+    for (const key of ['delivery-orders', 'delivery-order', 'sales-orders', 'customer-purchase-orders', 'customer-purchase-order']) {
+      queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  };
+
+  // Approved → in transit; the sales order lines record what was dispatched.
+  const dispatchDeliveryOrder = useMutation({
+    mutationFn: (doId: string) => untypedRpc<null>('dispatch_delivery_order', { p_do_id: doId }),
+    onSuccess: () => {
+      refreshAfterDelivery();
+      toast({ title: 'Dispatched', description: 'The delivery order is in transit.' });
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
+  // In transit (or approved) → delivered; the sales order and customer PO follow.
+  const confirmDelivery = useMutation({
+    mutationFn: (v: { doId: string; receivedBy: string; deliveredAt: string; lines: { item_id: string; quantity_delivered: number }[]; remarks?: string }) =>
+      untypedRpc<string>('confirm_delivery', {
+        p_do_id: v.doId,
+        p_received_by: v.receivedBy,
+        p_delivered_at: v.deliveredAt,
+        p_lines: v.lines,
+        p_remarks: v.remarks || null,
+      }),
+    onSuccess: () => {
+      refreshAfterDelivery();
+      toast({ title: 'Delivery confirmed' });
+    },
+    onError: (error: Error) => toast({ title: 'Error', description: error.message, variant: 'destructive' }),
+  });
+
   return {
     useDeliveryOrdersQuery,
+    dispatchDeliveryOrder: dispatchDeliveryOrder.mutate,
+    isDispatching: dispatchDeliveryOrder.isPending,
+    confirmDelivery: confirmDelivery.mutate,
+    isConfirmingDelivery: confirmDelivery.isPending,
     useDeliveryOrder,
     useDeliveryOrdersBySalesOrder,
     createDeliveryOrderWithItems: createDeliveryOrderWithItems.mutate,

@@ -7,7 +7,7 @@ import { SupplierInvoiceList } from "@/components/finance/ap/SupplierInvoiceList
 import { SupplierPaymentList } from "@/components/finance/ap/SupplierPaymentList";
 import { APAgingReport } from "@/components/finance/ap/APAgingReport";
 import { CreateSupplierInvoiceDialog } from "@/components/finance/ap/CreateSupplierInvoiceDialog";
-import { CreatePaymentDialog } from "@/components/finance/ap/CreatePaymentDialog";
+import { RecordMoneyDialog } from "@/components/finance/RecordMoneyDialog";
 import { DataTable, DataTableColumn } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAPStats, useDebitNotes, useDebitNoteStats, useVendorAdvances, useVendorAdvanceStats, useWHTCertificates, useWHTStats } from "@/hooks/finance/useAPExpansion";
@@ -59,7 +59,7 @@ export default function APModule({ activeSubTab, onSubTabChange }: APModuleProps
 
         <TabsContent value="payments" className="mt-4 space-y-6">
           <QuickActions actions={[
-            { label: "New Payment", icon: CreditCard, onClick: () => setShowPaymentDialog(true) },
+            { label: "Record Payment", icon: CreditCard, onClick: () => setShowPaymentDialog(true) },
             { label: "Export", icon: Download, onClick: () => {} },
           ]} />
           <SupplierPaymentList />
@@ -103,7 +103,7 @@ export default function APModule({ activeSubTab, onSubTabChange }: APModuleProps
       </ModuleSubTabs>
 
       <CreateSupplierInvoiceDialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog} />
-      <CreatePaymentDialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog} />
+      <RecordMoneyDialog kind="payment" open={showPaymentDialog} onOpenChange={setShowPaymentDialog} />
     </>
   );
 }

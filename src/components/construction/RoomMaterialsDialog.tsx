@@ -215,7 +215,9 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
                 {materials.map((material) => {
                   const warehouseStock = material.warehouse_item?.current_stock ?? 0;
                   const allocated = material.quantity_allocated ?? 0;
-                  const canIssue = warehouseStock > 0;
+                  // Requests go on an issue note from the project's warehouse.
+                  const required = material.quantity_required ?? 0;
+                  const canIssue = required <= 0 || allocated < required;
                   const canReturn = allocated > 0;
                   
                   return (
@@ -265,7 +267,7 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {canIssue ? 'Issue material from warehouse' : 'No stock available'}
+                                {canIssue ? "Request from the project's warehouse (issue note)" : 'Everything planned has been issued'}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>

@@ -154,6 +154,11 @@ export interface DeliveryOrder {
   special_instructions: string | null;
   delivery_instructions: string | null;
   internal_notes: string | null;
+  /** Set by dispatch_delivery_order / confirm_delivery. */
+  dispatched_at?: string | null;
+  delivered_at?: string | null;
+  received_by_name?: string | null;
+  delivery_remarks?: string | null;
   total_packages: number;
   total_weight: number | null;
   total_volume: number | null;

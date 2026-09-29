@@ -213,7 +213,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange, editingDraft }: 
       const { data, error } = await supabase
         .from('customer_purchase_orders')
         .select('id, cpo_number, customer:customers(customer_name), status, delivery_date')
-        .eq('status', 'confirmed')
+        .in('status', ['confirmed', 'in_production'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;

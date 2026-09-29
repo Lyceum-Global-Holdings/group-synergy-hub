@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { useGLSettings } from "@/hooks/useGLSettings";
+import { Button } from "@/components/ui/button";
+import { POSTABLE_SUPPLIER, usePostInvoice } from "@/hooks/finance/useFinancePosting";
 
 // Where the invoice came from, and how it matched its PO and goods receipt.
 const SOURCE: Record<string, string> = { portal: 'Supplier portal', peppol: 'PEPPOL e-invoice' };
@@ -21,6 +23,7 @@ const MATCH: Record<string, { label: string; className: string }> = {
 export function SupplierInvoiceList() {
   const { selectedCompany } = useCompany();
   const { currencySymbol } = useGLSettings();
+  const post = usePostInvoice("supplier");
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['supplier-invoices', selectedCompany?.id],
@@ -39,7 +42,7 @@ export function SupplierInvoiceList() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
       draft: 'secondary', pending_approval: 'warning', approved: 'default',
-      posted: 'default', paid: 'success', cancelled: 'destructive'
+      posted: 'default', partially_paid: 'warning', paid: 'success', cancelled: 'destructive'
     };
     return <Badge variant={variants[status] as any}>{status.replace('_', ' ')}</Badge>;
   };
@@ -60,11 +63,12 @@ export function SupplierInvoiceList() {
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Match</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {invoices?.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No invoices found</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No invoices found</TableCell></TableRow>
             ) : invoices?.map((inv: any) => (
               <TableRow key={inv.id}>
                 <TableCell className="font-medium">
@@ -82,7 +86,17 @@ export function SupplierInvoiceList() {
                     ? <Badge variant="outline" className={MATCH[inv.three_way_match_status].className}>{MATCH[inv.three_way_match_status].label}</Badge>
                     : <span className="text-xs text-muted-foreground">{inv.po_id ? 'Not checked yet' : 'No PO'}</span>}
                 </TableCell>
-                <TableCell>{getStatusBadge(inv.status)}</TableCell>
+                <TableCell>
+                  {getStatusBadge(inv.status)}
+                  {Number(inv.amount_paid) > 0 && inv.status !== 'paid' && (
+                    <div className="text-xs text-muted-foreground">Paid {currencySymbol} {Number(inv.amount_paid).toLocaleString()}</div>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {POSTABLE_SUPPLIER.includes(inv.status) && (
+                    <Button size="sm" variant="outline" onClick={() => post.mutate(inv.id)} disabled={post.isPending}>Post</Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

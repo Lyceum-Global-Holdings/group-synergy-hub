@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { untypedRpc } from '@/lib/untypedRpc';
 
 export type MaterialTransactionType = 'issue' | 'return' | 'adjustment';
 
@@ -42,216 +43,74 @@ export const useRoomMaterialTransactions = (roomMaterialId: string | null) => {
   });
 };
 
-interface IssueMaterialData {
-  room_material_id: string;
+// Issuing to a room goes through a Material Issue Note (request_room_materials):
+// it reserves bin stock at the project's warehouse, an admin approves it and the
+// store issues it; the room is updated when the MIN is issued. Returns go
+// through a Material Return Note against that MIN (return_room_material).
+export interface RequestRoomMaterialsData {
   room_id: string;
-  warehouse_item_id: string;
-  quantity: number;
-  unit_cost?: number;
-  company_id?: string;
+  location_id: string;
+  lines: { room_material_id: string; quantity: number }[];
   notes?: string;
 }
 
+export const useRoomWarehouseOptions = (roomId: string | null) =>
+  useQuery({
+    queryKey: ['room-warehouse-options', roomId],
+    queryFn: () => untypedRpc<{ id: string; name: string }[]>('room_warehouse_options', { p_room_id: roomId }),
+    enabled: !!roomId,
+  });
+
 export const useIssueMaterial = () => {
   const queryClient = useQueryClient();
-  
   return useMutation({
-    mutationFn: async (data: IssueMaterialData) => {
-      // Get current warehouse stock
-      const { data: warehouseItem, error: warehouseError } = await supabase
-        .from('warehouse_items_full')
-        .select('current_stock, unit_cost')
-        .eq('id', data.warehouse_item_id)
-        .single();
-      
-      if (warehouseError) throw warehouseError;
-      
-      const currentWarehouseStock = warehouseItem.current_stock || 0;
-      
-      // Validate stock availability
-      if (data.quantity > currentWarehouseStock) {
-        throw new Error(`Insufficient stock. Available: ${currentWarehouseStock}`);
-      }
-      
-      // Get current room material quantities
-      const { data: material, error: materialError } = await supabase
-        .from('floor_room_materials')
-        .select('quantity_allocated, quantity_used')
-        .eq('id', data.room_material_id)
-        .single();
-      
-      if (materialError) throw materialError;
-      
-      const previousAllocated = material.quantity_allocated || 0;
-      const newAllocated = previousAllocated + data.quantity;
-      const newWarehouseStock = currentWarehouseStock - data.quantity;
-      const unitCost = data.unit_cost || warehouseItem.unit_cost || 0;
-      
-      // Create the transaction record in floor_room_material_transactions
-      const { data: transaction, error: transactionError } = await supabase
-        .from('floor_room_material_transactions')
-        .insert({
-          room_material_id: data.room_material_id,
-          warehouse_item_id: data.warehouse_item_id,
-          room_id: data.room_id,
-          transaction_type: 'issue',
-          quantity: data.quantity,
-          previous_quantity: previousAllocated,
-          new_quantity: newAllocated,
-          previous_warehouse_stock: currentWarehouseStock,
-          new_warehouse_stock: newWarehouseStock,
-          unit_cost: unitCost,
-          total_value: data.quantity * unitCost,
-          notes: data.notes || null,
-          company_id: data.company_id || null,
-        })
-        .select('id')
-        .single();
-      
-      if (transactionError) throw transactionError;
-      
-      // Note: stock_transactions record is now created automatically by database trigger
-      
-      // Update warehouse stock
-      const { error: updateWarehouseError } = await supabase
-        .from('warehouse_items')
-        .update({ current_stock: newWarehouseStock })
-        .eq('id', data.warehouse_item_id);
-      
-      if (updateWarehouseError) throw updateWarehouseError;
-      
-      // Update room material quantities
-      const { error: updateMaterialError } = await supabase
-        .from('floor_room_materials')
-        .update({ 
-          quantity_allocated: newAllocated,
-          status: 'allocated'
-        })
-        .eq('id', data.room_material_id);
-      
-      if (updateMaterialError) throw updateMaterialError;
-      
-      return { room_id: data.room_id };
+    mutationFn: (data: RequestRoomMaterialsData) =>
+      untypedRpc<string>('request_room_materials', {
+        p_room_id: data.room_id,
+        p_location_id: data.location_id,
+        p_lines: data.lines,
+        p_notes: data.notes || null,
+      }),
+    onSuccess: (_minId, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['room-materials', variables.room_id] });
+      queryClient.invalidateQueries({ queryKey: ['material-issues'] });
+      toast.success('Issue note submitted', {
+        description: 'An admin approves it and the store issues it; the room is updated then.',
+      });
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['room-material-transactions', variables.room_material_id] });
-      queryClient.invalidateQueries({ queryKey: ['room-materials', data.room_id] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
-      toast.success('Material issued successfully');
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to issue material: ' + error.message);
-    },
+    onError: (error: Error) => toast.error(error.message),
   });
 };
 
-interface ReturnMaterialData {
-  room_material_id: string;
+export interface ReturnRoomMaterialData {
   room_id: string;
-  warehouse_item_id: string;
+  room_material_id: string;
   quantity: number;
-  unit_cost?: number;
-  company_id?: string;
-  notes?: string;
+  condition: 'good' | 'damaged' | 'expired';
+  reason: string;
 }
 
 export const useReturnMaterial = () => {
   const queryClient = useQueryClient();
-  
   return useMutation({
-    mutationFn: async (data: ReturnMaterialData) => {
-      // Get current warehouse stock
-      const { data: warehouseItem, error: warehouseError } = await supabase
-        .from('warehouse_items_full')
-        .select('current_stock, unit_cost')
-        .eq('id', data.warehouse_item_id)
-        .single();
-      
-      if (warehouseError) throw warehouseError;
-      
-      const currentWarehouseStock = warehouseItem.current_stock || 0;
-      
-      // Get current room material quantities
-      const { data: material, error: materialError } = await supabase
-        .from('floor_room_materials')
-        .select('quantity_allocated, quantity_used')
-        .eq('id', data.room_material_id)
-        .single();
-      
-      if (materialError) throw materialError;
-      
-      const previousAllocated = material.quantity_allocated || 0;
-      
-      // Validate return quantity
-      if (data.quantity > previousAllocated) {
-        throw new Error(`Cannot return more than allocated. Allocated: ${previousAllocated}`);
-      }
-      
-      const newAllocated = previousAllocated - data.quantity;
-      const newWarehouseStock = currentWarehouseStock + data.quantity;
-      const unitCost = data.unit_cost || warehouseItem.unit_cost || 0;
-      
-      // Create the transaction record in floor_room_material_transactions
-      const { data: transaction, error: transactionError } = await supabase
-        .from('floor_room_material_transactions')
-        .insert({
-          room_material_id: data.room_material_id,
-          warehouse_item_id: data.warehouse_item_id,
-          room_id: data.room_id,
-          transaction_type: 'return',
-          quantity: data.quantity,
-          previous_quantity: previousAllocated,
-          new_quantity: newAllocated,
-          previous_warehouse_stock: currentWarehouseStock,
-          new_warehouse_stock: newWarehouseStock,
-          unit_cost: unitCost,
-          total_value: data.quantity * unitCost,
-          notes: data.notes || null,
-          company_id: data.company_id || null,
-        })
-        .select('id')
-        .single();
-      
-      if (transactionError) throw transactionError;
-      
-      // Note: stock_transactions record is now created automatically by database trigger
-      
-      // Update warehouse stock
-      const { error: updateWarehouseError } = await supabase
-        .from('warehouse_items')
-        .update({ current_stock: newWarehouseStock })
-        .eq('id', data.warehouse_item_id);
-      
-      if (updateWarehouseError) throw updateWarehouseError;
-      
-      // Update room material quantities
-      const { error: updateMaterialError } = await supabase
-        .from('floor_room_materials')
-        .update({ 
-          quantity_allocated: newAllocated,
-          status: newAllocated > 0 ? 'allocated' : 'planned'
-        })
-        .eq('id', data.room_material_id);
-      
-      if (updateMaterialError) throw updateMaterialError;
-      
-      return { room_id: data.room_id };
+    mutationFn: (data: ReturnRoomMaterialData) =>
+      untypedRpc<string>('return_room_material', {
+        p_room_material_id: data.room_material_id,
+        p_quantity: data.quantity,
+        p_condition: data.condition,
+        p_reason: data.reason,
+      }),
+    onSuccess: (_mrnId, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['room-materials', variables.room_id] });
+      queryClient.invalidateQueries({ queryKey: ['material-returns'] });
+      toast.success('Return note created', {
+        description: 'Once an admin approves it, the stock goes back to its bin and the room is updated.',
+      });
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['room-material-transactions', variables.room_material_id] });
-      queryClient.invalidateQueries({ queryKey: ['room-materials', data.room_id] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
-      toast.success('Material returned successfully');
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to return material: ' + error.message);
-    },
+    onError: (error: Error) => toast.error(error.message),
   });
 };
 
-// Legacy hook for backward compatibility
 export const useCreateMaterialTransaction = () => {
   const queryClient = useQueryClient();
   

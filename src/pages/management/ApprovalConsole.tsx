@@ -1,202 +1,181 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
+import { CheckCircle2, ExternalLink, RefreshCw, Search, XCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useApprovalConsole } from "@/hooks/useApprovalConsole";
-import { ApprovalCard } from "@/components/approvals/ApprovalCard";
-import { ApprovalStats } from "@/components/approvals/ApprovalStats";
-import { ApprovalFilters, ApprovalType, ApprovalPriority } from "@/types/approval";
-import { Search, Filter, RefreshCw, Bell } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useIsAdmin } from "@/hooks/useSuperAdmin";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
+import {
+  APPROVAL_TYPE_LABEL,
+  type ApprovalItemType,
+  type ApprovalQueueItem,
+  useApprovalQueue,
+  useDecideApprovalItem,
+} from "@/hooks/useApprovalConsole";
 
+const money = (n: number | null, cur: string | null) =>
+  n == null ? null : `${cur || "LKR"} ${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+
+function QueueList({ items, isLoading, canDecide, onDecide }: {
+  items: ApprovalQueueItem[];
+  isLoading: boolean;
+  canDecide: boolean;
+  onDecide: (item: ApprovalQueueItem, approve: boolean) => void;
+}) {
+  if (isLoading) return <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
+  if (items.length === 0) {
+    return <Card><CardContent className="py-10 text-center text-muted-foreground">{canDecide ? "Nothing is waiting for you." : "Nothing you sent is waiting."}</CardContent></Card>;
+  }
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <Card key={`${item.item_type}-${item.item_id}`}>
+          <CardContent className="flex flex-wrap items-center gap-3 py-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{APPROVAL_TYPE_LABEL[item.item_type] ?? item.item_type}</Badge>
+                <span className="font-mono text-sm">{item.reference}</span>
+                <Badge variant="secondary">{item.stage}</Badge>
+              </div>
+              <p className="mt-1 truncate font-medium">{item.title}</p>
+              <p className="text-xs text-muted-foreground">
+                {money(item.amount, item.currency) && <>{money(item.amount, item.currency)} · </>}
+                {item.submitted_at ? `waiting ${formatDistanceToNow(new Date(item.submitted_at))}` : ""}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button asChild variant="ghost" size="sm">
+                <Link to={item.view_url}><ExternalLink className="mr-1 h-4 w-4" /> Open</Link>
+              </Button>
+              {canDecide && (
+                <>
+                  <Button size="sm" onClick={() => onDecide(item, true)}>
+                    <CheckCircle2 className="mr-1 h-4 w-4" /> Approve
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => onDecide(item, false)}>
+                    <XCircle className="mr-1 h-4 w-4" /> Reject
+                  </Button>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Everything waiting for the signed-in user's decision, from every module, as
+ * the database decides it. Approve and Reject go through each module's own
+ * rules, so they can't do more than the module's screen allows.
+ */
 export default function ApprovalConsole() {
-  const [filters, setFilters] = useState<ApprovalFilters>({});
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<ApprovalType | "all">("all");
-  const [viewScope, setViewScope] = useState<"my_queue" | "all_approvals">("my_queue");
+  const [tab, setTab] = useState<"to_decide" | "submitted">("to_decide");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<ApprovalItemType | "all">("all");
+  const [deciding, setDeciding] = useState<{ item: ApprovalQueueItem; approve: boolean } | null>(null);
+  const [comments, setComments] = useState("");
 
-  const { data: approvals, isLoading, refetch, isRefetching } = useApprovalConsole(filters);
-  const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
+  const toDecide = useApprovalQueue("to_decide");
+  const submitted = useApprovalQueue("submitted");
+  const decide = useDecideApprovalItem();
 
-  const handleFilterChange = (key: keyof ApprovalFilters, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  const filter = (items: ApprovalQueueItem[] = []) =>
+    items.filter((i) =>
+      (typeFilter === "all" || i.item_type === typeFilter)
+      && (!search || `${i.reference} ${i.title}`.toLowerCase().includes(search.toLowerCase())));
+  const typesPresent = useMemo(
+    () => [...new Set([...(toDecide.data ?? []), ...(submitted.data ?? [])].map((i) => i.item_type))],
+    [toDecide.data, submitted.data],
+  );
+
+  const close = () => { setDeciding(null); setComments(""); };
+  const confirm = () => {
+    if (!deciding) return;
+    decide.mutate(
+      { type: deciding.item.item_type, id: deciding.item.item_id, approve: deciding.approve, comments },
+      { onSuccess: close },
+    );
   };
-
-  const handleSearch = () => {
-    setFilters(prev => ({ ...prev, searchQuery }));
-  };
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(value as ApprovalType | "all");
-    if (value === "all") {
-      handleFilterChange('type', undefined);
-    } else {
-      handleFilterChange('type', value as ApprovalType);
-    }
-  };
-
-  const filteredApprovals = approvals || [];
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Approval Console</h1>
-          <p className="text-muted-foreground mt-1">
-            Centralized view of all pending approvals requiring your attention
-          </p>
+          <p className="mt-1 text-muted-foreground">Everything waiting for your decision, from every module.</p>
         </div>
         <div className="flex items-center gap-2">
-          {!isAdminLoading && isAdmin && (
-            <ToggleGroup 
-              type="single" 
-              value={viewScope} 
-              onValueChange={(value) => value && setViewScope(value as "my_queue" | "all_approvals")}
-              className="border rounded-md"
-            >
-              <ToggleGroupItem value="my_queue" aria-label="My queue" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                My Queue
-              </ToggleGroupItem>
-              <ToggleGroupItem value="all_approvals" aria-label="All approvals" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                All Approvals
-              </ToggleGroupItem>
-            </ToggleGroup>
-          )}
           <GenerateReportButton size="sm" template="MG-APR-PEND-001" />
-          <Button variant="outline" size="icon" onClick={() => refetch()}>
-            <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button variant="outline" size="icon">
-            <Bell className="h-4 w-4" />
+          <Button variant="outline" size="icon" aria-label="Refresh"
+            onClick={() => { void toDecide.refetch(); void submitted.refetch(); }}>
+            <RefreshCw className={`h-4 w-4 ${toDecide.isRefetching ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
 
-      {/* Statistics */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Search reference or title…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-      ) : (
-        <ApprovalStats approvals={filteredApprovals} />
-      )}
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as ApprovalItemType | "all")}>
+          <SelectTrigger className="w-[220px]" aria-label="Type"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {typesPresent.map((t) => <SelectItem key={t} value={t}>{APPROVAL_TYPE_LABEL[t] ?? t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Search by reference number or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                />
-                <Button onClick={handleSearch}>
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <Select 
-              value={filters.priority || "all"} 
-              onValueChange={(v) => handleFilterChange('priority', v === 'all' ? undefined : v as ApprovalPriority)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select 
-              value={filters.overdue ? "overdue" : "all"} 
-              onValueChange={(v) => handleFilterChange('overdue', v === 'overdue')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Items</SelectItem>
-                <SelectItem value="overdue">Overdue Only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Approval Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="purchase_order">PO</TabsTrigger>
-          <TabsTrigger value="purchase_requisition">PR</TabsTrigger>
-          <TabsTrigger value="supplier_registration">Suppliers</TabsTrigger>
-          <TabsTrigger value="customer_po">Customer PO</TabsTrigger>
-          <TabsTrigger value="production_receipt">Production</TabsTrigger>
-          <TabsTrigger value="asset_request">Assets</TabsTrigger>
-          <TabsTrigger value="material_request">Materials</TabsTrigger>
-          <TabsTrigger value="stock_transfer">Transfers</TabsTrigger>
-          <TabsTrigger value="grn">GRN</TabsTrigger>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        <TabsList>
+          <TabsTrigger value="to_decide">Waiting for me ({toDecide.data?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="submitted">Sent by me ({submitted.data?.length ?? 0})</TabsTrigger>
         </TabsList>
-
-        <TabsContent value={activeTab} className="mt-6">
-          {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-40" />
-              ))}
-            </div>
-          ) : filteredApprovals.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">
-                  {isAdmin && viewScope === "all_approvals" 
-                    ? "No pending approvals found system-wide" 
-                    : "No approvals assigned to you right now"}
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {isAdmin && viewScope === "my_queue"
-                    ? "Switch to 'All Approvals' to see all pending items"
-                    : "Try adjusting your filters or check back later"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredApprovals.map((approval) => (
-                <ApprovalCard key={approval.id} approval={approval} />
-              ))}
-            </div>
-          )}
+        <TabsContent value="to_decide" className="mt-4">
+          {toDecide.error
+            ? <p className="text-sm text-destructive">Couldn't load the queue: {(toDecide.error as Error).message}</p>
+            : <QueueList items={filter(toDecide.data)} isLoading={toDecide.isLoading} canDecide onDecide={(item, approve) => setDeciding({ item, approve })} />}
+        </TabsContent>
+        <TabsContent value="submitted" className="mt-4">
+          <QueueList items={filter(submitted.data)} isLoading={submitted.isLoading} canDecide={false} onDecide={() => {}} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!deciding} onOpenChange={(open) => !open && close()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{deciding?.approve ? "Approve" : "Reject"} {deciding?.item.reference}</DialogTitle>
+            <DialogDescription>
+              {deciding && `${APPROVAL_TYPE_LABEL[deciding.item.item_type]} · ${deciding.item.title} · ${deciding.item.stage}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="approval-comments">{deciding?.approve ? "Comments" : "Reason *"}</Label>
+            <Textarea id="approval-comments" rows={3} value={comments} onChange={(e) => setComments(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={close}>Cancel</Button>
+            <Button
+              variant={deciding?.approve ? "default" : "destructive"}
+              onClick={confirm}
+              disabled={decide.isPending || (!deciding?.approve && !comments.trim())}
+            >
+              {deciding?.approve ? "Approve" : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

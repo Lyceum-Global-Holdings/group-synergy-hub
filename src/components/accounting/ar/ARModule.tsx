@@ -9,7 +9,7 @@ import { CustomerReceiptList } from "@/components/finance/ar/CustomerReceiptList
 import { ARAgingReport } from "@/components/finance/ar/ARAgingReport";
 import { CreateCustomerDialog } from "@/components/finance/ar/CreateCustomerDialog";
 import { CreateCustomerInvoiceDialog } from "@/components/finance/ar/CreateCustomerInvoiceDialog";
-import { CreateReceiptDialog } from "@/components/finance/ar/CreateReceiptDialog";
+import { RecordMoneyDialog } from "@/components/finance/RecordMoneyDialog";
 import { DataTable, DataTableColumn } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useARStats, useCreditNotes, useCreditNoteStats, useCustomerAdvances, useCustomerAdvanceStats, useBadDebtProvisions, useBadDebtStats } from "@/hooks/finance/useARExpansion";
@@ -65,7 +65,7 @@ export default function ARModule({ activeSubTab, onSubTabChange }: ARModuleProps
 
         <TabsContent value="receipts" className="mt-4 space-y-6">
           <QuickActions actions={[
-            { label: "New Receipt", icon: Plus, onClick: () => setShowReceiptDialog(true) },
+            { label: "Record Receipt", icon: Plus, onClick: () => setShowReceiptDialog(true) },
             { label: "Export", icon: Download, onClick: () => {} },
           ]} />
           <CustomerReceiptList />
@@ -118,7 +118,7 @@ export default function ARModule({ activeSubTab, onSubTabChange }: ARModuleProps
 
       <CreateCustomerDialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog} />
       <CreateCustomerInvoiceDialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog} />
-      <CreateReceiptDialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog} />
+      <RecordMoneyDialog kind="receipt" open={showReceiptDialog} onOpenChange={setShowReceiptDialog} />
     </>
   );
 }

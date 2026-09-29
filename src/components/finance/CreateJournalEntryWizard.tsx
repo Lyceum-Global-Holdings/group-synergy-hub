@@ -47,7 +47,7 @@ export function CreateJournalEntryWizard({ open, onOpenChange }: CreateJournalEn
   });
 
   const { accounts } = useChartOfAccounts();
-  const { createJournalEntry } = useJournalEntries();
+  const { createJournalEntry, postJournalEntry } = useJournalEntries();
   const journalDate = watch("journal_date");
 
   const activeAccounts = accounts?.filter(a => !a.is_header && a.is_active) || [];
@@ -100,8 +100,9 @@ export function CreateJournalEntryWizard({ open, onOpenChange }: CreateJournalEn
       return;
     }
 
+    let created: { id: string } | undefined;
     try {
-      await createJournalEntry.mutateAsync({
+      created = await createJournalEntry.mutateAsync({
         journal_date: format(headerData.journal_date, "yyyy-MM-dd"),
         journal_type: headerData.journal_type,
         reference_type: headerData.reference_type,
@@ -110,12 +111,23 @@ export function CreateJournalEntryWizard({ open, onOpenChange }: CreateJournalEn
         lines: validLines
       });
 
-      toast.success(postImmediately ? "Journal entry created and posted" : "Journal entry created as draft");
-      onOpenChange(false);
-      resetWizard();
     } catch (error) {
       toast.error("Failed to create journal entry");
+      return;
     }
+    // "Create & Post" posts the new entry; if posting is refused (e.g. no posting
+    // rights) it stays as a draft and the hook reports why.
+    if (postImmediately && created?.id) {
+      try {
+        await postJournalEntry.mutateAsync(created.id);
+      } catch {
+        toast.warning("Saved as a draft; it couldn't be posted");
+      }
+    } else {
+      toast.success("Journal entry created as draft");
+    }
+    onOpenChange(false);
+    resetWizard();
   };
 
   const resetWizard = () => {

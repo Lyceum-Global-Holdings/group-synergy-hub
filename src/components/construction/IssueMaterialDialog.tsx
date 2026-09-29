@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -11,10 +12,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ArrowUpCircle, AlertCircle } from 'lucide-react';
 import { FloorRoomMaterial } from '@/types/construction';
-import { useIssueMaterial } from '@/hooks/construction/useRoomMaterialTransactions';
-import { useCompany } from '@/contexts/CompanyContext';
+import { useIssueMaterial, useRoomWarehouseOptions } from '@/hooks/construction/useRoomMaterialTransactions';
 
 interface IssueMaterialDialogProps {
   material: FloorRoomMaterial | null;
@@ -23,162 +24,102 @@ interface IssueMaterialDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function IssueMaterialDialog({
-  material,
-  roomId,
-  open,
-  onOpenChange,
-}: IssueMaterialDialogProps) {
-  const { selectedCompany } = useCompany();
-  const [quantity, setQuantity] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
-  
+/**
+ * Requests material for a room on a Material Issue Note from one of the
+ * project's warehouses. Stock is reserved now and leaves the bins when the
+ * approved note is issued; the room is updated then.
+ */
+export function IssueMaterialDialog({ material, roomId, open, onOpenChange }: IssueMaterialDialogProps) {
+  const [quantity, setQuantity] = useState('');
+  const [notes, setNotes] = useState('');
+  const [locationId, setLocationId] = useState<string>();
   const issueMaterial = useIssueMaterial();
-  
-  const warehouseStock = material?.warehouse_item?.current_stock ?? 0;
+  const { data: warehouses = [], isLoading: loadingWarehouses } = useRoomWarehouseOptions(open ? roomId : null);
+
+  useEffect(() => {
+    if (warehouses.length === 1) setLocationId(warehouses[0].id);
+  }, [warehouses]);
+
   const currentAllocated = material?.quantity_allocated ?? 0;
   const quantityRequired = material?.quantity_required ?? 0;
-  const remainingToAllocate = Math.max(0, quantityRequired - currentAllocated);
+  const remaining = Math.max(0, quantityRequired - currentAllocated);
   const quantityNum = parseFloat(quantity) || 0;
-  
-  const isInsufficientStock = quantityNum > warehouseStock;
-  const isExceedsRequired = quantityNum > remainingToAllocate && remainingToAllocate > 0;
+  const exceedsPlan = quantityRequired > 0 && quantityNum > remaining;
 
   const handleSubmit = () => {
-    if (!material || !material.warehouse_item?.id || quantityNum <= 0) return;
-
+    if (!material || !locationId || quantityNum <= 0 || exceedsPlan) return;
     issueMaterial.mutate(
-      {
-        room_material_id: material.id,
-        room_id: roomId,
-        warehouse_item_id: material.warehouse_item.id,
-        quantity: quantityNum,
-        unit_cost: material.warehouse_item.unit_cost || undefined,
-        company_id: selectedCompany?.id || undefined,
-        notes: notes || undefined,
-      },
+      { room_id: roomId, location_id: locationId, lines: [{ room_material_id: material.id, quantity: quantityNum }], notes },
       {
         onSuccess: () => {
-          onOpenChange(false);
           setQuantity('');
           setNotes('');
+          onOpenChange(false);
         },
-      }
+      },
     );
   };
 
-  const handleClose = () => {
-    onOpenChange(false);
-    setQuantity('');
-    setNotes('');
-  };
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowUpCircle className="h-5 w-5 text-green-600" />
-            Issue Material to Room
+            Request material for the room
           </DialogTitle>
+          <DialogDescription>
+            Creates a Material Issue Note. An admin approves it and the store issues it from the bins; the room is updated when it is issued.
+          </DialogDescription>
         </DialogHeader>
 
         {material && (
           <div className="space-y-4">
-            {/* Material Info */}
-            <div className="p-3 bg-muted/30 rounded-lg space-y-2">
-              <div className="font-medium">
-                {material.warehouse_item?.item_code} - {material.warehouse_item?.name}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Warehouse Stock:</span>{' '}
-                  <span className="font-medium text-green-600">{warehouseStock}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Already Issued:</span>{' '}
-                  <span className="font-medium">{currentAllocated}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Required:</span>{' '}
-                  <span className="font-medium">{quantityRequired}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Remaining:</span>{' '}
-                  <span className="font-medium text-primary">{remainingToAllocate}</span>
-                </div>
+            <div className="p-3 bg-muted rounded-lg space-y-1 text-sm">
+              <div className="font-medium">{material.warehouse_item?.item_code} - {material.warehouse_item?.name}</div>
+              <div className="grid grid-cols-3 gap-2 text-muted-foreground">
+                <span>Planned: <b className="text-foreground">{quantityRequired}</b></span>
+                <span>Issued: <b className="text-foreground">{currentAllocated}</b></span>
+                <span>Still needed: <b className="text-foreground">{remaining}</b></span>
               </div>
             </div>
 
-            {/* Quantity Input */}
             <div className="space-y-2">
-              <Label htmlFor="issue-quantity">Quantity to Issue</Label>
-              <Input
-                id="issue-quantity"
-                type="number"
-                min="0"
-                step="0.001"
-                max={warehouseStock}
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder={`Max: ${warehouseStock}`}
-              />
-              {remainingToAllocate > 0 && (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 text-xs"
-                  onClick={() => setQuantity(String(Math.min(remainingToAllocate, warehouseStock)))}
-                >
-                  Fill remaining ({Math.min(remainingToAllocate, warehouseStock)})
-                </Button>
+              <Label>From warehouse *</Label>
+              {!loadingWarehouses && warehouses.length === 0 ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>This project has no warehouse. Allocate one to the project first.</AlertDescription>
+                </Alert>
+              ) : (
+                <Select value={locationId} onValueChange={setLocationId}>
+                  <SelectTrigger aria-label="Warehouse"><SelectValue placeholder="Choose the project's warehouse" /></SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               )}
             </div>
 
-            {/* Validation Alerts */}
-            {isInsufficientStock && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Insufficient warehouse stock. Available: {warehouseStock}
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {isExceedsRequired && !isInsufficientStock && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  This exceeds the remaining requirement ({remainingToAllocate}). You can still proceed.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Notes */}
             <div className="space-y-2">
-              <Label htmlFor="issue-notes">Notes (Optional)</Label>
-              <Textarea
-                id="issue-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add notes about this issue..."
-                rows={2}
-              />
+              <Label htmlFor="issue-quantity">Quantity *</Label>
+              <Input id="issue-quantity" type="number" min="0" step="any" value={quantity}
+                onChange={(e) => setQuantity(e.target.value)} placeholder="Enter quantity" />
+              {exceedsPlan && <p className="text-xs text-destructive">Only {remaining} more is planned for this room.</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="issue-notes">Notes</Label>
+              <Textarea id="issue-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
             </div>
           </div>
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={quantityNum <= 0 || isInsufficientStock || issueMaterial.isPending}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={issueMaterial.isPending || !locationId || quantityNum <= 0 || exceedsPlan}>
             {issueMaterial.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Issue Material
+            Submit issue note
           </Button>
         </DialogFooter>
       </DialogContent>

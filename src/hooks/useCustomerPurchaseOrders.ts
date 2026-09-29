@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCachedUser } from "@/lib/currentUser";
 import { CustomerPurchaseOrder, CreateCustomerPoData } from "@/types/customer";
 import { toast } from "sonner";
+import { untypedRpc } from "@/lib/untypedRpc";
 
 export function useCustomerPurchaseOrders(companyId?: string) {
   const { data: customerPOs = [], isLoading, error } = useQuery({
@@ -68,7 +69,11 @@ export function useCustomerPurchaseOrders(companyId?: string) {
               total_price: item.total_price,
               delivery_date: item.delivery_date,
               color: item.color,
-              size: item.size
+              size: item.size,
+              // Production finds the BOM from the product and style number.
+              product_master_id: item.product_master_id || null,
+              style_no: item.style_no || null,
+              unit_of_measure: (item as { unit_of_measure?: string }).unit_of_measure || 'pcs',
             }))
           );
         
@@ -125,41 +130,10 @@ export function useCustomerPurchaseOrders(companyId?: string) {
     },
   });
 
+  // Decided in the database (decide_customer_po): admins of the company, with history.
   const approveCPO = useMutation({
-    mutationFn: async ({ id, action, comments }: { id: string; action: 'approved' | 'rejected'; comments?: string }) => {
-      const user = getCachedUser();
-      
-      // Update CPO status and approval fields
-      const newStatus = action === 'approved' ? 'confirmed' : 'rejected';
-      const { data, error } = await supabase
-        .from('customer_purchase_orders')
-        .update({
-          status: newStatus,
-          approved_by: user?.id,
-          approved_date: new Date().toISOString(),
-          approval_comments: comments,
-          pending_approval: false
-        })
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // Create approval record
-      const { error: approvalError } = await supabase
-        .from('customer_po_approvals')
-        .insert({
-          cpo_id: id,
-          approver_id: user?.id,
-          action,
-          comments
-        });
-      
-      if (approvalError) throw approvalError;
-      
-      return data;
-    },
+    mutationFn: ({ id, action, comments }: { id: string; action: 'approved' | 'rejected'; comments?: string }) =>
+      untypedRpc<string>('decide_customer_po', { p_cpo_id: id, p_approve: action === 'approved', p_comments: comments || null }),
     onSuccess: (_, { action }) => {
       queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
       toast.success(`Customer PO ${action} successfully`);
@@ -222,11 +196,23 @@ export function useCustomerPurchaseOrders(companyId?: string) {
     },
   });
 
+  // Delivered → completed (admins and sales managers; checked in the database).
+  const completeCPO = useMutation({
+    mutationFn: (id: string) => untypedRpc<null>('complete_customer_po', { p_cpo_id: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-order'] });
+      toast.success("Customer PO completed");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   return {
     customerPOs,
     isLoading,
     error,
     createCustomerPO,
+    completeCPO,
     updateCustomerPO,
     deleteCustomerPO,
     approveCPO,
@@ -238,5 +224,6 @@ export function useCustomerPurchaseOrders(companyId?: string) {
     isApproving: approveCPO.isPending,
     isSubmitting: submitForApproval.isPending,
     isCancelling: cancelCPO.isPending,
+    isCompleting: completeCPO.isPending,
   };
 }

@@ -168,6 +168,9 @@ const InventoryItems = lazy(() => import("./pages/construction/resources/Invento
 const SubcontractorResources = lazy(() => import("./pages/construction/resources/SubcontractorResources"));
 const QualityControl = lazy(() => import("./pages/construction/QualityControl"));
 const SafetyManagement = lazy(() => import("./pages/construction/SafetyManagement"));
+const ConstructionReportsAnalytics = lazy(() => import("./pages/construction/ReportsAnalytics"));
+const ProjectDocuments = lazy(() => import("./pages/construction/ProjectDocuments"));
+const ProjectBudgeting = lazy(() => import("./pages/construction/ProjectBudgeting"));
 const ProductionModule = lazy(() => import("./pages/production/ProductionModule"));
 
 // Missing module pages
@@ -459,6 +462,9 @@ function App() {
                 <Route path="/construction/resource-allocation/subcontractors" element={<SubcontractorResources />} />
                 <Route path="/construction/quality-control" element={<QualityControl />} />
                 <Route path="/construction/safety-management" element={<SafetyManagement />} />
+                <Route path="/construction/reports-analytics" element={<ConstructionReportsAnalytics />} />
+                <Route path="/construction/project-documents" element={<ProjectDocuments />} />
+                <Route path="/construction/project-budgeting" element={<ProjectBudgeting />} />
                 
                 {/* Production routes */}
                 <Route path="/production" element={<ProductionModule />} />

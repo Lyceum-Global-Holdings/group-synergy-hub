@@ -46,7 +46,7 @@ export default function CustomerPoView() {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   
-  const { approveCPO, submitForApproval, cancelCPO, isApproving, isSubmitting, isCancelling } = useCustomerPurchaseOrders();
+  const { approveCPO, submitForApproval, cancelCPO, completeCPO, isApproving, isSubmitting, isCancelling, isCompleting } = useCustomerPurchaseOrders();
   const { createMaterialDemandFromCPO, isCreatingMaterialDemand } = useCpoWorkflow(cpoId!);
   const { data: isAdmin } = useIsAdmin();
   const { data: isSuperAdmin } = useSuperAdmin();
@@ -54,7 +54,9 @@ export default function CustomerPoView() {
   // Determine available actions based on status and role
   const canSubmitForApproval = cpo?.status === 'draft';
   const canApprove = cpo?.status === 'pending_approval' && (isAdmin || isSuperAdmin);
-  const canProceedToNextStage = cpo?.status === 'confirmed';
+  // In production and delivered are set by the database as work progresses.
+  const canProceedToNextStage = cpo?.status === 'confirmed' || cpo?.status === 'in_production';
+  const canComplete = cpo?.status === 'delivered';
   const canCancel = ['draft', 'pending_approval', 'confirmed'].includes(cpo?.status || '') && cpo?.status !== 'cancelled';
   
   const handleSubmitForApproval = () => {
@@ -404,11 +406,17 @@ export default function CustomerPoView() {
       </div>
 
       {/* Action Buttons Card */}
-      {(canSubmitForApproval || canApprove || canProceedToNextStage || canCancel) && (
+      {(canSubmitForApproval || canApprove || canProceedToNextStage || canCancel || canComplete) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Actions</CardTitle>
-            <CardDescription>Available actions for this Customer PO</CardDescription>
+            <CardDescription>
+              {cpo?.status === 'in_production'
+                ? 'Production has started. The order becomes Delivered by itself once every line has been delivered.'
+                : cpo?.status === 'delivered'
+                  ? 'Every line has been delivered. Mark it completed to close the order.'
+                  : 'Available actions for this Customer PO'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
@@ -457,6 +465,13 @@ export default function CustomerPoView() {
                 </Button>
               )}
               
+              {canComplete && (
+                <Button onClick={() => cpoId && completeCPO.mutate(cpoId)} disabled={isCompleting}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  {isCompleting ? 'Completing...' : 'Mark Completed'}
+                </Button>
+              )}
+
               {/* Cancel - for appropriate statuses */}
               {canCancel && (
                 <Button variant="outline" className="text-destructive hover:text-destructive" onClick={handleCancel} disabled={isCancelling}>

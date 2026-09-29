@@ -7,6 +7,7 @@ import { useProductionOrder, useUpdateProductionOrder } from "@/hooks/useProduct
 import { PRODUCTION_ORDER_STATUSES } from "@/constants/productionSectors";
 import StageProgressCard from "./StageProgressCard";
 import StagePipeline from "./StagePipeline";
+import ProductionOutputCard from "./ProductionOutputCard";
 import { format } from "date-fns";
 
 interface Props {
@@ -102,6 +103,8 @@ export default function ProductionOrderDetail({ orderId, onBack }: Props) {
           </CardContent></Card>
         ))}
       </div>
+
+      <ProductionOutputCard orderId={orderId} completed={order.status === "completed"} />
 
       {/* Stage progress bar */}
       <div className="flex items-center gap-3">

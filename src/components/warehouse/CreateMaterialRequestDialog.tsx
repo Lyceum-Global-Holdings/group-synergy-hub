@@ -86,7 +86,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
           cpo_number,
           customer:customers(customer_name)
         `)
-        .eq('status', 'confirmed')
+        .in('status', ['confirmed', 'in_production'])
         .order('cpo_number', { ascending: false });
       
       if (error) throw error;

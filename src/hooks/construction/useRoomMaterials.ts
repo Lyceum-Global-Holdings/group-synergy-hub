@@ -25,7 +25,8 @@ export const useRoomMaterials = (roomId: string | null) => {
         .order('created_at', { ascending: true });
       
       if (error) throw error;
-      return data as unknown as unknown as FloorRoomMaterial[];
+      // Item code and name live on the catalogue row.
+      return (data ?? []).map((m: any) => ({ ...m, warehouse_item: flattenCatalog(m.warehouse_item) })) as unknown as FloorRoomMaterial[];
     },
     enabled: !!roomId,
   });

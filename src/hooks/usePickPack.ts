@@ -43,7 +43,7 @@ export const usePickPack = () => {
               )
             )
           `)
-          .eq('status', 'confirmed')
+          .in('status', ['confirmed', 'in_production'])
           .order('created_at', { ascending: false });
 
         if (error) throw error;

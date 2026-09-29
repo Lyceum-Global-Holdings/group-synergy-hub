@@ -9,14 +9,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search } from "lucide-react";
 import { format } from "date-fns";
 
+// Every entry is written by the database, in the same step as the change.
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   account_added: { label: "Account Added", color: "bg-info/10 text-info" },
-  access_granted: { label: "Access Granted", color: "bg-success/10 text-success" },
-  access_revoked: { label: "Access Revoked", color: "bg-destructive/10 text-destructive" },
-  nda_signed: { label: "NDA Signed", color: "bg-success/10 text-success" },
-  nda_expired: { label: "NDA Expired", color: "bg-warning/10 text-warning" },
+  account_updated: { label: "Account Changed", color: "bg-info/10 text-info" },
+  account_status_changed: { label: "Account Status Changed", color: "bg-info/10 text-info" },
   account_deactivated: { label: "Account Deactivated", color: "bg-muted text-muted-foreground" },
+  access_requested: { label: "Access Requested", color: "bg-warning/10 text-warning" },
+  access_granted: { label: "Access Approved", color: "bg-success/10 text-success" },
+  access_rejected: { label: "Access Rejected", color: "bg-destructive/10 text-destructive" },
+  access_level_changed: { label: "Access Level Changed", color: "bg-info/10 text-info" },
+  access_revoked: { label: "Access Revoked", color: "bg-destructive/10 text-destructive" },
+  access_restored: { label: "Access Restored", color: "bg-success/10 text-success" },
+  nda_signed: { label: "NDA Recorded", color: "bg-success/10 text-success" },
+  nda_expired: { label: "NDA Expired: Access Suspended", color: "bg-warning/10 text-warning" },
 };
+
+/** Plain-language summary of an entry's details. */
+function describe(details: Record<string, unknown> | null, name: (id: string) => string): string {
+  if (!details || Object.keys(details).length === 0) return "—";
+  const parts: string[] = [];
+  if (typeof details.user_id === "string") parts.push(`for ${name(details.user_id)}`);
+  if (details.access_level) parts.push(`level ${details.access_level}`);
+  if (details.old_level || details.new_level) parts.push(`${details.old_level} → ${details.new_level}`);
+  if (details.from || details.to) parts.push(`${details.from} → ${details.to}`);
+  if (Array.isArray(details.fields)) parts.push(`changed ${details.fields.join(", ").replace(/_/g, " ")}`);
+  if (details.account_name) parts.push(String(details.account_name));
+  if (details.expires) parts.push(`expires ${details.expires}`);
+  if (details.expired_on) parts.push(`expired ${details.expired_on}`);
+  if (details.note) parts.push(`“${details.note}”`);
+  return parts.join(" · ") || "—";
+}
 
 export default function ActivityLog() {
   const { selectedCompany } = useCompany();
@@ -39,19 +62,20 @@ export default function ActivityLog() {
     enabled: !!selectedCompany?.id,
   });
 
+  // Entries store login ids (performed_by and details.user_id).
   const { data: users = [] } = useQuery({
-    queryKey: ["profiles-activity-lookup"],
+    queryKey: ["profiles-directory-activity-lookup"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name, email");
+      const { data } = await supabase.from("profiles_directory").select("user_id, full_name, email");
       return data || [];
     },
   });
 
-  const userMap = new Map(users.map((u: Record<string, unknown>) => [u.id as string, u]));
+  const userMap = new Map(users.map((u) => [u.user_id as string, u]));
   const getUserName = (userId: string | null) => {
     if (!userId) return "System";
     const u = userMap.get(userId);
-    return u ? ((u as Record<string, unknown>).full_name as string) || ((u as Record<string, unknown>).email as string) : userId.slice(0, 8);
+    return u ? u.full_name || u.email || "Unknown user" : "Unknown user";
   };
 
   const filtered = logs.filter((l: Record<string, unknown>) => {
@@ -91,9 +115,7 @@ export default function ActivityLog() {
       key: "details",
       header: "Details",
       render: (row) => {
-        const details = row.details as Record<string, unknown> | null;
-        if (!details || Object.keys(details).length === 0) return "—";
-        return <span className="text-xs text-muted-foreground">{JSON.stringify(details)}</span>;
+        return <span className="text-xs text-muted-foreground">{describe(row.details as Record<string, unknown> | null, (id) => getUserName(id))}</span>;
       },
     },
   ];

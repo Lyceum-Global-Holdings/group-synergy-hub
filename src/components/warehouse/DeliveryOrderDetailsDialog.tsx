@@ -1,9 +1,13 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDeliveryOrders } from '@/hooks/useDeliveryOrders';
-import { Truck, User, MapPin, Calendar, Package, Phone, CheckCircle, XCircle } from 'lucide-react';
+import { Truck, User, MapPin, Calendar, Package, Phone, CheckCircle, XCircle, PackageCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 
@@ -23,9 +27,45 @@ export function DeliveryOrderDetailsDialog({
     updateDeliveryOrderStatus, 
     isUpdatingStatus,
     cancelDeliveryOrder,
-    isCancelling
+    isCancelling,
+    dispatchDeliveryOrder,
+    isDispatching,
+    confirmDelivery,
+    isConfirmingDelivery,
   } = useDeliveryOrders();
   const { data: deliveryOrder } = useDeliveryOrder(deliveryOrderId || '');
+  const [confirming, setConfirming] = useState(false);
+  const [receivedBy, setReceivedBy] = useState('');
+  const [deliveredAt, setDeliveredAt] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [delivered, setDelivered] = useState<Record<string, string>>({});
+
+  const openConfirm = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    setDeliveredAt(now.toISOString().slice(0, 16));
+    setReceivedBy('');
+    setRemarks('');
+    setDelivered(Object.fromEntries((deliveryOrder?.items ?? []).map((i) => [i.id, String(i.quantity_to_deliver)])));
+    setConfirming(true);
+  };
+  const lineProblem = (deliveryOrder?.items ?? []).some((i) => {
+    const q = Number(delivered[i.id]);
+    return delivered[i.id] === '' || !Number.isFinite(q) || q < 0 || q > Number(i.quantity_to_deliver);
+  });
+  const submitDelivery = () => {
+    if (!deliveryOrderId || !receivedBy.trim() || lineProblem) return;
+    confirmDelivery(
+      {
+        doId: deliveryOrderId,
+        receivedBy: receivedBy.trim(),
+        deliveredAt: new Date(deliveredAt).toISOString(),
+        lines: (deliveryOrder?.items ?? []).map((i) => ({ item_id: i.id, quantity_delivered: Number(delivered[i.id]) })),
+        remarks,
+      },
+      { onSuccess: () => setConfirming(false) },
+    );
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -130,17 +170,42 @@ export function DeliveryOrderDetailsDialog({
                 </Button>
               </div>
             )}
-            {['approved', 'ready_for_dispatch', 'dispatched'].includes(deliveryOrder.status) && (
-              <Button
-                variant="destructive"
-                onClick={handleCancel}
-                disabled={isCancelling}
-              >
-                <XCircle className="h-4 w-4 mr-1" />
-                {isCancelling ? 'Cancelling...' : 'Cancel Order'}
-              </Button>
+            {['approved', 'ready_for_dispatch', 'dispatched', 'in_transit'].includes(deliveryOrder.status) && (
+              <div className="flex gap-2">
+                {['approved', 'ready_for_dispatch'].includes(deliveryOrder.status) && (
+                  <Button variant="outline" onClick={() => deliveryOrderId && dispatchDeliveryOrder(deliveryOrderId)} disabled={isDispatching}>
+                    <Truck className="h-4 w-4 mr-1" />
+                    {isDispatching ? 'Dispatching...' : 'Dispatch'}
+                  </Button>
+                )}
+                <Button onClick={openConfirm} disabled={isConfirmingDelivery}>
+                  <PackageCheck className="h-4 w-4 mr-1" />
+                  Confirm delivery
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+                </Button>
+              </div>
             )}
           </div>
+
+          {(deliveryOrder.dispatched_at || deliveryOrder.delivered_at) && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+              {deliveryOrder.dispatched_at && <p>Dispatched {format(new Date(deliveryOrder.dispatched_at), 'MMM dd, yyyy HH:mm')}</p>}
+              {deliveryOrder.delivered_at && (
+                <p>
+                  Delivered {format(new Date(deliveryOrder.delivered_at), 'MMM dd, yyyy HH:mm')}
+                  {deliveryOrder.received_by_name ? `, received by ${deliveryOrder.received_by_name}` : ''}
+                </p>
+              )}
+              {deliveryOrder.delivery_remarks && <p className="text-muted-foreground">{deliveryOrder.delivery_remarks}</p>}
+            </div>
+          )}
 
           <Separator />
 
@@ -263,6 +328,7 @@ export function DeliveryOrderDetailsDialog({
                   <TableHead>Product Code</TableHead>
                   <TableHead className="text-right">Ordered</TableHead>
                   <TableHead className="text-right">To Deliver</TableHead>
+                  {deliveryOrder.status === 'delivered' && <TableHead className="text-right">Delivered</TableHead>}
                   <TableHead>Condition</TableHead>
                 </TableRow>
               </TableHeader>
@@ -273,6 +339,7 @@ export function DeliveryOrderDetailsDialog({
                     <TableCell>{item.finished_good?.product_code}</TableCell>
                     <TableCell className="text-right">{item.quantity_ordered}</TableCell>
                     <TableCell className="text-right font-medium">{item.quantity_to_deliver}</TableCell>
+                    {deliveryOrder.status === 'delivered' && <TableCell className="text-right">{item.quantity_delivered ?? 0}</TableCell>}
                     <TableCell>
                       <Badge variant={item.item_condition === 'good' ? 'default' : 'destructive'}>
                         {item.item_condition}
@@ -313,6 +380,64 @@ export function DeliveryOrderDetailsDialog({
           </Button>
         </div>
       </DialogContent>
+
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm delivery: {deliveryOrder.do_number}</DialogTitle>
+            <DialogDescription>Record who received the goods and how much arrived.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="do-received-by">Received by *</Label>
+                <Input id="do-received-by" value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="do-delivered-at">Delivered at *</Label>
+                <Input id="do-delivered-at" type="datetime-local" value={deliveredAt} onChange={(e) => setDeliveredAt(e.target.value)} />
+              </div>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Sent</TableHead>
+                  <TableHead className="text-right">Arrived</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {deliveryOrder.items?.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.finished_good?.product_name}</TableCell>
+                    <TableCell className="text-right">{item.quantity_to_deliver}</TableCell>
+                    <TableCell className="text-right">
+                      <Input
+                        aria-label={`Quantity of ${item.finished_good?.product_name ?? 'item'} delivered`}
+                        className="ml-auto h-8 w-24 text-right"
+                        inputMode="decimal"
+                        value={delivered[item.id] ?? ''}
+                        onChange={(e) => setDelivered({ ...delivered, [item.id]: e.target.value })}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {lineProblem && <p className="text-xs text-destructive">Each arrived quantity must be between 0 and what was sent.</p>}
+            <div className="space-y-1">
+              <Label htmlFor="do-remarks">Remarks</Label>
+              <Textarea id="do-remarks" rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="e.g. 3 items short, to follow" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirming(false)}>Cancel</Button>
+            <Button onClick={submitDelivery} disabled={!receivedBy.trim() || !deliveredAt || lineProblem || isConfirmingDelivery}>
+              Confirm delivery
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

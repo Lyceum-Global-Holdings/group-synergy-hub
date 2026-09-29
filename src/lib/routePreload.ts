@@ -111,6 +111,9 @@ const loaders: Array<[string, Loader]> = [
   ["/construction/resource-allocation", () => import("@/pages/construction/ResourceAllocation")],
   ["/construction/quality-control", () => import("@/pages/construction/QualityControl")],
   ["/construction/safety-management", () => import("@/pages/construction/SafetyManagement")],
+  ["/construction/reports-analytics", () => import("@/pages/construction/ReportsAnalytics")],
+  ["/construction/project-documents", () => import("@/pages/construction/ProjectDocuments")],
+  ["/construction/project-budgeting", () => import("@/pages/construction/ProjectBudgeting")],
 
   // Social media
   ["/social-media/accounts", () => import("@/pages/social-media/AccountRegistry")],
