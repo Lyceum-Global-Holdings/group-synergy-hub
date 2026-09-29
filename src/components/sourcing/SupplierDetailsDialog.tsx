@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { Building2, Mail, Phone, Globe, MapPin, CreditCard, Star, User, Edit, Plus, Trash2 } from 'lucide-react';
+import { Building2, Mail, Phone, Globe, MapPin, CreditCard, Star, User, Edit, Plus, Trash2, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useDeleteSupplierContact } from '@/hooks/useSuppliers';
+import { useSupplierBankProfile } from '@/hooks/useSupplierBankProfile';
 import type { Supplier, SupplierContact } from '@/types/supplier';
 import { SUPPLIER_TYPES, SUPPLIER_STATUSES, SUPPLIER_CATEGORIES, PAYMENT_TERMS } from '@/types/supplier';
 import { SupplierItemsSection } from './SupplierItemsSection';
@@ -31,6 +32,16 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
   const [contactToDelete, setContactToDelete] = useState<SupplierContact | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const deleteContactMutation = useDeleteSupplierContact();
+  const { data: bankProfile, isLoading: bankLoading } = useSupplierBankProfile(open ? supplier.id : undefined);
+  const bankRows: [string, string | null | undefined][] = [
+    ['Bank', bankProfile?.bank_name],
+    ['Branch', bankProfile?.bank_branch],
+    ['Account name', bankProfile?.bank_account_name],
+    ['Account number', bankProfile?.bank_account_number],
+    ['IBAN', bankProfile?.bank_iban],
+    ['SWIFT / BIC', bankProfile?.bank_swift],
+  ];
+  const hasBankDetails = bankRows.some(([, value]) => !!value);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -394,6 +405,30 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
                       <label className="text-sm font-medium text-muted-foreground">Currency</label>
                       <p className="text-sm">{supplier.currency}</p>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Bank details (from the registration or the supplier portal) */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Landmark className="w-5 h-5" />
+                      Bank Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {bankLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading…</p>
+                    ) : hasBankDetails ? (
+                      bankRows.filter(([, value]) => !!value).map(([label, value]) => (
+                        <div key={label}>
+                          <label className="text-sm font-medium text-muted-foreground">{label}</label>
+                          <p className="text-sm font-mono break-all">{value}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No bank details on file, or you don't have access to them.</p>
+                    )}
                   </CardContent>
                 </Card>
 

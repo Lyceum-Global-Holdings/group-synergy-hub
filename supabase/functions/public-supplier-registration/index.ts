@@ -1,15 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
-import { Resend } from 'https://esm.sh/resend@4.0.0';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { verifyTurnstile, getRequestIp } from "../_shared/turnstile.ts";
+import { emailLayout, escapeHtml, sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+// Links in staff emails. Not taken from the request's Origin, which a script can set.
+const APP_URL = (Deno.env.get('APP_URL') || 'https://stores.lgh.lk').replace(/\/+$/, '');
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -134,30 +135,6 @@ serve(async (req) => {
       }
     );
 
-    // Check for duplicates
-    const { data: duplicates, error: dupError } = await supabaseAdmin.rpc('check_duplicate_supplier', {
-      p_supplier_name: validatedData.supplier_name,
-      p_email: validatedData.email,
-      p_phone: validatedData.phone || '',
-      p_tax_id: validatedData.tax_id || null,
-    });
-
-    if (dupError) {
-      console.error('Duplicate check error:', dupError);
-    }
-
-    if (duplicates && duplicates.length > 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'A supplier with similar information already exists. Please contact support if you believe this is an error.'
-        }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
     // Resolve company by slug if provided (and slug not bypassed by trusted company_id)
     let resolvedCompanyId: string | null = null;
     if (company_slug) {
@@ -170,6 +147,33 @@ serve(async (req) => {
       // Verify supplied company_id actually maps to an active company
       const { data: c } = await supabaseAdmin.from('companies').select('id').eq('id', company_id).eq('status', 'active').maybeSingle();
       if (c) resolvedCompanyId = c.id;
+    }
+
+    // Duplicates: suppliers anywhere in the group, and applications already
+    // waiting for this company (normalised tax ID, email, phone and name).
+    const { data: duplicates, error: dupError } = await supabaseAdmin.rpc('find_supplier_duplicates', {
+      p_data: validatedData,
+      p_company_id: resolvedCompanyId,
+    });
+
+    if (dupError) {
+      // Approval re-checks duplicates, so a failed check here doesn't let one through.
+      console.error('Duplicate check error:', dupError);
+    }
+
+    if (duplicates && duplicates.length > 0) {
+      const existingSupplier = duplicates.some((d: { kind: string }) => d.kind === 'supplier');
+      return new Response(
+        JSON.stringify({
+          error: existingSupplier
+            ? 'A supplier with similar information already exists. Please contact support if you believe this is an error.'
+            : 'An application for this supplier is already being reviewed. We will contact you once it has been decided.',
+        }),
+        {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Create registration request
@@ -231,27 +235,51 @@ serve(async (req) => {
 
     console.log('Registration created:', registration.id);
 
-    // Send email confirmation
-    try {
-      await resend.emails.send({
-        from: 'Supplier Registration <onboarding@resend.dev>',
-        to: [validatedData.email],
-        subject: 'Supplier Registration Received',
-        html: `
-          <h1>Thank you for registering!</h1>
-          <p>Dear ${validatedData.supplier_name},</p>
-          <p>We have successfully received your supplier registration request.</p>
-          <p><strong>Registration ID:</strong> ${registration.id}</p>
-          <p>Our team will review your application and contact you within 2-3 business days.</p>
-          <p>If you have any questions, please don't hesitate to reach out.</p>
-          <br>
-          <p>Best regards,<br>The Procurement Team</p>
-        `,
+    const { data: companyInfo } = resolvedCompanyId
+      ? await supabaseAdmin.from('companies').select('name').eq('id', resolvedCompanyId).maybeSingle()
+      : { data: null };
+    const companyName: string | null = companyInfo?.name ?? null;
+    const d = validatedData as Record<string, unknown>;
+
+    // Confirmation to the applicant. Emails never fail the registration.
+    const confirmation = await sendEmail({
+      to: validatedData.email,
+      subject: 'Supplier registration received',
+      html: emailLayout({
+        heading: 'Thank you for registering',
+        body: `<p>We have received the supplier registration for <b>${escapeHtml(validatedData.supplier_name)}</b>${companyName ? ` with ${escapeHtml(companyName)}` : ''}.</p>
+               <p><b>Reference:</b> ${escapeHtml(registration.id)}</p>
+               <p>Our procurement team will review it and email you the decision.</p>`,
+      }),
+    });
+    if (!confirmation.sent) console.error('Confirmation email not sent:', confirmation.error);
+
+    // Tell the company's procurement staff there is an application to review.
+    const { data: reviewers, error: reviewersError } = await supabaseAdmin.rpc('supplier_registration_reviewers', {
+      p_company_id: resolvedCompanyId,
+    });
+    if (reviewersError) console.error('Reviewer lookup error:', reviewersError);
+    const staff = ((reviewers ?? []) as { email: string }[]).map((r) => r.email).filter(Boolean);
+    if (staff.length > 0) {
+      const row = (label: string, value: unknown) =>
+        value ? `<tr><td style="padding:2px 12px 2px 0;color:#6b7686">${label}</td><td>${escapeHtml(value)}</td></tr>` : '';
+      const alert = await sendEmail({
+        to: staff,
+        subject: `New supplier application: ${validatedData.supplier_name}`,
+        html: emailLayout({
+          heading: 'New supplier application',
+          body: `<p><b>${escapeHtml(validatedData.supplier_name)}</b> applied through the public registration form${companyName ? ` to supply <b>${escapeHtml(companyName)}</b>` : ''}.</p>
+                 <table style="font-size:14px;border-collapse:collapse">
+                   ${row('Email', d.email)}${row('Phone', d.phone)}${row('Contact', d.primary_contact_name)}${row('Country', d.country)}${row('Tax ID', d.tax_id)}
+                 </table>
+                 <p>Review it in Sourcing › Supplier Registration › Approval Dashboard.</p>`,
+          action: { label: 'Review the application', url: `${APP_URL}/sourcing/supplier-registration` },
+          footer: `You receive this because you handle supplier registrations${companyName ? ` for ${companyName}` : ''}.`,
+        }),
       });
-      console.log('Confirmation email sent to:', validatedData.email);
-    } catch (emailError) {
-      console.error('Failed to send email:', emailError);
-      // Don't fail the registration if email fails
+      if (!alert.sent) console.error('Staff alert not sent:', alert.error);
+    } else {
+      console.warn('No reviewers to notify for company', resolvedCompanyId);
     }
 
     return new Response(

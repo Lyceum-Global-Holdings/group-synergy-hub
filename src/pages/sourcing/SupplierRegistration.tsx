@@ -31,6 +31,7 @@ function isValidHttpsUrl(v: string): boolean {
 export default function SupplierRegistration() {
   const navigate = useNavigate();
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardDraftId, setWizardDraftId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState("registrations");
   const [configOpen, setConfigOpen] = useState(false);
   const [draftBaseUrl, setDraftBaseUrl] = useState("");
@@ -106,7 +107,11 @@ export default function SupplierRegistration() {
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Registrations
           </Button>
         </div>
-        <SupplierRegistrationWizard onComplete={() => { setShowWizard(false); navigate("/sourcing/supplier-registration"); }} />
+        <SupplierRegistrationWizard
+          key={wizardDraftId ?? "new"}
+          draftId={wizardDraftId}
+          onComplete={() => { setShowWizard(false); navigate("/sourcing/supplier-registration"); }}
+        />
       </div>
     );
   }
@@ -139,7 +144,7 @@ export default function SupplierRegistration() {
           <Button variant="outline" onClick={() => setActiveTab("approvals")}>
             <UserCheck className="w-4 h-4 mr-2" /> Approval Dashboard ({pendingRegistrations.length})
           </Button>
-          <Button onClick={() => setShowWizard(true)}>
+          <Button onClick={() => { setWizardDraftId(undefined); setShowWizard(true); }}>
             <Plus className="w-4 h-4 mr-2" /> New Registration
           </Button>
         </div>
@@ -196,7 +201,9 @@ export default function SupplierRegistration() {
                   <div className="flex items-start justify-between">
                     <div>
                       <CardTitle>{reg.supplier_data.supplier_name || "Unnamed Supplier"}</CardTitle>
-                      <CardDescription>Created {format(new Date(reg.created_at), "MMM dd, yyyy")}</CardDescription>
+                      <CardDescription>
+                        Created {format(new Date(reg.created_at), "MMM dd, yyyy")} · last saved {format(new Date(reg.updated_at), "MMM dd, yyyy HH:mm")}
+                      </CardDescription>
                     </div>
                     <Badge variant={getStatusVariant(reg.status)}>
                       {getStatusIcon(reg.status)}
@@ -206,7 +213,9 @@ export default function SupplierRegistration() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowWizard(true)}>Continue</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setWizardDraftId(reg.id); setShowWizard(true); }}>
+                      Continue
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

@@ -50,7 +50,9 @@ export default function DuplicateSupplierAlert({
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-sm">Please verify this is not a duplicate before continuing.</p>
+        <p className="mt-2 text-sm">
+          Check this isn&apos;t the same supplier. To submit anyway you&apos;ll need to explain why it is a different one.
+        </p>
       </AlertDescription>
     </Alert>
   );

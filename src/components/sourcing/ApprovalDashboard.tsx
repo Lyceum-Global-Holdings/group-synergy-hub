@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,17 +7,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useSupplierRegistrations, useApproveRegistration, useRejectRegistration } from "@/hooks/useSupplierRegistration";
+import { useSupplierRegistrations, useRejectRegistration } from "@/hooks/useSupplierRegistration";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { SupplierRegistrationRequest } from "@/types/supplierRegistration";
 import { RegistrationReviewBody } from "./RegistrationReviewBody";
+import { ApproveRegistrationDialog } from "./ApproveRegistrationDialog";
 
 export default function ApprovalDashboard() {
   const { selectedCompany } = useCompany();
   const { data: registrations = [], isLoading } = useSupplierRegistrations(selectedCompany?.id);
-  const approveRegistration = useApproveRegistration();
   const rejectRegistration = useRejectRegistration();
+  // Approving opens a dialog that checks for existing suppliers first.
+  const [approving, setApproving] = useState<SupplierRegistrationRequest | null>(null);
 
   const [selectedRegistration, setSelectedRegistration] = useState<SupplierRegistrationRequest | null>(null);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -26,9 +28,9 @@ export default function ApprovalDashboard() {
   const pendingRegistrations = registrations.filter(r => r.status === 'pending_approval');
   const selfServicePending = pendingRegistrations.filter(r => r.request_type === 'self_service');
 
-  const handleApprove = async (id: string) => {
-    await approveRegistration.mutateAsync({ id });
+  const handleApprove = (registration: SupplierRegistrationRequest) => {
     setSelectedRegistration(null);
+    setApproving(registration);
   };
 
   const handleReject = async () => {
@@ -53,6 +55,11 @@ export default function ApprovalDashboard() {
               {registration.supplier_data.supplier_name}
               {registration.request_type === 'self_service' && (
                 <Badge variant="secondary">Public</Badge>
+              )}
+              {registration.duplicate_reason && (
+                <Badge variant="outline" className="gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Possible duplicate
+                </Badge>
               )}
             </CardTitle>
             <CardDescription>
@@ -107,8 +114,7 @@ export default function ApprovalDashboard() {
             <Button
               variant="default"
               size="sm"
-              onClick={() => handleApprove(registration.id)}
-              disabled={approveRegistration.isPending}
+              onClick={() => handleApprove(registration)}
             >
               <CheckCircle className="w-4 h-4 mr-2" />
               Approve
@@ -196,12 +202,20 @@ export default function ApprovalDashboard() {
               >
                 Reject
               </Button>
-              <Button onClick={() => handleApprove(selectedRegistration.id)}>
+              <Button onClick={() => handleApprove(selectedRegistration)}>
                 Approve
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {approving && (
+        <ApproveRegistrationDialog
+          key={approving.id}
+          registration={approving}
+          onOpenChange={(open) => { if (!open) setApproving(null); }}
+        />
       )}
 
       {/* Reject Dialog */}

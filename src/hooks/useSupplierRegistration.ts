@@ -4,6 +4,26 @@ import { getCachedUser } from "@/lib/currentUser";
 import { SupplierRegistrationRequest, DuplicateSupplier } from "@/types/supplierRegistration";
 import { toast } from "sonner";
 import { notifyRegistrationDecision } from "@/lib/sourcingNotify";
+import { untypedRpc } from "@/lib/untypedRpc";
+
+export interface RegistrationDuplicate {
+  kind: "supplier" | "application";
+  id: string;
+  name: string;
+  code: string | null;
+  status: string;
+  reasons: ("tax_id" | "email" | "phone" | "name")[];
+  /** Already a supplier of the registration's company (always true for applications). */
+  in_company: boolean;
+}
+
+export interface RegistrationReview {
+  status: SupplierRegistrationRequest["status"];
+  can_approve: boolean;
+  /** The requester's reason for submitting despite possible duplicates. */
+  duplicate_reason: string | null;
+  duplicates: RegistrationDuplicate[];
+}
 
 export function useSupplierRegistrations(companyId?: string) {
   return useQuery({
@@ -93,6 +113,7 @@ export function useUpdateRegistration() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['supplier-registrations'] });
       queryClient.invalidateQueries({ queryKey: ['supplier-registration', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-registration-review', variables.id] });
       toast.success("Registration updated");
     },
     onError: (error: any) => {
@@ -105,39 +126,30 @@ export function useSubmitRegistration() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const user = getCachedUser();
-      const { data, error } = await supabase
-        .from('supplier_registration_requests')
-        .update({
-          status: 'pending_approval',
-          submitted_by: user?.id,
-          submitted_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-
-      // Create workflow entry
-      await supabase.from('supplier_approval_workflow').insert({
-        registration_request_id: id,
-        stage: 'submitted',
-        status: 'completed',
-        completed_by: user?.id,
-        completed_at: new Date().toISOString(),
+    // The database checks for duplicates; a match needs duplicateReason.
+    mutationFn: async ({ id, duplicateReason }: { id: string; duplicateReason?: string }) => {
+      await untypedRpc<null>('submit_supplier_registration', {
+        p_registration_id: id,
+        p_duplicate_reason: duplicateReason?.trim() || null,
       });
-
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supplier-registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-registration'] });
       toast.success("Registration submitted for approval");
     },
     onError: (error: any) => {
       toast.error(`Failed to submit: ${error.message}`);
     },
+  });
+}
+
+/** Duplicate matches and whether the caller can approve. */
+export function useRegistrationReview(id?: string) {
+  return useQuery({
+    queryKey: ['supplier-registration-review', id],
+    queryFn: () => untypedRpc<RegistrationReview>('supplier_registration_review', { p_registration_id: id }),
+    enabled: !!id,
   });
 }
 
@@ -166,142 +178,31 @@ export function useApproveRegistration() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
-      const user = getCachedUser();
-      
-      // Get registration data
-      const { data: registration, error: fetchError } = await supabase
-        .from('supplier_registration_requests')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (fetchError) throw fetchError;
-
-      // Create supplier from registration data with correct column mapping
-      const supplierData = registration.supplier_data as Record<string, any>;
-
-      // Generate and insert supplier with retry on duplicate code
-      let supplier: any = null;
-      let lastError: any = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const { data: codeResult, error: codeError } = await supabase
-          .rpc('generate_next_supplier_code', {
-            p_company_id: registration.company_id
-          });
-
-        if (codeError) {
-          lastError = codeError;
-          break;
-        }
-        const supplierCode = codeResult as string;
-
-        const { data, error } = await supabase
-          .from('suppliers')
-          .insert({
-            supplier_code: supplierCode,
-            name: supplierData.supplier_name || supplierData.name || '',
-            legal_name: supplierData.supplier_name || supplierData.name || null,
-            email: supplierData.email || null,
-            phone: supplierData.phone || null,
-            tax_id: supplierData.tax_id || null,
-            supplier_type: supplierData.supplier_type || undefined,
-            category: supplierData.category || null,
-            material_type: supplierData.material_type || null,
-            website: supplierData.website || null,
-            registration_number: supplierData.registration_number || null,
-            address_line1: supplierData.street_address || null,
-            address_line2: null,
-            city: supplierData.city || null,
-            state: supplierData.state_province || null,
-            postal_code: supplierData.postal_code || null,
-            country: supplierData.country || null,
-            payment_terms: supplierData.payment_terms || null,
-            company_id: registration.company_id,
-            status: 'active',
-            created_by: user?.id || null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          } as any)
-          .select()
-          .single();
-
-        if (!error) {
-          supplier = data;
-          break;
-        }
-
-        if (error.code === '23505' && String(error.message).includes('supplier_code')) {
-          // Retry on unique violation for supplier_code
-          if (attempt < 3) {
-            console.info(`Supplier code conflict on attempt ${attempt}, retrying...`);
-            continue;
-          }
-        }
-
-        lastError = error;
-        break;
-      }
-
-      if (!supplier) {
-        if (lastError?.code === '23505' && String(lastError.message).includes('supplier_code')) {
-          throw new Error('Supplier code conflict detected. Please try again.');
-        }
-        if (lastError) throw lastError;
-        throw new Error('Failed to create supplier');
-      }
-
-      // Create primary contact if provided
-      if (supplierData.primary_contact_name && supplierData.primary_contact_email) {
-        const { error: contactError } = await supabase
-          .from('supplier_contacts')
-          .insert([{
-            supplier_id: supplier.id,
-            name: supplierData.primary_contact_name,
-            email: supplierData.primary_contact_email,
-            phone: supplierData.primary_contact_phone || null,
-            is_primary: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }]);
-
-        if (contactError) {
-          console.error('Error creating primary contact:', contactError);
-        }
-      }
-      
-
-      // Update registration status
-      const { error: updateError } = await supabase
-        .from('supplier_registration_requests')
-        .update({
-          status: 'approved',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          // The database allocates this supplier to the registration's company
-          // as approved (migration 20260927180000).
-          supplier_id: supplier.id,
-        } as any)
-        .eq('id', id);
-      
-      if (updateError) throw updateError;
-
-      // Create workflow entry
-      await supabase.from('supplier_approval_workflow').insert({
-        registration_request_id: id,
-        stage: 'approved',
-        status: 'completed',
-        completed_by: user?.id,
-        completed_at: new Date().toISOString(),
-        notes,
-      });
-
-      return supplier;
-    },
-    onSuccess: (_supplier, { id }) => {
+    // One database step creates the supplier with its contact and bank details
+    // (or links the matching supplier), allocates it to the company and
+    // approves the registration.
+    mutationFn: async ({
+      id,
+      notes,
+      duplicateReason,
+      linkSupplierId,
+    }: {
+      id: string;
+      notes?: string;
+      duplicateReason?: string;
+      linkSupplierId?: string;
+    }) =>
+      untypedRpc<string>('approve_supplier_registration', {
+        p_registration_id: id,
+        p_notes: notes?.trim() || null,
+        p_duplicate_reason: duplicateReason?.trim() || null,
+        p_link_supplier_id: linkSupplierId ?? null,
+      }),
+    onSuccess: (_supplierId, { id, linkSupplierId }) => {
       queryClient.invalidateQueries({ queryKey: ['supplier-registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-registration-review', id] });
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      toast.success("Supplier approved and created");
+      toast.success(linkSupplierId ? "Registration approved and linked to the existing supplier" : "Supplier approved and created");
       void notifyRegistrationDecision(id);
     },
     onError: (error: any) => {

@@ -13,6 +13,10 @@ export interface SupplierRegistrationRequest {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  /** The supplier created or linked on approval. */
+  supplier_id?: string | null;
+  /** Why the requester submitted despite possible duplicates. */
+  duplicate_reason?: string | null;
 }
 
 export interface SupplierDocument {
