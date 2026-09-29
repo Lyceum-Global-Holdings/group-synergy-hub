@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Building2, Edit, Trash2, Settings, Loader2, MoreHorizontal, Package } from "lucide-react";
+import { Plus, Building2, Edit, Trash2, Loader2, MoreHorizontal, Package, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CompanyForm } from "@/components/admin/CompanyForm";
+import { CompanyApproversDialog } from "@/components/admin/CompanyApproversDialog";
 import { useCompanies } from "@/hooks/useCompanies";
 import { Company } from "@/types/company";
 import { normalizeCompanyModules, moduleConfig } from "@/constants/moduleConfig";
@@ -48,6 +49,7 @@ export default function CompanyManagement() {
   const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [approversCompany, setApproversCompany] = useState<Company | null>(null);
   const [deletingCompany, setDeletingCompany] = useState<Company | null>(null);
   
   const { data: isSuperAdmin, isLoading: superAdminLoading } = useSuperAdmin();
@@ -169,6 +171,14 @@ export default function CompanyManagement() {
             )}
           </DialogContent>
         </Dialog>
+
+        {approversCompany && (
+          <CompanyApproversDialog
+            key={approversCompany.id}
+            company={approversCompany}
+            onOpenChange={(open) => { if (!open) setApproversCompany(null); }}
+          />
+        )}
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!deletingCompany} onOpenChange={() => setDeletingCompany(null)}>
@@ -355,9 +365,12 @@ export default function CompanyManagement() {
                               Manage Modules
                             </DropdownMenuItem>
                             
-                            <DropdownMenuItem className="cursor-pointer">
-                              <Settings className="h-4 w-4 mr-2" />
-                              Company Settings
+                            <DropdownMenuItem
+                              onClick={() => setApproversCompany(company)}
+                              className="cursor-pointer"
+                            >
+                              <UserCheck className="h-4 w-4 mr-2" />
+                              Approvers &amp; limits
                             </DropdownMenuItem>
                             
                             <DropdownMenuSeparator />

@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Send, Package, Edit, FileText, Check, X, Clock, FilePlus } from "lucide-react";
-import { useSendPurchaseOrder, usePurchaseOrder } from "@/hooks/usePurchaseOrders";
+import { Send, Package, Edit, FileText, Check, X, Clock, FilePlus, Mail } from "lucide-react";
+import { useSendPurchaseOrder, usePurchaseOrder, useEmailPurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
 import {
   useSubmitForMerchandiserApproval,
@@ -72,6 +72,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const po = poDetails ?? purchaseOrder;
   
   const sendMutation = useSendPurchaseOrder();
+  const emailMutation = useEmailPurchaseOrder();
   const submitMerchandiserMutation = useSubmitForMerchandiserApproval();
   const approveMerchandiserMutation = useApprovePOAsMerchandiser();
   const approveDeptHeadMutation = useApprovePOAsDeptHead();
@@ -91,6 +92,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const canDeptHeadApprove = po.status === 'pending_dept_head_approval' && canDecide;
   const canWithdraw = isPending && po.created_by === currentUserId;
   const canSend = po.status === 'approved';
+  const canEmail = ['sent', 'acknowledged', 'partially_received'].includes(po.status);
   const canAmend = ['approved', 'sent', 'acknowledged', 'partially_received'].includes(po.status);
   const emailLevel = po.status === 'pending_approval' ? 'merchandiser' : 'department_head';
 
@@ -241,6 +243,12 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   Send PO
                 </Button>
               )}
+              {canEmail && (
+                <Button size="sm" variant="outline" onClick={() => emailMutation.mutate(purchaseOrder.id)} disabled={emailMutation.isPending}>
+                  <Mail className="h-4 w-4 mr-2" />
+                  {po.supplier_emailed_at ? "Email again" : "Email to supplier"}
+                </Button>
+              )}
               {canAmend && (
                 <Button size="sm" variant="outline" onClick={() => setShowAmendmentDialog(true)}>
                   <FilePlus className="h-4 w-4 mr-2" />
@@ -248,6 +256,13 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                 </Button>
               )}
           </div>
+          {canEmail && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {po.supplier_emailed_at
+                ? `Emailed to ${po.supplier_emailed_to} on ${format(new Date(po.supplier_emailed_at), 'dd MMM yyyy HH:mm')}`
+                : 'Not emailed to the supplier yet'}
+            </p>
+          )}
           {isPending && rightsKnown && blockReason && (
             <p className="mt-2 text-xs text-muted-foreground">
               {po.status === 'pending_approval' ? 'Waiting for merchandiser approval' : 'Waiting for department head approval'}. {blockReason}.

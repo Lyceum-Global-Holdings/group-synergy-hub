@@ -49,6 +49,9 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
+import { supabase } from '@/integrations/supabase/client';
+import { bomLinesForPr } from '@/lib/bomToPr';
+import { toast } from '@/hooks/use-toast';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUsers } from '@/hooks/useUsers';
@@ -116,10 +119,15 @@ const unitsOfMeasure = [
   'hours', 'days', 'weeks', 'months'
 ];
 
+const NO_BOM = 'none';
+
 export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
   const createPrMutation = useCreatePurchaseRequisition();
   const { selectedCompany } = useCompany();
   const { boms } = useBillOfMaterials(selectedCompany?.id);
+  const bomChoices = boms.filter((b) => b.status !== 'inactive');
+  const [bomUnits, setBomUnits] = useState(1);
+  const [loadingBom, setLoadingBom] = useState(false);
   const { data: users = [] } = useUsers();
   const { user } = useAuth();
   
@@ -210,6 +218,29 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       specifications: '',
       notes: '',
     });
+  };
+
+  // Fill lines with the linked BOM's materials for the number of units to make.
+  const addBomMaterials = async () => {
+    const bomId = form.getValues('bom_id');
+    const bom = boms.find((b) => b.id === bomId);
+    if (!bom || !(bomUnits > 0)) return;
+    setLoadingBom(true);
+    const { data, error } = await supabase.from('bom_items').select('*').eq('bom_id', bom.id);
+    setLoadingBom(false);
+    if (error) {
+      toast({ title: "Couldn't load the BOM", description: error.message, variant: 'destructive' });
+      return;
+    }
+    const lines = bomLinesForPr(data ?? [], bomUnits, bom.bom_number);
+    if (lines.length === 0) {
+      toast({ title: 'This BOM has no materials with a quantity' });
+      return;
+    }
+    // Replace the untouched blank first line rather than leave it behind.
+    const current = form.getValues('items');
+    if (current.length === 1 && !current[0].item_name) remove(0);
+    append(lines);
   };
 
   const handleItemSelect = (index: number, item: WarehouseItem | null) => {
@@ -431,6 +462,59 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                     )}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Bill of materials */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-base">Bill of Materials (optional)</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-2 items-end">
+                <FormField
+                  control={form.control}
+                  name="bom_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Linked BOM</FormLabel>
+                      <Select value={field.value || NO_BOM} onValueChange={(v) => field.onChange(v === NO_BOM ? '' : v)}>
+                        <FormControl>
+                          <SelectTrigger className="h-8 text-sm" aria-label="Bill of materials">
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_BOM}>None</SelectItem>
+                          {bomChoices.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.bom_number} · {b.product_name}{b.size ? ` (${b.size})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="bom-units" className="text-xs">Units to make</Label>
+                  <Input
+                    id="bom-units"
+                    type="number"
+                    min={1}
+                    className="h-8 text-sm"
+                    value={bomUnits}
+                    onChange={(e) => setBomUnits(Number(e.target.value))}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addBomMaterials}
+                  disabled={!form.watch('bom_id') || !(bomUnits > 0) || loadingBom}
+                >
+                  Add BOM materials
+                </Button>
               </CardContent>
             </Card>
 

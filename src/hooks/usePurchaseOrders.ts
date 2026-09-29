@@ -4,6 +4,7 @@ import { getCachedUser, getCachedUserId } from "@/lib/currentUser";
 import { useToast } from '@/hooks/use-toast';
 import { PurchaseOrder, CreatePoData, PoSummary, CreateReceiptData } from '@/types/purchaseOrder';
 import { useCompany } from '@/contexts/CompanyContext';
+import { emailPurchaseOrder } from '@/lib/sourcingNotify';
 
 // Fetch all purchase orders
 export function usePurchaseOrders() {
@@ -264,7 +265,8 @@ export function useUpdatePurchaseOrder() {
   });
 }
 
-// Send purchase order
+// Send purchase order: marks it sent (the database creates the draft GRN) and
+// emails it to the supplier.
 export function useSendPurchaseOrder() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -281,12 +283,14 @@ export function useSendPurchaseOrder() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       toast({
-        title: "Success",
-        description: "Purchase Order sent successfully",
+        title: "Purchase order sent",
+        description: "Emailing it to the supplier…",
       });
+      await emailPurchaseOrder(id);
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
     },
     onError: (error) => {
       toast({
@@ -295,6 +299,18 @@ export function useSendPurchaseOrder() {
         variant: "destructive",
       });
       console.error('Send PO error:', error);
+    },
+  });
+}
+
+/** Emails an already-sent purchase order to the supplier again. */
+export function useEmailPurchaseOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => emailPurchaseOrder(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
     },
   });
 }

@@ -18,6 +18,10 @@ export interface PurchaseRequisition {
   approved_date?: string;
   rejection_reason?: string;
   bom_id?: string; // Link to BOM for material planning
+  bom?: { bom_number: string; product_name: string } | null;
+  /** First-level approver when a final approval is also needed. */
+  first_approved_by?: string | null;
+  first_approved_at?: string | null;
   created_at: string;
   updated_at: string;
   items?: PrItem[];

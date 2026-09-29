@@ -1,141 +1,113 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { getCachedUser } from "@/lib/currentUser";
-import { useToast } from "@/hooks/use-toast";
-import type { CompanyApprover } from "@/types/company";
+import { toast } from "sonner";
+import { untypedRpc } from "@/lib/untypedRpc";
 
-interface CompanyApproverFormData {
-  company_id: string;
+export type ApprovalLevel = "hod" | "manager" | "finance" | "procurement" | "custom";
+
+/** What each company-approver level can approve (enforced in the database). */
+export const APPROVAL_LEVELS: { value: ApprovalLevel; label: string; approves: string }[] = [
+  { value: "hod", label: "Head of department", approves: "Requisitions (first approval) · PO final approval" },
+  { value: "manager", label: "Manager", approves: "Requisitions (first or final approval) · PO first or final approval" },
+  { value: "finance", label: "Finance", approves: "Requisitions (first or final approval) · PO final approval" },
+  { value: "procurement", label: "Procurement", approves: "PO first approval" },
+  { value: "custom", label: "Other", approves: "PO first approval" },
+];
+
+export interface CompanyApproverRow {
+  id: string;
   user_id: string;
-  approval_level: 'hod' | 'manager' | 'finance' | 'procurement' | 'custom';
-  department?: string;
-  is_primary?: boolean;
-  can_approve_up_to_amount?: number;
-  modules?: string[];
-  created_by?: string;
+  full_name: string | null;
+  email: string | null;
+  approval_level: ApprovalLevel;
+  department: string | null;
+  is_primary: boolean;
+  can_approve_up_to_amount: number | null;
+  deactivated: boolean;
+  in_company: boolean;
 }
 
-export const useCompanyApprovers = (companyId: string) => {
+interface Person {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+export interface CompanyApprovalSetup {
+  company_id: string;
+  company_name: string;
+  /** Requisitions above this also need a final approval; null = one level. */
+  pr_final_approval_above: number | null;
+  hod: Person | null;
+  manager: Person | null;
+  approvers: CompanyApproverRow[];
+  /** Active users of the company who can be made approvers. */
+  candidates: Person[];
+}
+
+/** Approvers, limits and the requisition threshold for one company (admins only). */
+export function useCompanyApprovalSetup(companyId?: string) {
   return useQuery({
-    queryKey: ['company-approvers', companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('company_approvers')
-        .select(`
-          *,
-          profiles!company_approvers_user_id_fkey (
-            full_name,
-            email
-          )
-        `)
-        .eq('company_id', companyId)
-        .order('is_primary', { ascending: false })
-        .order('approval_level');
-      
-      if (error) throw error;
-      return data as CompanyApprover[];
-    },
+    queryKey: ["company-approval-setup", companyId],
+    queryFn: () => untypedRpc<CompanyApprovalSetup>("company_approval_setup", { p_company_id: companyId }),
     enabled: !!companyId,
   });
-};
+}
 
-export const useAddCompanyApprover = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
-  return useMutation({
-    mutationFn: async (approverData: CompanyApproverFormData) => {
-      const user = getCachedUser();
-      
-      const { data, error } = await supabase
-        .from('company_approvers')
-        .insert({
-          ...approverData,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['company-approvers', data.company_id] });
-      toast({
-        title: "Success",
-        description: "Approver added successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-};
+export interface SaveApproverInput {
+  id?: string;
+  companyId: string;
+  userId: string;
+  level: ApprovalLevel;
+  limit: number | null;
+  department?: string;
+  isPrimary?: boolean;
+}
 
-export const useUpdateCompanyApprover = () => {
+export function useSaveCompanyApprover() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<CompanyApproverFormData> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('company_approvers')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+    mutationFn: (a: SaveApproverInput) =>
+      untypedRpc<string>("save_company_approver", {
+        p_id: a.id ?? null,
+        p_company_id: a.companyId,
+        p_user_id: a.userId,
+        p_level: a.level,
+        p_limit: a.limit,
+        p_department: a.department?.trim() || null,
+        p_is_primary: !!a.isPrimary,
+      }),
+    onSuccess: (_id, a) => {
+      queryClient.invalidateQueries({ queryKey: ["company-approval-setup", a.companyId] });
+      toast.success(a.id ? "Approver updated" : "Approver added");
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['company-approvers', data.company_id] });
-      toast({
-        title: "Success",
-        description: "Approver updated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    onError: (e: Error) => toast.error(e.message),
   });
-};
+}
 
-export const useDeleteCompanyApprover = () => {
+export function useRemoveCompanyApprover() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
   return useMutation({
-    mutationFn: async ({ id, companyId }: { id: string; companyId: string }) => {
-      const { error } = await supabase
-        .from('company_approvers')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      return { id, companyId };
+    mutationFn: ({ id }: { id: string; companyId: string }) => untypedRpc<null>("remove_company_approver", { p_id: id }),
+    onSuccess: (_r, { companyId }) => {
+      queryClient.invalidateQueries({ queryKey: ["company-approval-setup", companyId] });
+      toast.success("Approver removed");
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['company-approvers', data.companyId] });
-      toast({
-        title: "Success",
-        description: "Approver removed successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    onError: (e: Error) => toast.error(e.message),
   });
-};
+}
+
+export function useSaveCompanyApprovalSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companyId, prFinalApprovalAbove }: { companyId: string; prFinalApprovalAbove: number | null }) =>
+      untypedRpc<null>("save_company_approval_settings", {
+        p_company_id: companyId,
+        p_pr_final_approval_above: prFinalApprovalAbove,
+      }),
+    onSuccess: (_r, { companyId }) => {
+      queryClient.invalidateQueries({ queryKey: ["company-approval-setup", companyId] });
+      toast.success("Requisition approval rule saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}

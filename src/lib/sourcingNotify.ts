@@ -3,12 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 type NotifyBody =
   | { event: "registration_decision"; registration_id: string }
-  | { event: "rfq_published"; request_id: string };
+  | { event: "rfq_published"; request_id: string }
+  | { event: "po_sent"; po_id: string };
 
 export interface NotifyResult {
   sent: number;
   failed?: string[];
   error?: string;
+  to?: string[];
 }
 
 /**
@@ -32,4 +34,14 @@ export async function notifyRegistrationDecision(registrationId: string) {
   else toast.warning("The applicant couldn't be emailed", {
     description: result?.error ?? "Check the email settings, or contact them directly.",
   });
+}
+
+/** Emails a sent purchase order to the supplier and says where it went. */
+export async function emailPurchaseOrder(poId: string) {
+  const result = await notifySourcing({ event: "po_sent", po_id: poId });
+  if (result?.sent) toast.success(`Purchase order emailed to ${result.to?.join(", ") ?? "the supplier"}`);
+  else toast.warning("The purchase order couldn't be emailed", {
+    description: `${result?.error ?? "Check the email settings."} Download the PDF and send it to the supplier yourself.`,
+  });
+  return result;
 }

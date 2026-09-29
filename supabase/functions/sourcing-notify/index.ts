@@ -2,7 +2,9 @@
 //   { event: "registration_decision", registration_id } → the applicant hears
 //     that their supplier registration was approved or rejected (with reason);
 //   { event: "rfq_published", request_id } → every invited supplier (its email
-//     and its portal users) gets the RFQ with a link to quote in the portal.
+//     and its portal users) gets the RFQ with a link to quote in the portal;
+//   { event: "po_sent", po_id } → the supplier (its email and primary contact)
+//     gets the purchase order, with replies going to the buyer who sent it.
 // The caller must be able to manage that company's sourcing.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
@@ -145,6 +147,101 @@ serve(async (req) => {
       }
       if (failed.length) console.warn("rfq_published emails not sent:", failed);
       return json(200, { success: true, sent, failed });
+    }
+
+    if (body?.event === "po_sent") {
+      const { data: po } = await admin
+        .from("purchase_orders")
+        .select("id, po_number, po_date, status, company_id, supplier_id, currency, payment_terms, delivery_terms, expected_delivery_date, notes, total_amount, tax_amount, discount_amount, final_amount")
+        .eq("id", body.po_id)
+        .maybeSingle();
+      if (!po) return json(404, { success: false, error: "Purchase order not found" });
+      if (!(await canManageCompany(po.company_id))) return json(403, { success: false, error: "Not allowed" });
+      if (!["sent", "acknowledged", "partially_received"].includes(po.status)) {
+        return json(400, { success: false, error: "Send the purchase order before emailing it" });
+      }
+
+      const [{ data: supplier }, { data: contacts }, { data: lines }, { data: company }, { data: buyer }] = await Promise.all([
+        admin.from("suppliers").select("name, email").eq("id", po.supplier_id).maybeSingle(),
+        admin.from("supplier_contacts").select("email, is_primary").eq("supplier_id", po.supplier_id),
+        admin.from("po_items")
+          .select("item_code, item_name, description, quantity_ordered, unit_of_measure, unit_price, total_price, delivery_date")
+          .eq("po_id", po.id)
+          .order("created_at"),
+        admin.from("companies").select("name, address").eq("id", po.company_id).maybeSingle(),
+        admin.from("profiles").select("full_name, email").eq("user_id", user.id).maybeSingle(),
+      ]);
+
+      // The supplier's own address and its primary contact.
+      const recipients = new Set<string>();
+      if (supplier?.email) recipients.add(supplier.email.trim().toLowerCase());
+      for (const c of contacts ?? []) if (c.is_primary && c.email) recipients.add(c.email.trim().toLowerCase());
+      if (recipients.size === 0) {
+        return json(200, { success: true, sent: 0, error: "The supplier has no email address on file" });
+      }
+
+      const currency = po.currency || "LKR";
+      const money = (n: unknown) =>
+        `${currency} ${Number(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const day = (d: string | null) =>
+        d ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Colombo" }) : null;
+      const td = "padding:6px 8px;border-bottom:1px solid #dfe4ec;vertical-align:top";
+      const num = `${td};text-align:right;white-space:nowrap`;
+      const small = (v: unknown) => `<br><span style="color:#6b7686;font-size:12px">${escapeHtml(v)}</span>`;
+      const rows = (lines ?? []).map((l, i) => `<tr>
+          <td style="${td}">${i + 1}</td>
+          <td style="${td}">${escapeHtml(l.item_name)}${l.item_code ? small(l.item_code) : ""}${l.description ? small(l.description) : ""}${l.delivery_date ? small(`Deliver by ${day(l.delivery_date)}`) : ""}</td>
+          <td style="${num}">${escapeHtml(Number(l.quantity_ordered).toLocaleString("en-US"))} ${escapeHtml(l.unit_of_measure)}</td>
+          <td style="${num}">${money(l.unit_price)}</td>
+          <td style="${num}">${money(l.total_price)}</td>
+        </tr>`).join("");
+      const detail = (label: string, value: unknown) =>
+        value ? `<tr><td style="padding:2px 12px 2px 0;color:#6b7686">${label}</td><td>${escapeHtml(value)}</td></tr>` : "";
+      const total = (label: string, value: unknown, bold = false) =>
+        `<tr><td colspan="4" style="${num}${bold ? ";font-weight:700" : ""}">${label}</td><td style="${num}${bold ? ";font-weight:700" : ""}">${money(value)}</td></tr>`;
+      const companyName = company?.name ?? "our company";
+      const buyerName = buyer?.full_name || buyer?.email || "the procurement team";
+
+      const result = await sendEmail({
+        to: [...recipients],
+        replyTo: buyer?.email ?? undefined,
+        subject: `Purchase order ${po.po_number} from ${companyName}`,
+        html: emailLayout({
+          heading: `Purchase order ${po.po_number}`,
+          body: `<p>${escapeHtml(companyName)} places the following order with <b>${escapeHtml(supplier?.name ?? "you")}</b>.</p>
+                 <table style="font-size:14px;border-collapse:collapse;margin:8px 0 16px">
+                   ${detail("Order date", day(po.po_date))}${detail("Deliver by", day(po.expected_delivery_date))}
+                   ${detail("Payment terms", po.payment_terms)}${detail("Delivery terms", po.delivery_terms)}
+                   ${detail("Deliver to", company?.address)}
+                 </table>
+                 <table style="width:100%;font-size:13px;border-collapse:collapse">
+                   <thead><tr>
+                     <th style="${td};text-align:left">#</th><th style="${td};text-align:left">Item</th>
+                     <th style="${td};text-align:right">Quantity</th><th style="${td};text-align:right">Unit price</th><th style="${td};text-align:right">Amount</th>
+                   </tr></thead>
+                   <tbody>${rows}</tbody>
+                   <tfoot>
+                     ${total("Subtotal", po.total_amount)}
+                     ${Number(po.discount_amount) > 0 ? total("Discount", -Number(po.discount_amount)) : ""}
+                     ${Number(po.tax_amount) > 0 ? total("Tax", po.tax_amount) : ""}
+                     ${total("Total", po.final_amount ?? po.total_amount, true)}
+                   </tfoot>
+                 </table>
+                 ${po.notes ? `<p><b>Notes:</b> ${escapeHtml(po.notes)}</p>` : ""}
+                 <p>Please quote <b>${escapeHtml(po.po_number)}</b> on your delivery note and invoice, and reply to confirm the order and delivery date.</p>
+                 <p>${escapeHtml(buyerName)}<br>${escapeHtml(companyName)}</p>`,
+          footer: `Replies go to ${buyer?.email ?? "the buyer"}. Sent by the LGH ERP on behalf of ${companyName}.`,
+        }),
+      });
+      if (!result.sent) {
+        console.warn("po_sent email not sent:", result.error);
+        return json(200, { success: true, sent: 0, error: result.error });
+      }
+      await admin
+        .from("purchase_orders")
+        .update({ supplier_emailed_at: new Date().toISOString(), supplier_emailed_to: [...recipients].join(", ") })
+        .eq("id", po.id);
+      return json(200, { success: true, sent: 1, to: [...recipients] });
     }
 
     return json(400, { success: false, error: "Unknown event" });

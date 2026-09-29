@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSubmitPurchaseRequisition, useApprovePurchaseRequisition, usePrApprovalBlockReason } from '@/hooks/usePurchaseRequisitions';
+import { useSubmitPurchaseRequisition, useApprovePurchaseRequisition, usePrApprovalInfo } from '@/hooks/usePurchaseRequisitions';
 import type { PurchaseRequisition, PrStatus } from '@/types/procurement';
 
 interface PrDetailsDialogProps {
@@ -42,6 +42,18 @@ const statusColors: Record<PrStatus, string> = {
   cancelled: 'bg-gray-400',
 };
 
+const statusLabels: Record<PrStatus, string> = {
+  draft: 'Draft',
+  submitted: 'Awaiting approval',
+  pending_approval: 'Awaiting final approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+};
+
+const levelLabel = (level: string | null) =>
+  level === 'final' ? 'Final approval' : level === 'department_head' ? 'Department head' : 'Approval';
+
 const priorityColors = {
   low: 'bg-gray-500',
   medium: 'bg-blue-500',
@@ -57,11 +69,11 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
 
   const canEdit = pr.requested_by === user?.id && pr.status === 'draft';
   const canSubmit = pr.requested_by === user?.id && pr.status === 'draft';
-  // Approval rights come from the database (Department Head / HOD / company
-  // approvers or admins; never the requester).
-  const { data: approvalBlock, isSuccess: rightsKnown } = usePrApprovalBlockReason(pr.id, pr.status);
+  // Approval rights and stage come from the database: a department head first,
+  // then, above the company's threshold, a manager or finance approver.
+  const { data: approval } = usePrApprovalInfo(pr.id, pr.status);
   const awaitingApproval = pr.status === 'submitted' || pr.status === 'pending_approval';
-  const canApprove = awaitingApproval && rightsKnown && !approvalBlock;
+  const canApprove = awaitingApproval && !!approval && !approval.block_reason;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -72,7 +84,7 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
 
   const getStatusBadge = (status: PrStatus) => (
     <Badge className={`${statusColors[status]} text-white`}>
-      {status.replace('_', ' ').toUpperCase()}
+      {statusLabels[status] ?? status}
     </Badge>
   );
 
@@ -230,6 +242,24 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
                     </div>
                   )}
 
+                  {pr.bom && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Bill of Materials</Label>
+                      <p className="text-sm">{pr.bom.bom_number} · {pr.bom.product_name}</p>
+                    </div>
+                  )}
+
+                  {awaitingApproval && approval && (
+                    <div className="rounded border bg-muted/40 p-2 text-sm">
+                      {approval.stage === 'final'
+                        ? 'Waiting for the final approval from a manager or finance approver.'
+                        : approval.needs_final
+                          ? `Waiting for department head approval. Above ${formatCurrency(approval.final_threshold ?? 0)}, a manager or finance approver then gives the final approval.`
+                          : 'Waiting for department head approval.'}
+                      {approval.block_reason && <span className="block text-muted-foreground mt-1">{approval.block_reason}.</span>}
+                    </div>
+                  )}
+
                   {pr.rejection_reason && (
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Rejection Reason</Label>
@@ -311,7 +341,6 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {/* This would show approval history - for now showing status timeline */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -322,46 +351,24 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
                       </p>
                     </div>
                   </div>
-
-                  {pr.status !== 'draft' && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  {(approval?.history ?? []).map((h, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className={`mt-2 w-2 h-2 rounded-full ${h.action === 'rejected' ? 'bg-red-500' : 'bg-green-500'}`}></div>
                       <div className="flex-1">
-                        <p className="font-medium">Submitted for Approval</p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(pr.updated_at), 'MMM dd, yyyy HH:mm')}
+                        <p className="font-medium">
+                          {levelLabel(h.level)}: {h.action === 'rejected' ? 'rejected' : 'approved'} by {h.approver}
                         </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {pr.status === 'approved' && pr.approved_date && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="font-medium">Approved</p>
-                        <p className="text-sm text-muted-foreground">
-                          By {pr.approved_by_profile?.full_name || 'Unknown'} on{' '}
-                          {format(new Date(pr.approved_date), 'MMM dd, yyyy HH:mm')}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {pr.status === 'rejected' && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="font-medium">Rejected</p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(new Date(pr.updated_at), 'MMM dd, yyyy HH:mm')}
-                        </p>
-                        {pr.rejection_reason && (
-                          <p className="text-sm bg-red-50 p-2 rounded border border-red-200 mt-2">
-                            {pr.rejection_reason}
-                          </p>
+                        <p className="text-sm text-muted-foreground">{format(new Date(h.at), 'MMM dd, yyyy HH:mm')}</p>
+                        {h.comments && (
+                          <p className={`text-sm mt-1 ${h.action === 'rejected' ? 'bg-red-50 p-2 rounded border border-red-200' : ''}`}>{h.comments}</p>
                         )}
                       </div>
+                    </div>
+                  ))}
+                  {awaitingApproval && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      <p className="font-medium">{statusLabels[pr.status]}</p>
                     </div>
                   )}
                 </div>
@@ -438,8 +445,8 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
 
                 {!canEdit && !canSubmit && !canApprove && (
                   <div className="text-center py-8 text-muted-foreground">
-                    {awaitingApproval && rightsKnown && approvalBlock
-                      ? `Waiting for approval. ${approvalBlock}.`
+                    {awaitingApproval && approval?.block_reason
+                      ? `${statusLabels[pr.status]}. ${approval.block_reason}.`
                       : 'No actions available for this purchase requisition.'}
                   </div>
                 )}

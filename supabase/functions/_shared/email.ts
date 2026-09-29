@@ -14,6 +14,8 @@ export async function sendEmail(opts: {
   subject: string;
   html: string;
   text?: string;
+  /** Where replies go, e.g. the buyer who sent a purchase order. */
+  replyTo?: string;
 }): Promise<EmailResult> {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) return { sent: false, error: "RESEND_API_KEY is not set" };
@@ -31,6 +33,7 @@ export async function sendEmail(opts: {
         subject: opts.subject,
         html: opts.html,
         text: opts.text,
+        ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
       }),
     });
     if (!res.ok) return { sent: false, error: `Resend ${res.status}: ${(await res.text()).slice(0, 300)}` };

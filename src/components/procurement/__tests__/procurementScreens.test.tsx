@@ -12,6 +12,8 @@ const m = vi.hoisted(() => ({
   releaseBlock: null as string | null,
   releases: [] as any[],
   userId: "creator",
+  send: vi.fn(),
+  email: vi.fn(),
 }));
 
 vi.mock("@/hooks/useTwoLevelPoApprovals", () => {
@@ -28,7 +30,8 @@ vi.mock("@/hooks/useTwoLevelPoApprovals", () => {
 });
 vi.mock("@/hooks/usePurchaseOrders", () => ({
   usePurchaseOrder: () => ({ data: undefined, isLoading: false }),
-  useSendPurchaseOrder: () => ({ mutate: vi.fn(), isPending: false }),
+  useSendPurchaseOrder: () => ({ mutate: m.send, isPending: false }),
+  useEmailPurchaseOrder: () => ({ mutate: m.email, isPending: false }),
 }));
 vi.mock("@/hooks/usePurchaseOrderApprovals", () => ({ usePurchaseOrderApprovals: () => ({ data: [] }) }));
 vi.mock("@/components/procurement/PoAmendmentsTab", () => ({ PoAmendmentsTab: () => null }));
@@ -90,6 +93,31 @@ describe("PoDetailsDialog approval buttons follow the database", () => {
     unmount();
     renderWithRouter(<PoDetailsDialog open onOpenChange={() => {}} purchaseOrder={po({ status: "sent" })} />);
     expect(screen.getByRole("button", { name: /create amendment/i })).toBeInTheDocument();
+  });
+});
+
+describe("PoDetailsDialog emailing the supplier", () => {
+  beforeEach(() => { m.send.mockClear(); m.email.mockClear(); m.userId = "creator"; });
+
+  it("Send PO sends (and the hook emails it)", async () => {
+    renderWithRouter(<PoDetailsDialog open onOpenChange={() => {}} purchaseOrder={po({ status: "approved" })} />);
+    expect(screen.queryByRole("button", { name: /email/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /send po/i }));
+    expect(m.send).toHaveBeenCalledWith("po1");
+  });
+
+  it("a sent PO says where it was emailed and can be emailed again", async () => {
+    renderWithRouter(<PoDetailsDialog open onOpenChange={() => {}}
+      purchaseOrder={po({ status: "sent", supplier_emailed_at: "2026-09-29T04:30:00Z", supplier_emailed_to: "sales@cement.lk" })} />);
+    expect(screen.getByText(/emailed to sales@cement.lk on/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /email again/i }));
+    expect(m.email).toHaveBeenCalledWith("po1");
+  });
+
+  it("a sent PO that wasn't emailed offers to email it", () => {
+    renderWithRouter(<PoDetailsDialog open onOpenChange={() => {}} purchaseOrder={po({ status: "sent" })} />);
+    expect(screen.getByText(/not emailed to the supplier yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /email to supplier/i })).toBeInTheDocument();
   });
 });
 

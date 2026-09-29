@@ -23,6 +23,15 @@ import { format } from 'date-fns';
 import { GenerateReportButton } from '@/components/management/reports/GenerateReportButton';
 import { useOpenFromQuery } from "@/hooks/useOpenFromQuery";
 
+const statusLabels: Record<string, string> = {
+  draft: 'Draft',
+  submitted: 'Awaiting approval',
+  pending_approval: 'Awaiting final approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+};
+
 const statusColors: Record<PrStatus, string> = {
   draft: 'bg-gray-500',
   submitted: 'bg-blue-500',
@@ -85,7 +94,7 @@ export default function PurchaseRequisition() {
 
   const getStatusBadge = (status: PrStatus) => (
     <Badge className={`${statusColors[status]} text-white`}>
-      {status.replace('_', ' ').toUpperCase()}
+      {statusLabels[status] ?? status}
     </Badge>
   );
 
@@ -195,8 +204,8 @@ export default function PurchaseRequisition() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="pending_approval">Pending Approval</SelectItem>
+                <SelectItem value="submitted">Awaiting approval</SelectItem>
+                <SelectItem value="pending_approval">Awaiting final approval</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>

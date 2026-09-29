@@ -16,7 +16,8 @@ export const usePurchaseRequisitions = () => {
         .from('purchase_requisitions')
         .select(`
           *,
-          items:pr_items(*)
+          items:pr_items(*),
+          bom:bill_of_materials(bom_number, product_name)
         `);
 
       // Filter by company if not viewing all companies
@@ -149,6 +150,7 @@ export const useCreatePurchaseRequisition = () => {
           priority: data.priority,
           required_date: data.required_date,
           justification: data.justification,
+          bom_id: data.bom_id || null,
           company_id: selectedCompany.id,
         })
         .select()
@@ -248,24 +250,33 @@ export const useSubmitPurchaseRequisition = () => {
   });
 };
 
-// Approval is decided in the database (decide_purchase_requisition): Department
-// Head / HOD / company approvers or admins, never the requester.
+// Approval is decided in the database (decide_purchase_requisition): a
+// department head first (within their limit), then, above the company's
+// threshold, a manager or finance approver; never the requester, and the final
+// approver is not the first. Returns the requisition's new status.
 export const useApprovePurchaseRequisition = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ id, action, comments }: { id: string; action: 'approved' | 'rejected'; comments?: string }) =>
-      untypedRpc<null>('decide_purchase_requisition', {
+      untypedRpc<PrStatus>('decide_purchase_requisition', {
         p_pr_id: id,
         p_approve: action === 'approved',
         p_comments: comments || null,
       }),
-    onSuccess: (_, { id }) => {
+    onSuccess: (newStatus, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['purchase-requisitions'] });
       queryClient.invalidateQueries({ queryKey: ['pr-approval-block-reason', id] });
+      queryClient.invalidateQueries({ queryKey: ['pr-approval-info', id] });
       toast({
-        title: 'Purchase Requisition Processed',
-        description: 'The purchase requisition has been processed successfully.',
+        title:
+          newStatus === 'pending_approval' ? 'First approval given'
+          : newStatus === 'approved' ? 'Purchase requisition approved'
+          : 'Purchase requisition rejected',
+        description:
+          newStatus === 'pending_approval'
+            ? 'The amount is above the company threshold, so a manager or finance approver gives the final approval.'
+            : undefined,
       });
     },
     onError: (error: any) => {
@@ -284,6 +295,27 @@ export const usePrApprovalBlockReason = (prId: string, status: string | undefine
     queryKey: ['pr-approval-block-reason', prId, status],
     queryFn: () => untypedRpc<string | null>('pr_approval_block_reason', { p_pr_id: prId }),
     enabled: !!prId && (status === 'submitted' || status === 'pending_approval'),
+    staleTime: 30_000,
+  });
+
+export interface PrApprovalInfo {
+  /** Level the requisition is waiting for, or null when it isn't waiting. */
+  stage: 'department_head' | 'final' | null;
+  amount: number;
+  /** Company threshold above which a final approval is needed (null = one level). */
+  final_threshold: number | null;
+  needs_final: boolean;
+  /** Why the signed-in user can't decide now; null when they can. */
+  block_reason: string | null;
+  history: { action: PrStatus; level: 'department_head' | 'final' | null; comments: string | null; at: string; approver: string }[];
+}
+
+/** Approval stage, threshold and history for the requisition screen. */
+export const usePrApprovalInfo = (prId: string, status: string | undefined) =>
+  useQuery({
+    queryKey: ['pr-approval-info', prId, status],
+    queryFn: () => untypedRpc<PrApprovalInfo>('pr_approval_info', { p_pr_id: prId }),
+    enabled: !!prId && !!status && status !== 'draft',
     staleTime: 30_000,
   });
 

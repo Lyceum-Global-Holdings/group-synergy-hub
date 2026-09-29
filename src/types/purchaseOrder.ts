@@ -41,6 +41,9 @@ export interface PurchaseOrder {
   document_number?: string;
   revision_number?: string;
   revision_date?: string;
+  /** When "Send PO" last emailed it, and to whom. */
+  supplier_emailed_at?: string | null;
+  supplier_emailed_to?: string | null;
   items?: PoItem[];
   receipts?: PoReceipt[];
   approvals?: PoApproval[];

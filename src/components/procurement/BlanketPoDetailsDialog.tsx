@@ -28,13 +28,14 @@ interface BlanketPoDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// After approval a release follows its purchase order (set in the database).
 const releaseStatusLabel: Record<string, string> = {
   draft: "Draft",
   submitted: "Waiting for approval",
   approved: "Approved",
-  sent: "Sent",
-  received: "Received",
-  completed: "Completed",
+  sent: "Sent to supplier",
+  received: "Partly received",
+  completed: "Delivered",
   cancelled: "Cancelled",
 };
 
